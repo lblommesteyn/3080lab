@@ -144,7 +144,7 @@ def run(exp, opts: dict) -> dict:
         "experiment": exp.name, "description": exp.description, "target_opcode": exp.target_opcode,
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "config": {"trials": trials, "warmup_ms": warmup_ms, "warmup_launches": n_warm, "seed": seed,
-                   "variants": [v.label for v in variants], "ptxas_flags": exp.ptxas_flags, **{k: v for k, v in opts.items() if k not in ("trials",)}},
+                   "variants": [v.label for v in variants], "ptxas_flags": exp.ptxas_flags, **{k: v for k, v in opts.items() if k not in ("trials", "seed")}},
         "host": {"platform": platform.platform(), "python": platform.python_version()},
         "device": dev.props, "env_static": static_env, "clock_lock": clock_state,
         "env_before": env_before, "env_after_warmup": env_after_warm,
