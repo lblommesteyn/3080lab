@@ -26,6 +26,13 @@ def _ints(s: str | None):
     return [int(x) for x in s.split(",")] if s else None
 
 
+def _sizes(s: str | None):
+    if not s:
+        return None
+    mult = {"k": 1 << 10, "m": 1 << 20, "g": 1 << 30}
+    return [int(float(x[:-1]) * mult[x[-1].lower()]) if x[-1].lower() in mult else int(x) for x in s.split(",")]
+
+
 def cmd_list(_):
     for name, exp in registry().items():
         print(f"{name:<24} {exp.description}")
@@ -44,14 +51,16 @@ def cmd_sass(a):
 
 def _submit(a) -> int:
     py = ROOT / ".venv" / "Scripts" / "python.exe"
-    argv = [str(py), "-m", "lab.cli", "run", a.experiment, "--local", "--trials", str(a.trials)]
-    for flag in ("warps", "iters", "seed", "lock_clock", "ptxas"):
+    argv = [str(py), "-m", "lab.cli", "run", *a.experiment, "--local", "--trials", str(a.trials)]
+    for flag in ("warps", "iters", "seed", "lock_clock", "ptxas", "sizes"):
         val = getattr(a, flag)
         if val:
             argv += [f"--{flag.replace('_', '-')}={val}"]
     if a.force:
         argv.append("--force")
-    r = subprocess.run(["pcslurm", "submit", "--shared", "-p", str(ROOT), "-J", f"3080lab-{a.experiment}", "--", *argv],
+    if a.cold:
+        argv.append("--cold")
+    r = subprocess.run(["pcslurm", "submit", "--shared", "-p", str(ROOT), "-J", f"3080lab-{a.experiment[0]}" + (f"+{len(a.experiment) - 1}" if len(a.experiment) > 1 else ""), "--", *argv],
                        capture_output=True, text=True)
     sys.stderr.write(r.stdout + r.stderr)
     m = re.search(r"(\d{2,})", r.stdout + r.stderr)
@@ -72,13 +81,26 @@ def _submit(a) -> int:
 def cmd_run(a):
     if not a.local:
         return _submit(a)
-    exp = registry()[a.experiment]
-    if a.ptxas is not None:
-        exp.ptxas_flags = a.ptxas.split()
-    opts = {"force": a.force, "trials": a.trials, "warps": _ints(a.warps), "iters": a.iters, "seed": a.seed, "lock_clock": a.lock_clock}
-    rec = runner.run(exp, opts)
-    print(runner.report(rec))
-    return 0
+    reg = registry()
+    unknown = [e for e in a.experiment if e not in reg]
+    if unknown:
+        print(f"unknown experiment(s): {', '.join(unknown)}", file=sys.stderr)
+        return 2
+    failed = 0
+    for name in a.experiment:
+        exp = reg[name]
+        if a.ptxas is not None:
+            exp.ptxas_flags = a.ptxas.split()
+        opts = {"force": a.force, "trials": a.trials, "warps": _ints(a.warps), "iters": a.iters,
+                "seed": a.seed, "lock_clock": a.lock_clock, "sizes": _sizes(a.sizes), "cold": a.cold}
+        try:
+            rec = runner.run(exp, opts)
+            print(runner.report(rec), flush=True)
+        except SystemExit as e:  # static validation refusal: report and continue the batch
+            print(f"{name}: {e}", flush=True)
+            failed += 1
+        print("=" * 100, flush=True)
+    return 1 if failed else 0
 
 
 def cmd_show(a):
@@ -97,12 +119,14 @@ def main(argv=None):
     s.add_argument("--ptxas")
     s.set_defaults(fn=cmd_sass)
     r = sub.add_parser("run")
-    r.add_argument("experiment")
+    r.add_argument("experiment", nargs="+")
     r.add_argument("--local", action="store_true", help="run here instead of queueing via pcslurm")
     r.add_argument("--trials", type=int, default=30)
     r.add_argument("--warps", help="comma list, e.g. 1,4,8")
     r.add_argument("--iters", type=int, help="ops per chain per thread (default 10M)")
     r.add_argument("--seed", type=int)
+    r.add_argument("--sizes", help="working sets for chase experiments, e.g. 4k,64k,1m,64m")
+    r.add_argument("--cold", action="store_true", help="chase: skip the warm walk")
     r.add_argument("--lock-clock", type=int, help="try nvidia-smi -lgc MHz (needs admin)")
     r.add_argument("--ptxas", help="override ptxas flags, e.g. --ptxas=-O3")
     r.add_argument("--force", action="store_true", help="measure even if SASS validation fails")
