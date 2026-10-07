@@ -164,6 +164,6 @@ extern "C" __global__ void k(float* out, long long* cyc, unsigned long long* ns,
 
 
 def probes() -> dict[str, Experiment]:
-    exps = [StallProbe(op=o) for o in ("ffma", "fadd", "imad")]
+    exps = [StallProbe(op=o) for o in ("ffma", "fadd", "imad", "iadd")]
     exps += [Mix(partner=p) for p in ("shl", "imad", "hfma2")]
     return {e.name: e for e in exps}

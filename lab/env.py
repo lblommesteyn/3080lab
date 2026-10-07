@@ -82,7 +82,7 @@ def unlock_clocks():
     subprocess.run(["nvidia-smi", "-rgc"], capture_output=True, text=True)
 
 
-def warnings(snaps: list[dict], max_temp: int = 80) -> list[str]:
+def warnings(snaps: list[dict], max_temp: int = 80, inkernel_mhz: list[float] | None = None) -> list[str]:
     w = []
     bad = {"hw_slowdown", "sw_thermal", "hw_thermal", "hw_power_brake", "sw_power_cap"}
     hits = sorted({r for s in snaps for r in s["throttle"] if r in bad})
@@ -90,7 +90,10 @@ def warnings(snaps: list[dict], max_temp: int = 80) -> list[str]:
         w.append(f"throttle reasons seen during trials: {', '.join(hits)}")
     if snaps and max(s["temp_c"] for s in snaps) > max_temp:
         w.append(f"temperature exceeded {max_temp} C")
-    clocks = [s["sm_mhz"] for s in snaps]
-    if clocks and max(clocks) - min(clocks) > 60:
-        w.append(f"NVML SM clock varied {min(clocks)}-{max(clocks)} MHz across trials")
+    # NVML is sampled after each launch, when the GPU may already be dropping to idle;
+    # clock drift is judged from the in-kernel clock (cycles / globaltimer) instead.
+    if inkernel_mhz:
+        lo, hi = min(inkernel_mhz), max(inkernel_mhz)
+        if hi - lo > 60:
+            w.append(f"in-kernel SM clock varied {lo:.0f}-{hi:.0f} MHz across trials")
     return w

@@ -124,7 +124,7 @@ def run(exp, opts: dict) -> dict:
 
     # ---- summarize ----
     all_env = [e for pv in per_variant.values() for e in pv["env"]]
-    warnings += env.warnings(all_env)
+    warnings += env.warnings(all_env, inkernel_mhz=[r["sm_mhz_inkernel"] for pv in per_variant.values() for r in pv["results"] if r.get("sm_mhz_inkernel")])
     summary = {}
     for label, pv in per_variant.items():
         rs = pv["results"]

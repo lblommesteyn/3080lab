@@ -2,3 +2,4 @@
 __pycache__/
 *.egg-info/
 results/
+results_batch1.log
