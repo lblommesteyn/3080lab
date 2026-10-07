@@ -71,11 +71,8 @@ def run(exp, opts: dict) -> dict:
                                 "variant": v, "results": [], "env": []}
 
     if warnings and not opts.get("force"):
-        raise SystemExit("refusing to measure, static validation failed:
-  " + "
-  ".join(warnings)
-                         + "
-(use --force to measure anyway)")
+        lines = "".join(f"\n  {w}" for w in warnings)
+        raise SystemExit(f"refusing to measure, static validation failed:{lines}\n(use --force to measure anyway)")
 
     # ---- device ----
     dev = Device()
