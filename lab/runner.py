@@ -50,25 +50,32 @@ def run(exp, opts: dict) -> dict:
     builds: dict[str, toolchain.Build] = {}
     per_variant: dict[str, dict] = {}
     warnings: list[str] = []
+    base_builds: dict[str, toolchain.Build] = {}
     for v in variants:
         src = exp.source(v)
-        if src not in builds:
-            builds[src] = toolchain.build(src, ptxas_flags=exp.ptxas_flags)
-        b = builds[src]
+        key = src + "|" + repr(exp.build_key(v))
+        if src not in base_builds:
+            base_builds[src] = toolchain.build(src, ptxas_flags=exp.ptxas_flags)
+        if key not in builds:
+            b0 = base_builds[src]
+            cubin = exp.transform(b0.cubin, v)
+            builds[key] = b0 if cubin is b0.cubin else toolchain.Build(
+                b0.source, b0.ptx, cubin, b0.ptxas_log, toolchain.disassemble(cubin), b0.ptxas_flags)
+        b = builds[key]
         ins = sass.parse(b.sass)
         body = sass.loop_body(ins)
         hist = sass.opcode_histogram(body)
         res = toolchain.ptxas_resources(b.ptxas_log)
-        expected = exp.expected_body_ops()
-        got = sum(n for op, n in hist.items() if op == exp.target_opcode)
-        # The loop counter is itself an IADD3, so allow exactly one extra for that opcode.
-        slack = 1 if exp.target_opcode == "IADD3" else 0
-        if expected is not None and not (expected <= got <= expected + slack):
-            warnings.append(f"[{v.label}] SASS loop body has {got} {exp.target_opcode}, expected {expected}")
+        for opcode, expected in exp.expected(v).items():
+            got = hist.get(opcode, 0)
+            # The loop counter is itself an IADD3, so allow exactly one extra for that opcode.
+            slack = 1 if opcode == "IADD3" else 0
+            if not (expected <= got <= expected + slack):
+                warnings.append(f"[{v.label}] SASS loop body has {got} {opcode}, expected {expected}")
         if res.get("spill_stores") or res.get("spill_loads"):
             warnings.append(f"[{v.label}] register spills present")
         per_variant[v.label] = {"build": b, "instrs": ins, "body": body, "hist": hist, "resources": res,
-                                "variant": v, "results": [], "env": []}
+                                "variant": v, "results": [], "env": [], "key": key}
 
     if warnings and not opts.get("force"):
         lines = "".join(f"\n  {w}" for w in warnings)
@@ -82,7 +89,7 @@ def run(exp, opts: dict) -> dict:
     states = {}
     for v in variants:
         pv = per_variant[v.label]
-        pv["kernel"] = kernels[exp.source(v)]
+        pv["kernel"] = kernels[exp.source(v) + "|" + repr(exp.build_key(v))]
         states[v.label] = exp.prepare(dev, v)
         L = states[v.label]["launch"]
         pv["attrs"] = pv["kernel"].attrs(L["block"] if isinstance(L["block"], int) else int(np.prod(L["block"])))
@@ -204,6 +211,8 @@ def report(record: dict, per_variant_sass: dict | None = None, sass_lines: int =
         out.append(f"  throughput:      {t['median']:.3f} warp-instr/cycle/SM  = {t['median'] * 32:.1f} thread-ops/cycle/SM")
         if s.get("correctness") is not None:
             out.append(f"  result check:    {'PASS' if s['correctness'] else 'FAIL'} (host reference)")
+        if "lost_fraction" in m:
+            out.append(f"  lost increments: {m['lost_fraction']['median']:.4%} (median over trials)")
         out.append(f"  runtime:         {m['runtime_ms']['median']:.3f} ms (event-timed)")
         out.append(f"  instructions:    ~{s['dynamic_instructions_per_warp_est']:,} per warp (static loop body {s['loop_body_instructions']} x trips)")
         out.append(f"  loop body:       {', '.join(f'{k}x{v}' for k, v in s['loop_body_histogram'].items())}")

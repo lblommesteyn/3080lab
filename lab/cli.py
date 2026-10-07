@@ -96,7 +96,7 @@ def cmd_run(a):
         try:
             rec = runner.run(exp, opts)
             print(runner.report(rec), flush=True)
-        except SystemExit as e:  # static validation refusal: report and continue the batch
+        except (SystemExit, Exception) as e:  # refusal or crash: report and continue the batch
             print(f"{name}: {e}", flush=True)
             failed += 1
         print("=" * 100, flush=True)
@@ -106,6 +106,29 @@ def cmd_run(a):
 def cmd_show(a):
     rec = json.loads((Path(a.path) / "record.json").read_text())
     print(runner.report(rec))
+
+
+def cmd_table(a):
+    """Latest record per experiment -> one markdown table (also written to results/TABLE.md)."""
+    latest = {}
+    for f in sorted(runner.RESULTS.glob("*/record.json")):
+        rec = json.loads(f.read_text())
+        latest[rec["experiment"]] = rec
+    rows = ["| experiment | variant | cycles/op | CV | warp-instr/cyc/SM | correct | warnings |",
+            "|---|---|---:|---:|---:|---|---|"]
+    for name in sorted(latest):
+        rec = latest[name]
+        for label, s in rec["summary"].items():
+            m = s["metrics"]
+            ok = {True: "yes", False: "NO", None: ""}[s.get("correctness")]
+            if "lost_fraction" in m:
+                ok = f"lost {m['lost_fraction']['median']:.2%}"
+            nw = sum(w.startswith(f"[{label}]") or not w.startswith("[") for w in rec["warnings"])
+            rows.append(f"| {name} | {label} | {m['cycles_per_op']['median']:.3f} | {m['cycles_per_op']['cv']:.2%} | "
+                        f"{m['warp_ops_per_cycle']['median']:.3f} | {ok} | {nw or ''} |")
+    text = "\n".join(rows)
+    (runner.RESULTS / "TABLE.md").write_text(text + "\n")
+    print(text)
 
 
 def main(argv=None):
@@ -134,6 +157,7 @@ def main(argv=None):
     sh = sub.add_parser("show")
     sh.add_argument("path")
     sh.set_defaults(fn=cmd_show)
+    sub.add_parser("table").set_defaults(fn=cmd_table)
     a = p.parse_args(argv)
     if a.cmd == "run" and not a.local and os.environ.get("LAB_FORCE_LOCAL"):
         a.local = True

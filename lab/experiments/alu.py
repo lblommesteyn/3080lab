@@ -39,6 +39,7 @@ OPS: dict[str, tuple] = {
 DEFAULT_PTXAS = {"iadd": ["-O0"], "lop3": ["-O0"]}
 # Loop-invariant operand overrides. A uniform shfl source lane makes the chain
 # idempotent and ptxas deletes it; a per-lane rotation cannot be folded.
+SLOW_PIPE_ITERS = {"dfma": 50_000, "rsqrt": 250_000, "ex2": 250_000, "sin": 250_000, "shfl": 250_000}
 A_EXPR = {"shfl": "(unsigned)((threadIdx.x + 1) & 31)"}
 
 
@@ -120,12 +121,16 @@ extern "C" __global__ void k({ctype}* out, long long* cyc, unsigned long long* n
     # ---- execution ---------------------------------------------------------
     def variants(self, opts: dict) -> list[Variant]:
         warps = opts.get("warps") or ([1] if self.chains == 1 else [1, 4, 8, 16, 32])
-        total = int(opts.get("iters") or 10_000_000)
+        # Independent runs at 32 warps retire 32x the ops; keep slow pipes under the ~2 s Windows TDR.
+        default = 10_000_000 if self.chains == 1 else SLOW_PIPE_ITERS.get(self.op, 1_000_000)
+        total = int(opts.get("iters") or default)
         iters = max(1, total // self.body)
         return [Variant(f"warps={w}", {"warps": w, "iters": iters}) for w in warps]
 
     def prepare(self, dev, v: Variant) -> dict:
         ctype, _, _, _, x0, a, b = OPS[self.op]
+        if getattr(self, "inputs", None):
+            x0, a, b = self.inputs
         np_t = {"float": np.float32, "int": np.int32, "unsigned": np.uint32, "double": np.float64}[ctype]
         w = v.params["warps"]
         st = {
@@ -172,7 +177,8 @@ extern "C" __global__ void k({ctype}* out, long long* cyc, unsigned long long* n
 
 
 def registry() -> dict[str, Experiment]:
-    out: dict[str, Experiment] = {}
+    from .probes import probes
+    out: dict[str, Experiment] = dict(probes())
     for op in OPS:
         dep = Chain(op=op, chains=1)
         ind = Chain(op=op, chains=8, body=64)
