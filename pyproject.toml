@@ -1,0 +1,24 @@
+[project]
+name = "lab3080"
+version = "0.1.0"
+description = "Empirical microarchitecture lab for one RTX 3080 (GA102, sm_86)"
+requires-python = ">=3.11"
+dependencies = [
+  "cuda-python>=13,<14",
+  "nvidia-cuda-nvrtc",
+  "nvidia-cuda-nvcc",
+  "nvidia-cuda-nvdisasm",
+  "nvidia-cuda-cuobjdump",
+  "nvidia-ml-py",
+  "numpy",
+]
+
+[project.scripts]
+3080lab = "lab.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["lab*"]
