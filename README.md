@@ -85,6 +85,52 @@ A single warp cannot issue dependent ALU ops faster than 1 per 2 cycles
 (stall 1 and 2 both give ~2.06), while 8 independent chains in one warp
 reach ~0.95 FFMA/cycle.
 
+### Hazards: data is the compiler's job, structure is the hardware's (`issue_*`, `scoreboard_*`)
+
+One warp, k independent chains, every op's stall patched to s:
+
+- FFMA: correct iff the real time between producer and consumer is >= 4
+  cycles (k=2,s=1 runs 1.55 cyc/instr -> 3.1 cycles apart -> wrong;
+  k=4,s=1 -> 4.2 -> correct). Legal code issues FFMA at ~1/cycle from one
+  warp. The "2-cycle floor" only appears in *illegal* schedules (a 1-cycle
+  bubble when an op reads a register with a write still pending), so it
+  costs nothing in real code.
+- IMAD never issues faster than 1 per 2 cycles from one warp, whatever the
+  stall field says: a 16-lane pipe takes 2 cycles per warp, and that
+  **structural** hazard is interlocked by hardware. Same for DFMA (16
+  cyc/instr, one shared FP64 pipe), MUFU (8), SHFL (4).
+- Scoreboards are expensive and necessary. With waits stripped, an isolated
+  SHFL is correct at 12-cycle spacing (wrong at 8) vs 26 cycles through the
+  scoreboard; MUFU.SIN is correct at 15 (wrong at 12) vs ~19 through the
+  scoreboard. But with 2-4 SHFLs in flight, 16 cycles is no longer enough,
+  and DFMA is wrong even 64 cycles apart (correct only with 8 chains): issue
+  runs ahead of variable-latency pipes, so no static stall can stand in for
+  the barrier.
+- Stripping a SHFL barrier also corrupted the kernel's *clock* registers
+  (negative cycle counts): the late SHFL write landed on a register ptxas
+  had already reused. Write-after-write is a scoreboard job too.
+- nvdisasm rejects yield=1 combined with stall 0 or stall >= 12 as illegal
+  encodings, so the control field is not fully free.
+
+### L1: size, carveout, replacement (`chase_l1_carveout`, `l1_replacement`)
+
+| preferred carveout | L1 flat up to | fully missing at |
+|---|---|---|
+| default / 0 | 104 KB | > 136 KB (degrades from 112) |
+| 50 | 56 KB | 96 KB |
+| 100 | 16 KB | 32 KB |
+
+The carveout attribute moves L1 exactly as expected. Even at carveout 0,
+L1 holds ~100-108 KB of data, not 128.
+Per-access scripted timing (L1 hit ~54 cycles including timing overhead,
+miss ~250): after filling N lines, a forward re-read thrashes past ~100 KB
+(hit 0.9% at 128 KB), while a reverse re-read keeps ~780 lines (97 KB).
+**Replacement is recency-based (LRU-family), not FIFO and not random**:
+lines re-touched after the fill survive 100% even though they were inserted
+first, and untouched lines die oldest-first (survival 25% oldest vs 79%
+newest when streaming 384 new lines). Not strict LRU; some old lines
+survive, which fits pseudo-LRU with uneven set load.
+
 ### FP32/INT32 sharing (tentative)
 
 GA102 has 16 FP32 + 16 FP32/INT32 lanes per partition. If INT ops simply
@@ -92,8 +138,10 @@ borrowed the shared half, a 50/50 FFMA:SHF mix would reach 4 warp-instr/cyc/SM.
 Measured: 2.65. Most mix points fit T = p*1 + (1-p)*2 cycles per warp-instr
 per partition (p = FFMA fraction): **no overlap between FFMA and INT issue**,
 as if a warp FFMA occupies both halves for one cycle and an INT op holds the
-shared half for two while the other idles. f=1/8 and 2/8 beat the model;
-check SASS ordering before trusting this.
+shared half for two while the other idles. f=1/8 and 2/8 beat the model.
+ptxas does not keep the generated interleave (it front-loads FFMAs), but an
+additive per-instruction cost model is order-independent, so ordering alone
+does not explain it. Next: pin the order by swapping instructions in the cubin.
 
 ### Memory hierarchy (one thread, dependent 64-bit loads, 128 B stride)
 

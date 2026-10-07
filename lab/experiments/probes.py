@@ -312,9 +312,9 @@ class ScoreboardProbe(IssueGrid):
         n = r["ops_per_thread"] // v.params["k"]
         if self.op == "dfma":
             r["correct"] = bool(out[0] == r["ops_per_thread"])
-        elif self.op == "shfl":  # lane l ends at k * ((l + n) mod 32)
+        elif self.op == "shfl":  # lane l ends at k * (x0 + (l + n) mod 32), x0 = 1
             lanes = np.arange(32)
-            r["correct"] = bool(np.array_equal(out.astype(np.int64), v.params["k"] * ((lanes + n) % 32)))
+            r["correct"] = bool(np.array_equal(out.astype(np.int64), v.params["k"] * (1 + (lanes + n) % 32)))
         return r
 
     def finalize(self, results):
