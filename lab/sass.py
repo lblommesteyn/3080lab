@@ -95,20 +95,23 @@ def parse(text: str) -> list[Instr]:
     return out
 
 
-def loop_body(instrs: list[Instr], marker_opcode: str = "CS2R") -> list[Instr]:
-    """Instructions of the innermost backward branch between the two clock reads.
-
-    Our kernels bracket the timed loop with clock64() reads (CS2R ... SR_CLOCKLO).
-    The timed loop is the region between the backward-branch target and the
-    backward branch.
-    """
+def loops(instrs: list[Instr]) -> list[list[Instr]]:
+    """Every backward-branch region [label .. BRA label]."""
+    out = []
     for i, ins in enumerate(instrs):
         if ins.opcode == "BRA" and (m := re.search(r"\(\.L_x_\d+\)", ins.text)):
             tgt = m.group(0)[1:-1]
             starts = [j for j, x in enumerate(instrs[:i]) if x.label == tgt]
             if starts:
-                return instrs[starts[0]: i + 1]
-    return []
+                out.append(instrs[starts[0]: i + 1])
+    return out
+
+
+def loop_body(instrs: list[Instr]) -> list[Instr]:
+    """The timed loop: by construction our kernels' largest loop (explicitly
+    unrolled body under `#pragma unroll 1`); warm-up loops are short."""
+    ls = loops(instrs)
+    return max(ls, key=len) if ls else []
 
 
 def opcode_histogram(instrs: list[Instr]) -> dict[str, int]:
