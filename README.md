@@ -54,18 +54,71 @@ Bits [105:125] of each 128-bit instruction: stall (4), yield (1), write
 barrier (3), read barrier (3), wait mask (6), reuse (4). Listing format:
 `S04 - W- R- wait:- reuse:0` means stall 4, no yield bit, no scoreboards.
 
-## Findings so far
+## Findings so far (RTX 3080, boost ~1965 MHz, cycles from clock64)
+
+### Instruction table (`3080lab table` regenerates `results/TABLE.md`)
+
+| op | dependent latency (cyc) | throughput, warp-instr/cyc/SM (32 warps) | lanes/SM |
+|---|---:|---:|---:|
+| FFMA / FADD / FMUL | 4 | 3.94-3.97 | 128 |
+| HFMA2 | 4 | 2.00 | 64 (x2 halves) |
+| IMAD | 4 | 2.00 | 64 |
+| SHF | 4 | 1.99 | 64 |
+| IADD3 | 4 (stall-probe) | n/a yet (see -O0 note) | |
+| MUFU.RSQ / MUFU.EX2 | 17 | 0.50 | 16 |
+| FMUL.RZ + MUFU.SIN | 23 (pair) | 0.50 | 16 |
+| SHFL.IDX | 26 | 0.50 | 16 |
+| DFMA | 55 | 0.0625 | 2 (1/64 rate) |
+| LDS (shared) | 23 | | |
+
+### The hardware trusts the compiler (control-bit patching)
+
+Patching the stall field of a dependent FFMA/FADD/IMAD/IADD3 chain:
+stall 4+ gives correct results; stall 1-3 gives **wrong answers in 20/20
+trials** with exactly half the increments lost (each op reads the register
+before the previous write lands, so pairs collapse). There is no interlock
+for fixed-latency ops: latency = 4 cycles, measured by breaking it.
+**Stall 0 is not "zero"**: it is correct but costs ~32.8 cycles/op. That is
+why `-O0` code (which emits S00 on IADD3/LOP3) runs dependent chains at
+33.7 cycles; `-O0` timings are invalid as latency measurements.
+A single warp cannot issue dependent ALU ops faster than 1 per 2 cycles
+(stall 1 and 2 both give ~2.06), while 8 independent chains in one warp
+reach ~0.95 FFMA/cycle.
+
+### FP32/INT32 sharing (tentative)
+
+GA102 has 16 FP32 + 16 FP32/INT32 lanes per partition. If INT ops simply
+borrowed the shared half, a 50/50 FFMA:SHF mix would reach 4 warp-instr/cyc/SM.
+Measured: 2.65. Most mix points fit T = p*1 + (1-p)*2 cycles per warp-instr
+per partition (p = FFMA fraction): **no overlap between FFMA and INT issue**,
+as if a warp FFMA occupies both halves for one cycle and an INT op holds the
+shared half for two while the other idles. f=1/8 and 2/8 beat the model;
+check SASS ordering before trusting this.
+
+### Memory hierarchy (one thread, dependent 64-bit loads, 128 B stride)
+
+| level | latency (cyc) | ~ns | capacity edge |
+|---|---:|---:|---|
+| L1 hit | 35 | 18 | flat to 96 KB, degrading 104-128 KB (0 B smem kernel) |
+| L2 hit | 238 | 121 | flat to 4.5 MB, 353 at 5 MB, miss at 5.5 MB (5 MB L2) |
+| DRAM | 498 | 254 | +9 cyc at 256 MB random (TLB), not for sequential |
+| shared | 23 | 12 | |
+
+`ld.global.cg` bypasses L1 (238 at 2 KB). Past L1 capacity, a sequential
+sweep is worse than random (128 KB: 192 vs 144), the LRU-thrash signature;
+replacement experiments next. Variance spikes at capacity edges (CV 5-18%).
+
+### Toolchain behaviour
 
 - ptxas is an optimizing assembler; `asm volatile` pins PTX, not SASS. At
-  -O1 and above, `add` chains fuse pairwise into 3-input IADD3 (half the ops),
-  `xor` chains with a repeated operand fold to identity, and a uniform-lane
-  `shfl.idx` chain is deleted as idempotent. The validator catches all three.
-  iadd/lop3 default to `-O0`; shfl uses a per-lane source.
-- `-O0` keeps one SASS op per PTX op but emits **stall 0** on dependent IADD3
-  chains, while -O3 builds encode stall 4 on dependent FFMA. Whether S00 code
-  is correct, and what it costs, is a Phase 2 question.
-- MUFU.SIN is always preceded by FMUL.RZ (range reduction by 1/2pi), so the
-  sin "latency" is a two-instruction chain.
+  -O1+ `add` chains fuse into 3-input IADD3, `xor` chains with a repeated
+  operand fold away, uniform `shfl.idx` chains are deleted. The validator
+  refuses to measure in all three cases.
+- Inline `ld.global.ca` -> `LDG.E.64.STRONG.SM`; `ld.global.cg` ->
+  `STRONG.GPU`; a C deref of an int-derived pointer -> generic `LD.E.64`.
+  All three hit L1 at 35 cycles.
+- ptxas encodes fixed-latency ops (FFMA, FADD, FMUL, IMAD, SHF, HFMA2) with
+  stall 4 and no scoreboard; DFMA, MUFU, SHFL use scoreboard barriers.
 
 ## Not yet available
 
