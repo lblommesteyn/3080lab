@@ -32,6 +32,13 @@ class Experiment:
         """Variants with different keys get separately transformed cubins."""
         return None
 
+    def kernel_attrs(self, v: Variant) -> dict[str, int]:
+        """CUfunction attributes to set after loading (e.g. carveout)."""
+        return {}
+
+    def finalize(self, results: dict[str, list[dict]]):
+        """Cross-variant post-processing (e.g. compare outputs to a golden variant)."""
+
     def transform(self, cubin: bytes, v: Variant) -> bytes:
         """Post-ptxas cubin edit (control-bit patching etc.). Identity by default."""
         return cubin

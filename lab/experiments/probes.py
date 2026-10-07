@@ -163,7 +163,167 @@ extern "C" __global__ void k(float* out, long long* cyc, unsigned long long* ns,
             dev.free(st[k])
 
 
+def _golden_finalize(results: dict[str, list[dict]]):
+    """Variants labelled 'k=K/...' are correct iff their output matches the unpatched 'k=K/orig'."""
+    for label, rs in results.items():
+        if label.endswith("/orig"):
+            continue
+        gold = {r["out_hash"] for r in results.get(label.split("/")[0] + "/orig", [])}
+        if len(gold) != 1:
+            continue
+        g = next(iter(gold))
+        for r in rs:
+            if r.get("correct") is None and "out_hash" in r:
+                r["correct"] = r["out_hash"] == g
+
+
+@dataclass
+class IssueGrid(Experiment):
+    """One warp, k independent dependent chains interleaved, every target op's stall
+    patched to s. With latency L and in-order issue, correct iff k*s >= L, unless
+    something else (issue rate, register ports) spaces instructions further apart.
+    Probes why a single dependent chain cannot go faster than 1 op per 2 cycles."""
+    op: str = "ffma"
+    ks: tuple = (1, 2, 3, 4, 8)
+    stalls: tuple = (1, 2, 3, 4)
+
+    def __post_init__(self):
+        self.name = f"issue_{self.op}"
+        self.target_opcode = OPS[self.op][3]
+        self.description = f"k chains x patched stall s for {self.target_opcode}: correctness and issue rate"
+
+    def _chain(self, k: int) -> Chain:
+        c = Chain(op=self.op, chains=k, body=256 // k)
+        one = 1.0 if OPS[self.op][0] == "float" else 1
+        c.inputs = (0 * one, one, one)  # x*1+1 counts executions
+        return c
+
+    def source(self, v: Variant) -> str:
+        return self._chain(v.params["k"]).source(v)
+
+    def expected(self, v: Variant) -> dict[str, int]:
+        k = v.params["k"]
+        return {self.target_opcode: k * (256 // k)}
+
+    def _iters(self, opts, k, default):
+        return max(1, int(opts.get("iters") or default) // (k * (256 // k)))
+
+    def variants(self, opts: dict) -> list[Variant]:
+        out = []
+        for k in self.ks:
+            it = self._iters(opts, k, 1_000_000)
+            out.append(Variant(f"k={k}/orig", {"k": k, "stall": None, "iters": it, "warps": 1}))
+            out += [Variant(f"k={k}/s={s}", {"k": k, "stall": s, "iters": it, "warps": 1}) for s in self.stalls]
+        return out
+
+    def build_key(self, v):
+        return v.params["stall"]
+
+    def transform(self, cubin: bytes, v: Variant) -> bytes:
+        from .. import patch, sass, toolchain
+        s = v.params["stall"]
+        if s is None:
+            return cubin
+        body = sass.loop_body(sass.parse(toolchain.disassemble(cubin)))
+        return patch.set_control(cubin, self.kernel_name,
+                                 {i.offset: {"stall": s} for i in body if i.opcode == self.target_opcode})
+
+    def prepare(self, dev, v: Variant) -> dict:
+        return self._chain(v.params["k"]).prepare(dev, v)
+
+    def _base(self, dev, v, st) -> dict:
+        k = v.params["k"]
+        total = k * v.params["iters"] * (256 // k)
+        cyc = int(dev.dtoh(np.zeros(1, np.int64), st["cyc"])[0])
+        ns = int(dev.dtoh(np.zeros(1, np.uint64), st["ns"])[0])
+        return {"cycles": cyc, "ns": ns, "ops_per_thread": total,
+                "cycles_per_op": cyc / total,  # per instruction, all chains together
+                "warp_ops_per_cycle": total / cyc, "sm_mhz_inkernel": cyc / max(ns, 1) * 1e3}
+
+    def collect(self, dev, v: Variant, st: dict) -> dict:
+        r = self._base(dev, v, st)
+        is_float = OPS[self.op][0] == "float"
+        x = float(dev.dtoh(np.zeros(1, np.float32 if is_float else np.int32), st["out"])[0])
+        r["lost_fraction"] = 1 - x / r["ops_per_thread"]
+        r["correct"] = x == r["ops_per_thread"]
+        return r
+
+    def release(self, dev, st: dict):
+        for key in ("out", "cyc", "ns", "in"):
+            dev.free(st[key])
+
+
+@dataclass
+class ScoreboardProbe(IssueGrid):
+    """Variable-latency ops (DFMA, MUFU, SHFL) are protected by scoreboard barriers,
+    not stall counts. Strip the barrier (producer wbar -> none, consumers stop
+    waiting on it), set every target op's stall to s, and find the spacing at which
+    the chain becomes correct: that bounds the op's real pipeline latency."""
+    ks: tuple = (1, 2, 4, 8)
+    stalls: tuple = (1, 4, 8, 12, 15)
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.name = f"scoreboard_{self.op}"
+        self.description = f"{self.target_opcode} with scoreboard waits removed: correctness vs spacing"
+
+    def _chain(self, k: int) -> Chain:
+        c = Chain(op=self.op, chains=k, body=256 // k, lane_seed=1 if self.op == "shfl" else 0)
+        if self.op == "dfma":
+            c.inputs = (0.0, 1.0, 1.0)
+        return c
+
+    def variants(self, opts: dict) -> list[Variant]:
+        out = []
+        for k in self.ks:
+            it = self._iters(opts, k, 200_000)
+            out.append(Variant(f"k={k}/orig", {"k": k, "stall": None, "iters": it, "warps": 1}))
+            out += [Variant(f"k={k}/s={s}", {"k": k, "stall": s, "iters": it, "warps": 1}) for s in self.stalls]
+        return out
+
+    def transform(self, cubin: bytes, v: Variant) -> bytes:
+        from .. import patch, sass, toolchain
+        s = v.params["stall"]
+        if s is None:
+            return cubin
+        body = sass.loop_body(sass.parse(toolchain.disassemble(cubin)))
+        tgt = [i for i in body if i.opcode == self.target_opcode]
+        mask = sum(1 << b for b in {i.wbar for i in tgt if i.wbar != 7})
+        edits = {}
+        for i in body:
+            e = {}
+            if i.wait & mask:
+                e["wait"] = i.wait & ~mask
+            if i.opcode == self.target_opcode:
+                e.update(stall=s, wbar=7)
+                if s >= 12:  # nvdisasm rejects yield=1 with stall 0 or >= 12 as an illegal encoding
+                    e["yield"] = 0
+            if e:
+                edits[i.offset] = e
+        return patch.set_control(cubin, self.kernel_name, edits)
+
+    def collect(self, dev, v: Variant, st: dict) -> dict:
+        r = self._base(dev, v, st)
+        ctype = OPS[self.op][0]
+        np_t = {"float": np.float32, "double": np.float64, "unsigned": np.uint32, "int": np.int32}[ctype]
+        out = dev.dtoh(np.zeros(32, np_t), st["out"])
+        r["out_hash"] = hash(out.tobytes())
+        r["correct"] = None
+        n = r["ops_per_thread"] // v.params["k"]
+        if self.op == "dfma":
+            r["correct"] = bool(out[0] == r["ops_per_thread"])
+        elif self.op == "shfl":  # lane l ends at k * ((l + n) mod 32)
+            lanes = np.arange(32)
+            r["correct"] = bool(np.array_equal(out.astype(np.int64), v.params["k"] * ((lanes + n) % 32)))
+        return r
+
+    def finalize(self, results):
+        _golden_finalize(results)
+
+
 def probes() -> dict[str, Experiment]:
     exps = [StallProbe(op=o) for o in ("ffma", "fadd", "imad", "iadd")]
     exps += [Mix(partner=p) for p in ("shl", "imad", "hfma2")]
+    exps += [IssueGrid(op=o) for o in ("ffma", "imad")]
+    exps += [ScoreboardProbe(op=o) for o in ("dfma", "shfl", "sin")]
     return {e.name: e for e in exps}

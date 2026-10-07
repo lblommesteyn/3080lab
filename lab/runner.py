@@ -85,11 +85,18 @@ def run(exp, opts: dict) -> dict:
     dev = Device()
     static_env = env.static_info()
     clock_state = env.try_lock_clocks(opts.get("lock_clock"))
-    kernels = {k: Kernel.load(dev, b.cubin, exp.kernel_name) for k, b in builds.items()}
+    kernels = {}
     states = {}
     for v in variants:
         pv = per_variant[v.label]
-        pv["kernel"] = kernels[exp.source(v) + "|" + repr(exp.build_key(v))]
+        key = exp.source(v) + "|" + repr(exp.build_key(v))
+        kattrs = exp.kernel_attrs(v)
+        kkey = key + "|" + repr(sorted(kattrs.items()))
+        if kkey not in kernels:  # function attributes are per module load
+            kernels[kkey] = Kernel.load(dev, builds[key].cubin, exp.kernel_name)
+            for name, val in kattrs.items():
+                kernels[kkey].set_attr(name, val)
+        pv["kernel"] = kernels[kkey]
         states[v.label] = exp.prepare(dev, v)
         L = states[v.label]["launch"]
         pv["attrs"] = pv["kernel"].attrs(L["block"] if isinstance(L["block"], int) else int(np.prod(L["block"])))
@@ -119,6 +126,7 @@ def run(exp, opts: dict) -> dict:
 
     for v in variants:
         exp.release(dev, states[v.label])
+    exp.finalize({label: pv["results"] for label, pv in per_variant.items()})
     if opts.get("lock_clock") and clock_state.startswith("locked"):
         env.unlock_clocks()
 

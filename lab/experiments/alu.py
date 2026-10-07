@@ -64,6 +64,7 @@ class Chain(Experiment):
     op: str = "ffma"
     chains: int = 1          # independent accumulators per thread (ILP)
     body: int = 256          # ops per chain per loop iteration
+    lane_seed: int = 0       # 1: every chain starts at in[0] + lane (needed to see shfl rotation)
 
     def __post_init__(self):
         kind = "dependent" if self.chains == 1 else "independent"
@@ -87,7 +88,7 @@ class Chain(Experiment):
                 ins = ", ".join(f'"{cons}"({o})' for o in ops)
                 lines.append(f'asm volatile("{pt}" : "+{cons}"(x{c}){" : " + ins if ins else ""});')
         body = "\n      ".join(lines)
-        decl = "\n  ".join(f"{ctype} x{c} = in[0] + ({ctype})(threadIdx.x * {int(c > 0)});" for c in range(k))
+        decl = "\n  ".join(f"{ctype} x{c} = in[0] + ({ctype})(threadIdx.x * {int(c > 0 or self.lane_seed)});" for c in range(k))
         fold = " + ".join(f"x{c}" for c in range(k))
         return f"""
 extern "C" __global__ void k({ctype}* out, long long* cyc, unsigned long long* ns,

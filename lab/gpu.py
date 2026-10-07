@@ -114,5 +114,10 @@ class Kernel:
         check(cu.cuEventDestroy(e1))
         return float(ms)
 
+    def set_attr(self, name: str, value: int):
+        """name: CUfunction_attribute suffix, e.g. 'PREFERRED_SHARED_MEMORY_CARVEOUT'."""
+        attr = getattr(cu.CUfunction_attribute, f"CU_FUNC_ATTRIBUTE_{name}")
+        check(cu.cuFuncSetAttribute(self.func, attr, value))
+
     def unload(self):
         check(cu.cuModuleUnload(self.module))
