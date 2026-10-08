@@ -122,7 +122,7 @@ class GridBarrier(Experiment):
 
     def source(self, v):
         return r"""
-extern "C" __global__ void k(unsigned* bar, int n, long long* cyc, unsigned long long* ns)
+extern "C" __global__ void k(unsigned* bar, int n, long long* cyc, unsigned long long* ns, unsigned* timedout)
 {
   // bar[0] = arrive count, bar[1] = generation
   long long t0 = clock64(); unsigned long long g0; asm volatile("mov.u64 %0, %%globaltimer;" : "=l"(g0));
@@ -133,7 +133,12 @@ extern "C" __global__ void k(unsigned* bar, int n, long long* cyc, unsigned long
       unsigned g = *gen;
       __threadfence();
       if (atomicAdd(bar, 1u) == gridDim.x - 1) { bar[0] = 0; __threadfence(); atomicAdd(bar + 1, 1u); }
-      else { while (*gen == g) { } }
+      else {
+        // hard spin cap: a non-co-resident grid would otherwise hang the (shared) GPU forever;
+        // this machine does not reset hung kernels (no TDR)
+        unsigned long long spins = 0;
+        while (*gen == g) { if (++spins > 20000000ull) { *timedout = 1u; break; } }
+      }
       __threadfence();
     }
     __syncthreads();
@@ -147,24 +152,32 @@ extern "C" __global__ void k(unsigned* bar, int n, long long* cyc, unsigned long
         return {}
 
     def variants(self, opts):
-        return [Variant(f"blocks{b}/t{t}", {"blocks": b, "threads": t, "n": 2000, "warps": t // 32, "iters": 1})
-                for b in (68, 136, 272, 544) for t in (128, 256)]
+        out = []
+        for b in (68, 136, 272, 544):
+            for t in (128, 256):
+                per_sm = b // 68
+                if per_sm * t > 1536 or per_sm > 16:   # must be co-resident or a software barrier deadlocks
+                    continue
+                out.append(Variant(f"blocks{b}/t{t}", {"blocks": b, "threads": t, "n": 2000, "warps": t // 32, "iters": 1}))
+        return out
 
     def prepare(self, dev, v):
-        st = {"bar": dev.alloc(8), "cyc": dev.alloc(8), "ns": dev.alloc(8)}
+        st = {"bar": dev.alloc(8), "cyc": dev.alloc(8), "ns": dev.alloc(8), "to": dev.alloc(4)}
         dev.memset(st["bar"], 8)
+        dev.memset(st["to"], 4)
         st["launch"] = dict(grid=v.params["blocks"], block=v.params["threads"],
                             args=[ctypes.c_uint64(st["bar"]), ctypes.c_int32(v.params["n"]),
-                                  ctypes.c_uint64(st["cyc"]), ctypes.c_uint64(st["ns"])])
+                                  ctypes.c_uint64(st["cyc"]), ctypes.c_uint64(st["ns"]), ctypes.c_uint64(st["to"])])
         return st
 
     def collect(self, dev, v, st):
         cyc = int(dev.dtoh(np.zeros(1, np.int64), st["cyc"])[0])
         ns = int(dev.dtoh(np.zeros(1, np.uint64), st["ns"])[0])
         n = v.params["n"]
+        to = int(dev.dtoh(np.zeros(1, np.uint32), st["to"])[0])
         return {"cycles": cyc, "ns": ns, "ops_per_thread": n, "cycles_per_op": cyc / n, "warp_ops_per_cycle": 0.0,
-                "sm_mhz_inkernel": cyc / max(ns, 1) * 1e3, "us_per_barrier": ns / n / 1e3}
+                "sm_mhz_inkernel": cyc / max(ns, 1) * 1e3, "us_per_barrier": ns / n / 1e3, "correct": to == 0}
 
     def release(self, dev, st):
-        for x in ("bar", "cyc", "ns"):
+        for x in ("bar", "cyc", "ns", "to"):
             dev.free(st[x])
