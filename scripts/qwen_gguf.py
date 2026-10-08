@@ -125,6 +125,9 @@ class GGUFQwen(F.FusedQwen):
         self.attn_threads = 512 if attn == "ATTN4" else 128
 
 
+_BASE_GEMV = F.FusedQwen.gemv   # captured before main() rebinds F.FusedQwen
+
+
 def _gemv(self, name, wsplit, X, Y, aux, N, K):
     if name == "head" and getattr(self, "head_q6", False):
         Lw, Hw, SCw, Dw = wsplit
@@ -132,7 +135,7 @@ def _gemv(self, name, wsplit, X, Y, aux, N, K):
                             [Lw.data_ptr(), Hw.data_ptr(), SCw.data_ptr(), Dw.data_ptr(), X.data_ptr(), Y.data_ptr(),
                              F.ctypes.c_int32(N), F.ctypes.c_int32(K)])
     else:
-        F.FusedQwen.gemv(self, name, wsplit, X, Y, aux, N, K)
+        _BASE_GEMV(self, name, wsplit, X, Y, aux, N, K)
 
 
 GGUFQwen.gemv = _gemv
