@@ -18,6 +18,15 @@
   "opcode": "SEL",
   "tokens": 3
  },
+ "20b": {
+  "example": "FSETP.NEU.FTZ.AND P0, PT, R0, R3, PT",
+  "fields": {
+   "a": 0,
+   "b": 1
+  },
+  "opcode": "FSETP.NEU.FTZ.AND",
+  "tokens": 2
+ },
  "20c": {
   "example": "ISETP.NE.AND P0, PT, R0, RZ, PT",
   "fields": {
@@ -194,6 +203,15 @@
   "opcode": "I2FP.F32.U32",
   "tokens": 2
  },
+ "302": {
+  "example": "FCHK P0, R0, R9",
+  "fields": {
+   "a": 0,
+   "b": 1
+  },
+  "opcode": "FCHK",
+  "tokens": 2
+ },
  "308": {
   "example": "MUFU.RSQ R16, R16",
   "fields": {
@@ -256,6 +274,16 @@
   },
   "opcode": "FADD",
   "tokens": 2
+ },
+ "423": {
+  "example": "FFMA R13, -R9, R2, 1",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "FFMA",
+  "tokens": 3
  },
  "424": {
   "example": "IMAD.MOV.U32 R11, RZ, RZ, 0x4",
@@ -322,6 +350,23 @@
   "opcode": "CS2R",
   "tokens": 1
  },
+ "807": {
+  "example": "SEL R0, RZ, 0x1, !P0",
+  "fields": {
+   "a": 1,
+   "d": 0
+  },
+  "opcode": "SEL",
+  "tokens": 2
+ },
+ "80b": {
+  "example": "FSETP.GEU.AND P0, PT, R4, -126, PT",
+  "fields": {
+   "a": 0
+  },
+  "opcode": "FSETP.GEU.AND",
+  "tokens": 1
+ },
  "80c": {
   "example": "ISETP.GE.AND P0, PT, R10, 0x1, PT",
   "fields": {
@@ -379,6 +424,16 @@
   "opcode": "FMUL.RZ",
   "tokens": 2
  },
+ "823": {
+  "example": "@!P0 FFMA R6, R0, 1.84467440737095516160e+19, RZ",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "FFMA",
+  "tokens": 3
+ },
  "824": {
   "example": "IMAD.IADD R17, R15, 0x1, R0",
   "fields": {
@@ -398,6 +453,14 @@
   },
   "opcode": "IMAD.WIDE",
   "tokens": 3
+ },
+ "908": {
+  "example": "MUFU.RSQ R2, -QNAN",
+  "fields": {
+   "d": 0
+  },
+  "opcode": "MUFU.RSQ",
+  "tokens": 1
  },
  "919": {
   "example": "S2R R6, SR_TID.X",

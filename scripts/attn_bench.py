@@ -78,5 +78,17 @@ def main(srcs):
 
 
 if __name__ == "__main__":
-    main({"attn_v1": (KS.ATTN % {"maxlen": MAXLEN}, NH, 128),
-          "attn_v4": (KS.ATTN4 % {"maxlen": MAXLEN}, NH, 512)})
+    v4 = KS.ATTN4 % {"maxlen": MAXLEN}
+    body_start = v4.index("  __shared__ float q[HD]")
+    NL = chr(10)
+    empty = v4[:body_start] + "  if (threadIdx.x == 0 && blockIdx.x == 999) out[0] = __float2bfloat16_rn(scale);" + NL + "}" + NL
+    # prologue only: everything up to the first __syncthreads after the rope/kv block, then store
+    pro_end = v4.index("  __syncthreads();" + NL + "  float q0")
+    prologue = (v4[:pro_end] + "  __syncthreads();" + NL
+                + "  if (t < HD) out[h * HD + t] = __float2bfloat16_rn(q[t] + kn[t] + vn[t]);" + NL + "}" + NL)
+    no_loops = v4.replace("for (int j0 = warp; j0 <= pos; j0 += 64) {", "for (int j0 = warp; j0 <= -1; j0 += 64) {")
+    no_loops = no_loops.replace("for (; j + 12 < pos; j += 16) {", "for (; j + 12 < 0; j += 16) {")
+    no_loops = no_loops.replace("for (; j < pos; j += 4) o0 +=", "for (; j < 0; j += 4) o0 +=")
+    assert no_loops != v4
+    main({"empty": (empty, NH, 512), "prologue": (prologue, NH, 512), "no_loops": (no_loops, NH, 512),
+          "v4": (v4, NH, 512)})
