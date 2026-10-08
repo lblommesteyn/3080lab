@@ -392,6 +392,31 @@ boundary in a graph, so a persistent megakernel would not remove the per-kernel
 cost. Hung kernels are not reset by TDR on this machine: spin loops need caps. Remaining gap to the bandwidth floor (0.52
 ms/token) is per-kernel fixed cost: attention 32%, RMSNorm 18%, GEMV tails.
 
+### Round 4: load order, launch cost, L2 slices (Oct 8)
+
+- **Production Q4_0 GEMVs are clean**: weights never split a sector; only the
+  L1-resident activation vector has split pairs, 1-6 instructions apart (inside
+  the merge window). No ptxas load-deferral problem there.
+- **Kernel launch cost in a CUDA graph** (`scripts/launch_cost.py`): 1.07-1.28 us
+  for an empty kernel regardless of block shape (1-68 blocks, 128-1024 threads) or
+  parameter count; +0.2 us when it declares 5.7 KB of static shared memory;
+  dispatch grows past ~500 blocks (4,480 blocks: 3.46 us, ~34 ns per block per SM).
+  This is most of the "~1.3 us residual" on tiny kernels and most of attention's
+  fixed cost. Splitting a head across blocks needs a cross-block combine (>= 2 us
+  measured), so one block per head is near the floor on Ampere.
+- **L2 = 40 slices x 128 KB, mapped by contention** (`scripts/l2_slices.py`):
+  67 SMs hammer one line while a probe SM times every line of a 2 MB buffer.
+  Getting this right took fixing three of my own bugs: ptxas hoisted the
+  hammer's loop-invariant load, flag polling was itself a hammer, and hammer
+  blocks on the probe's SM slowed everything through that SM's load pipeline.
+  With 57 adaptive references every line has a unit: 37 units of 402-428 lines
+  (16,384/40 = 409.6), the rest one unsplit pair. Slices interleave at 256 B
+  (98% of 256 B chunks in one slice). The hash has a **linear part of rank 3**:
+  XOR of bits {12,13,15,16,17,18}, {8,11,14,15,16,17,19} (the near/far half),
+  {10,14,16,17,20} are constant within every slice, giving 8 classes of 5 slices.
+  The 5-way selector is not a simple modulo of address bits below 2^21 (best
+  0.36 vs 0.24 chance); it likely uses higher physical bits or a table.
+
 ### FP32/INT32 sharing (superseded by the section above)
 
 GA102 has 16 FP32 + 16 FP32/INT32 lanes per partition. If INT ops simply
