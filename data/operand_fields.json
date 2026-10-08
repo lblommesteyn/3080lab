@@ -59,6 +59,16 @@
   "opcode": "LOP3.LUT",
   "tokens": 4
  },
+ "217": {
+  "example": "IMNMX R62, R15, R62, PT",
+  "fields": {
+   "a": 1,
+   "b": 2,
+   "d": 0
+  },
+  "opcode": "IMNMX",
+  "tokens": 3
+ },
  "219": {
   "example": "SHF.L.U32 R13, R13, R8, RZ",
   "fields": {
@@ -144,6 +154,16 @@
   "opcode": "DFMA",
   "tokens": 4
  },
+ "230": {
+  "example": "@!P1 HADD2.F32 R9, -RZ, R9.H0_H0",
+  "fields": {
+   "a": 1,
+   "b": 2,
+   "d": 0
+  },
+  "opcode": "HADD2.F32",
+  "tokens": 3
+ },
  "231": {
   "example": "HFMA2 R13, R13, R6.reuse, R7.reuse",
   "fields": {
@@ -154,6 +174,16 @@
   },
   "opcode": "HFMA2",
   "tokens": 4
+ },
+ "23e": {
+  "example": "F2FP.PACK_AB R37, R13, R9",
+  "fields": {
+   "a": 1,
+   "b": 2,
+   "d": 0
+  },
+  "opcode": "F2FP.PACK_AB",
+  "tokens": 3
  },
  "245": {
   "example": "I2FP.F32.U32 R10, R6",
@@ -218,6 +248,15 @@
   "opcode": "R2UR",
   "tokens": 1
  },
+ "421": {
+  "example": "FADD R31, R32, -8388616",
+  "fields": {
+   "a": 1,
+   "d": 0
+  },
+  "opcode": "FADD",
+  "tokens": 2
+ },
  "424": {
   "example": "IMAD.MOV.U32 R11, RZ, RZ, 0x4",
   "fields": {
@@ -227,6 +266,15 @@
   },
   "opcode": "IMAD.MOV.U32",
   "tokens": 3
+ },
+ "430": {
+  "example": "HADD2 R8, R8, -1032, -1032",
+  "fields": {
+   "a": 1,
+   "d": 0
+  },
+  "opcode": "HADD2",
+  "tokens": 2
  },
  "589": {
   "example": "SHFL.IDX PT, R15, R14, R11, 0x1f",
@@ -438,6 +486,15 @@
   "opcode": "LEA",
   "tokens": 2
  },
+ "a17": {
+  "example": "IMNMX R0, R0, c[0x0][0x188], PT",
+  "fields": {
+   "a": 1,
+   "d": 0
+  },
+  "opcode": "IMNMX",
+  "tokens": 2
+ },
  "a24": {
   "example": "IMAD R0, R7, c[0x0][0x0], R6",
   "fields": {
@@ -464,6 +521,63 @@
   },
   "opcode": "MOV",
   "tokens": 1
+ },
+ "c0c": {
+  "example": "ISETP.GE.AND P0, PT, R36, UR4, PT",
+  "fields": {
+   "a": 0
+  },
+  "opcode": "ISETP.GE.AND",
+  "tokens": 1
+ },
+ "c10": {
+  "example": "IADD3 R45, R0, UR6, RZ",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "IADD3",
+  "tokens": 3
+ },
+ "c11": {
+  "example": "LEA.HI R41, R36.reuse, UR8, RZ, 0x1b",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "LEA.HI",
+  "tokens": 3
+ },
+ "c17": {
+  "example": "IMNMX R45, R45, UR4, PT",
+  "fields": {
+   "a": 1,
+   "d": 0
+  },
+  "opcode": "IMNMX",
+  "tokens": 2
+ },
+ "c24": {
+  "example": "IMAD R0, R0, UR6, RZ",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "IMAD",
+  "tokens": 3
+ },
+ "c25": {
+  "example": "IMAD.WIDE R4, R5, UR4, R36.reuse",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "IMAD.WIDE",
+  "tokens": 3
  },
  "e24": {
   "example": "IMAD.U32 R6, RZ, RZ, UR6",

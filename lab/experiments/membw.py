@@ -296,7 +296,7 @@ extern "C" __global__ void __launch_bounds__(1024) k(const unsigned char* __rest
   for (int i = 0; i < iters; ++i) {{
     unsigned off = ((lane * stride) + (i & 7) * 4096 + (threadIdx.x >> 5) * 16) & 16383;
     {decl}
-    asm volatile("ld.global.ca.{ty} {dst}, [%{n}];" : {outs} : "l"(B + off));
+    asm volatile("ld.global.{v.params.get('cop', 'ca')}.{ty} {dst}, [%{n}];" : {outs} : "l"(B + off));
     acc ^= {fold};
   }}
   long long t1 = clock64();
@@ -310,9 +310,11 @@ extern "C" __global__ void __launch_bounds__(1024) k(const unsigned char* __rest
 
     def variants(self, opts):
         out = []
-        for w in (4, 16):
-            for s in (w, 32, 64, 128, 256):
-                out.append(Variant(f"{w}B/stride{s}", {"width": w, "stride": s, "iters": 4096, "warps": 32}))
+        for cop in ("ca", "nc"):
+            for w in (4, 16):
+                for s in (w, 32, 64, 128, 256):
+                    out.append(Variant(f"{cop}/{w}B/stride{s}", {"width": w, "stride": s, "iters": 4096, "warps": 32,
+                                                                 "cop": cop}))
         return out
 
     def prepare(self, dev, v):

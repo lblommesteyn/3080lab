@@ -112,7 +112,7 @@ def calibrate_dram_latency() -> int:
 
 
 def predict_sim(body, *, total_bytes: float, warps_total: int, threads_per_block: int, regs: int,
-                trips_per_warp: int, mem: MemFit, dram_lat: int) -> dict:
+                trips_per_warp: int, mem: MemFit, dram_lat: int, l1_lines: dict | None = None) -> dict:
     """T = max(SM simulation with DRAM-latency loads, total_bytes / peak)."""
     from . import model
     model.MEM_LATENCY["DRAM"] = dram_lat
@@ -121,7 +121,7 @@ def predict_sim(body, *, total_bytes: float, warps_total: int, threads_per_block
     w_sim = max(1, min(wres, per_sm))
     waves = -(-per_sm // w_sim)
     sim = model.simulate(body, warps=w_sim, iters=max(1, trips_per_warp), mem_level="DRAM",
-                         sim_iters=min(6, max(1, trips_per_warp)), version=1)
+                         sim_iters=min(6, max(1, trips_per_warp)), version=1, l1_lines=l1_lines)
     t_sm = waves * sim["cycles"] / F_CLK_GHZ          # ns
     t_bw = total_bytes / mem.peak_gbps                # ns
     return {"us": max(t_sm, t_bw) / 1e3, "t_sm_us": t_sm / 1e3, "t_bw_us": t_bw / 1e3,

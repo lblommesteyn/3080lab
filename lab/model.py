@@ -135,7 +135,7 @@ class Warp:
 
 
 def simulate(body: list[Instr], warps: int, iters: int, mem_level: str = "L1",
-             sim_iters: int = 6, version: int = 1) -> dict:
+             sim_iters: int = 6, version: int = 1, l1_lines: dict | None = None) -> dict:
     """Predict cycles for `iters` trips through `body` with `warps` warps in one block.
     version 0: one shared dispatch port, no register file. version 1: fma/alu pipes,
     register-bank read ports and the operand reuse cache."""
@@ -170,6 +170,11 @@ def simulate(body: list[Instr], warps: int, iters: int, mem_level: str = "L1",
                 port, cost, smp, smc = pof(ins.opcode)
                 if part_port[p].get(port, 0) > t or (smp and sm_port.get(smp, 0) > t):
                     continue
+                if l1_lines and ins.offset in l1_lines:
+                    # L1 processes one 128 B line (wavefront) per SM cycle; floor ~3 (l1_wavefronts)
+                    if sm_port.get("l1", 0) > t:
+                        continue
+                    sm_port["l1"] = t + max(3, l1_lines[ins.offset])
                 if version >= 1:
                     if RF_MODEL == "shared" and part_port[p].get("rf", 0) > t:
                         continue
@@ -237,3 +242,58 @@ def body_from_listing(path) -> list[Instr]:
         raw = int(r["raw"], 16)
         ins.append(Instr(r["offset"], r["text"], raw & (2**64 - 1), raw >> 64, r.get("label")))
     return loop_body(ins)
+
+
+# ---- address provenance and L1 wavefront cost --------------------------------------------
+PARAM_BASE = 0x160   # sm_86: kernel parameters start at c[0x0][0x160], 8 bytes per pointer
+
+
+def load_provenance(cubin: bytes, kernel: str = "k") -> dict[int, set]:
+    """Flow-sensitive: for each global load (by offset), the kernel-parameter indices its address
+    derives from, following exact reaching definitions (regalloc dataflow) backwards, plus uniform
+    registers loaded from the constant bank."""
+    from . import regalloc
+    g = regalloc.build(cubin, kernel)
+    uses = regalloc.reaching(g)
+    ins = g["ins"]
+    ur_defs: dict[str, list[str]] = {}
+    for i in ins:
+        m = re.match(r"^(?:@!?U?P\w+\s+)?U\w+(?:\.\w+)*\s+(UR\d+)", i.text.strip())
+        if m:
+            ur_defs.setdefault(m.group(1), []).append(i.text)
+
+    def consts(text: str, seen_ur: set) -> set:
+        out = {(int(c, 16) - PARAM_BASE) // 8 for c in re.findall(r"c\[0x0\]\[(0x[0-9a-f]+)\]", text)
+               if int(c, 16) >= PARAM_BASE}
+        for ur in re.findall(r"(UR\d+)", text):
+            for alias in (ur, f"UR{int(ur[2:]) & ~1}"):
+                if alias in seen_ur:
+                    continue
+                seen_ur.add(alias)
+                for t in ur_defs.get(alias, []):
+                    out |= consts(t, seen_ur)
+        return out
+
+    out = {}
+    for k, i in enumerate(ins):
+        if not i.opcode.startswith(("LDG", "LD.")):
+            continue
+        m = re.search(r"\[R(\d+)", i.text)
+        if not m:
+            continue
+        addr = int(m.group(1))
+        params, seen, frontier = set(), set(), []
+        for o in g["occs"][k]:
+            if not o.is_def and o.reg in (addr, addr + 1):
+                frontier += [(d, o.reg) for d in uses.get((k, o.tok, o.reg), [])]
+        while frontier:
+            d, reg = frontier.pop()
+            if (d, reg) in seen or d < 0:
+                continue
+            seen.add((d, reg))
+            params |= consts(ins[d].text, set())
+            for o in g["occs"][d]:
+                if not o.is_def:
+                    frontier += [(dd, o.reg) for dd in uses.get((d, o.tok, o.reg), [])]
+        out[i.offset] = params
+    return out

@@ -14,6 +14,8 @@ from lab import model, model_gpu as G
 
 R = Path(__file__).resolve().parents[1] / "results"
 F_CLK_GHZ = 1.95
+import sys as _sys
+USE_L1 = "--no-l1" not in _sys.argv
 
 
 def gemv_spec(exp: str, p: dict):
@@ -47,6 +49,25 @@ def gemv_spec(exp: str, p: dict):
     return warps, tpb, trips, per, total
 
 
+# lines (128 B) touched per load instruction, per pointer role, from each family's access pattern
+LINES = {
+    "gemv_int4_v3": {"W": 4, "X": 32, "S": 1},      # fp32 x: each lane reads its own 128 B chunk
+    "gemv_int4_v4": {"W": 4, "X": 32, "S": 1},
+    "gemv_int4_v4_q15": {"W": 4, "X": 32, "S": 1},
+    "gemv_q4_0_blocks": {"W": 4, "X": 16, "S": 1},  # bf16 x: 64 B per lane
+}
+
+
+def l1_map(cubin: bytes, exp: str) -> dict:
+    prov = model.load_provenance(cubin)
+    out = {}
+    for off, params in prov.items():
+        role = "W" if 0 in params else "X" if 2 in params else "S" if 1 in params else None
+        if role:
+            out[off] = LINES[exp][role]
+    return out
+
+
 def main():
     mem = G.fit_mlp()
     lat = G.calibrate_dram_latency()
@@ -68,8 +89,10 @@ def main():
                 continue
             warps, tpb, trips, per, total = spec
             body = model.body_from_listing(d / f"{s['kernel_artifact']}.sass.json")
+            l1 = l1_map((d / f"{s['kernel_artifact']}.cubin").read_bytes(), exp) if USE_L1 else None
             pr = G.predict_sim(body, total_bytes=total, warps_total=warps, threads_per_block=tpb,
-                               regs=s["resources"]["registers"], trips_per_warp=trips, mem=mem, dram_lat=lat)
+                               regs=s["resources"]["registers"], trips_per_warp=trips, mem=mem, dram_lat=lat,
+                               l1_lines=l1)
             meas = s["metrics"]["us"]["median"]
             rows.append((exp, lab, meas, pr["us"], (pr["us"] - meas) / meas, pr["bound"], pr["waves"]))
     e = np.abs([r[4] for r in rows])
