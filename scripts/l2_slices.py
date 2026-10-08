@@ -24,8 +24,10 @@ SRC = r"""
 extern "C" __global__ void k(const unsigned char* __restrict__ B, int nlines, int ref, int hammer,
                              volatile unsigned* done, unsigned short* lat)
 {
+  unsigned sm; asm volatile("mov.u32 %0, %%smid;" : "=r"(sm));
   if (blockIdx.x == 0) {
     if (threadIdx.x != 0) return;
+    done[2] = sm + 1;                                               // publish the probe's SM
     unsigned acc = 0;
     for (int i = 0; i < nlines; ++i) { unsigned v; asm volatile("ld.global.cg.u32 %0, [%1];" : "=r"(v) : "l"(B + (size_t)i * 128)); acc += v; }
     done[1] = 1u;                                                   // go: start hammering
@@ -47,6 +49,9 @@ extern "C" __global__ void k(const unsigned char* __restrict__ B, int nlines, in
   for (unsigned long long it = 0; it < 200000000ull; ++it) {
     if ((it & 1023) == 0 && done[1] != 0u) break;
   }
+  // never share the probe's SM: its loads would queue behind ours in that SM's LSU, not in L2
+  for (unsigned long long it = 0; it < 200000000ull && done[2] == 0u; ++it) { }
+  if (done[2] == sm + 1) return;
   unsigned acc = 0;
   const unsigned char* line = B + (size_t)ref * 128;
   for (unsigned long long it = 0; it < 2000000000ull; ++it) {             // capped
@@ -67,15 +72,15 @@ def main():
     n = size // 128
     B = dev.alloc(size)
     dev.memset(B, size)
-    done = dev.alloc(8)
+    done = dev.alloc(16)
     lat = dev.alloc(n * 2)
     base_ptr = B
 
     def run(ref, hammer):
-        dev.memset(done, 8)
+        dev.memset(done, 16)
         args = [ctypes.c_uint64(B), ctypes.c_int32(n), ctypes.c_int32(ref), ctypes.c_int32(hammer),
                 ctypes.c_uint64(done), ctypes.c_uint64(lat)]
-        k.launch(1 + 67 * 4, 256, args)
+        k.launch(1 + 67 * 2, 256, args)
         dev.sync()
         return dev.dtoh(np.zeros(n, np.uint16), lat).astype(float)
 
