@@ -326,6 +326,48 @@ FP16-acc) is about its latency, so chains within one warp do not overlap.
 Register fragment layouts for m16n8k16 f16 and m16n8k32 s8 verified exactly
 against numpy (`tc_correct`).
 
+### Open questions closed (Oct 8)
+
+**L1 capacity** (`l1_capacity`, `l1_carveout_fine`): capacity is constant in
+128 B *lines* (~830) across slot strides 32-128 B, and one formula fits all
+eight measured carveouts:
+
+    L1 data = 128 KB - max(16 KB, smem carveout) - 8 KB
+
+(0/8/16% -> 104 KB, 24/32% -> 88, 50% -> 56, 100% -> ~20). The 16 KB floor and
+the constant 8 KB are inferred from the data, not documented.
+
+**L2 slices** (`l2_latency_map`): per-line latency profiles across 68 SMs are
+2-dimensional and discrete; equal-size groups of ~410 lines -> ~40 slices of
+128 KB (4 per 32-bit memory controller), interleaved at 256 B. Some slice pairs
+have identical latency profiles, so the full slice hash (non power-of-two) is
+not recoverable from latency alone; needs an eviction-set method.
+
+**Instruction cache** (`icache`): full issue rate up to 64 KB of loop code; one
+warp per partition drops at 96 KB (1.34/cycle) and 192 KB (0.82).
+
+**The R8U2 GEMV mystery** (`gemv_l1_pollution`, `gemv_ablate`, `mem_split_gap`,
+`gemv_load_order`): with U=2 each lane's two 16 B loads split every 32 B sector
+across two instructions; under register pressure ptxas emits the second-half
+loads ~1,000 instructions after the first; L1 merges a second half-sector request
+only within ~2 loads (microbenchmark: gap 4 -> 609 GB/s, gap 8 -> 441 vs 723), so
+each sector is fetched twice. Refuted on the way: instruction cache, L1
+pollution, split sectors at any occupancy, partial trips, per-warp MLP.
+Fix (predicted, then measured): lane-contiguous U loads -> gate_up R8U2
+94.2 -> 55.3 us (1.70x), q_o 15.4 -> 12.3, down 65.5 -> 59.4.
+
+**Predictor**: adding the split-sector rule (efficiency 0.61 from the
+microbenchmark) takes the GEMV median error to 12.8% (77% within 20%).
+
+**Predictor-guided Qwen work** (`scripts/qwen_kernel_times.py`): per-kernel
+cost vs bandwidth floor (with clocks warmed; the first attempt ran at the 210 MHz
+idle clock and was 10x off). Sum 2.136 ms/token vs 2.29 measured; floor 1.468;
+recoverable 0.668 ms: attention 31%, RMSNorm launches 19%, qkv 15%, gate/up 15%,
+down 11%, o 8%. Attention ablation (fixed 3.0 us, scores 2.5, PV 1.5 at pos 160)
+showed iterations not overlapping across shuffle reductions; attention v4
+(4-way ILP in scores and PV) is exact and 17-21% faster. **End to end on
+llama.cpp's Q4_0 weights: 446 -> 463 tok/s, 1.36x llama.cpp (340.5).**
+
 ### FP32/INT32 sharing (superseded by the section above)
 
 GA102 has 16 FP32 + 16 FP32/INT32 lanes per partition. If INT ops simply
