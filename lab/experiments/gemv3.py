@@ -77,8 +77,13 @@ extern "C" __global__ void k(const uint4* __restrict__ W, const float* S, const 
         wpb = Tn // 32
         L = []
         L.append("for (int j = lane * %d; j < K / 32; j += 32 * %d) {" % (U, U))
-        for u in range(U):
-            for r in range(R):
+        # load order: "u_major" (default; all rows' first halves, then second halves) or
+        # "r_major" (each row's halves adjacent; avoids the delayed split-sector penalty, mem_split_gap)
+        order = [(u, r) for u in range(U) for r in range(R)]
+        if v.params.get("worder") == "r_major":
+            order = [(u, r) for r in range(R) for u in range(U)]
+        for u, r in order:
+            if True:
                 wexpr = f"W[(size_t)(row0 + {r}) * (K / 32) + j + {u}]"
                 if v.params.get("wc") == "cg":   # weights bypass L1 (no pollution of the reused x lines)
                     wexpr = f"__ldcg(&{wexpr})"
@@ -239,6 +244,27 @@ class Gemv3Ablate(Gemv3):
         return out
 
 
+@dataclass
+class Gemv3Order(Gemv3):
+    """Prediction test: row-major load order removes the U=2 penalty."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.name = "gemv_load_order"
+        self.description = "int4 GEMV U=2: u-major vs row-major weight-load order"
+
+    def variants(self, opts):
+        out = []
+        for name, n, k in SHAPES:
+            if name not in ("gate_up", "down", "q_o"):
+                continue
+            for R, U in ((4, 1), (4, 2), (8, 2)):
+                for wo in (("u_major", "r_major") if U == 2 else ("u_major",)):
+                    out.append(Variant(f"{name}/R{R}U{U}/{wo}", {"N": n, "K": k, "R": R, "U": U, "T": 128,
+                                                                "deq": "magic", "worder": wo, "warps": 4, "iters": 1}))
+        return out
+
+
 def registry():
-    exps = [Gemv3(), Gemv3WC(), Gemv3Ablate()]
+    exps = [Gemv3(), Gemv3WC(), Gemv3Ablate(), Gemv3Order()]
     return {e.name: e for e in exps}
