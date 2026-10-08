@@ -11,18 +11,20 @@ from .experiments.gemv4 import _inner
 EPILOGUES = ("store", "bias", "biasf", "resid", "swiglu", "logits")
 
 
-def gemv_source(S_: int, epi: str, quant: str = "g128f32") -> str:
-    """Split-K int4 GEMV, block = S warps on one 4-row group, bf16 X.
-    epi: store (bf16 Y), bias (bf16 Y = acc + B), resid (fp32 Y += acc),
+def gemv_source(S_: int, epi: str, quant: str = "g128f32", G: int = 1, timed: bool = False) -> str:
+    """Split-K int4 GEMV. A block holds G row-groups of 4 rows; each row-group is
+    reduced by S warps splitting K (block = 32*S*G threads). Fewer, fatter blocks cut
+    the ~49 ns/block/SM dispatch cost measured in scripts/graph_overhead.py.
+    epi: store (bf16 Y), bias/biasf (bf16 Y = acc + B), resid (fp32 Y += acc),
          swiglu (rows interleaved g,u: bf16 Y[row0/2 + t] = silu(g) * u), logits (fp32 Y)."""
     body = _inner(4, "kb + lane", "ke", "32", "bf16", quant)
     if epi == "swiglu":
         fin = """
-  if (threadIdx.x < 2 && row0 + 2 * threadIdx.x + 1 < rowEnd + 1) {
+  if (sub < 2) {
     float g = 0.f, u = 0.f;
     #pragma unroll
-    for (int s = 0; s < SPLIT; ++s) { g += red[s][2 * threadIdx.x]; u += red[s][2 * threadIdx.x + 1]; }
-    ((__nv_bfloat16*)Y)[row0 / 2 + threadIdx.x] = __float2bfloat16_rn(g / (1.f + __expf(-g)) * u);
+    for (int s = 0; s < SPLIT; ++s) { g += red[grp][s][2 * sub]; u += red[grp][s][2 * sub + 1]; }
+    ((__nv_bfloat16*)Y)[row0 / 2 + sub] = __float2bfloat16_rn(g / (1.f + __expf(-g)) * u);
   }"""
     else:
         store = {
@@ -33,36 +35,49 @@ def gemv_source(S_: int, epi: str, quant: str = "g128f32") -> str:
             "logits": "((float*)Y)[r] = a;",
         }[epi]
         fin = f"""
-  if (threadIdx.x < 4 && row0 + threadIdx.x < rowEnd) {{
+  if (sub < 4 && row0 + sub < rowEnd) {{
     float a = 0.f;
     #pragma unroll
-    for (int s = 0; s < SPLIT; ++s) a += red[s][threadIdx.x];
-    int r = row0 + threadIdx.x;
+    for (int s = 0; s < SPLIT; ++s) a += red[grp][s][sub];
+    int r = row0 + sub;
     {store}
   }}"""
+    tparam = ", unsigned long long* T" if timed else ""
+    tstart = 'unsigned long long g0; asm volatile("mov.u64 %0, %%globaltimer;" : "=l"(g0));' if timed else ""
+    tend = ("""
+  __syncthreads();
+  if (threadIdx.x == 0) { unsigned long long g1; asm volatile("mov.u64 %0, %%globaltimer;" : "=l"(g1));
+    T[2 * blockIdx.x] = g0; T[2 * blockIdx.x + 1] = g1; }""" if timed else "")
     return f"""
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 #define SPLIT {S_}
-extern "C" __global__ void __launch_bounds__({32 * S_}, 1) k(
+#define GROUPS {G}
+extern "C" __global__ void __launch_bounds__({32 * S_ * G}, 1) k(
     const uint4* __restrict__ W, const float* __restrict__ S, const uint4* __restrict__ X,
-    void* Y, const void* AUX, int N, int K)
+    void* Y, const void* AUX, int N, int K{tparam})
 {{
-  __shared__ float red[SPLIT][4];
-  int ws = threadIdx.x >> 5, lane = threadIdx.x & 31;
+  {tstart}
+  __shared__ float red[GROUPS][SPLIT][4];
+  int warp = threadIdx.x >> 5, lane = threadIdx.x & 31;
+  int grp = warp / SPLIT, ws = warp % SPLIT, sub = threadIdx.x - grp * SPLIT * 32;
   int KW = K / 32;
-  int row0 = blockIdx.x * 4, rowEnd = min(N, row0 + 4);
+  int row0 = (blockIdx.x * GROUPS + grp) * 4, rowEnd = min(N, row0 + 4);
   int chunk = (KW + SPLIT - 1) / SPLIT;
   int kb = ws * chunk, ke = min(KW, kb + chunk);
   float acc[4] = {{0, 0, 0, 0}};
+  if (row0 < N) {{
       {body}
+  }}
   #pragma unroll
   for (int r = 0; r < 4; ++r) {{
     float a = acc[r];
     for (int o = 16; o; o >>= 1) a += __shfl_xor_sync(0xffffffffu, a, o);
-    if (lane == 0) red[ws][r] = a;
+    if (lane == 0) red[grp][ws][r] = a;
   }}
-  __syncthreads();{fin}
+  __syncthreads();
+  if (row0 < N) {{{fin}
+  }}{tend}
 }}
 """
 
