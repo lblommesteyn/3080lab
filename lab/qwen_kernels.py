@@ -549,7 +549,7 @@ def gemv_q6_source(S_: int) -> str:
       {{ int row = row0 + {r};
         if (row < rowEnd) {{
         uint4 lo = L[(size_t)row * (K / 32) + j];
-        uint2 hi = Hb[(size_t)row * (K / 64) + j];
+        uint2 hi = Hb[(size_t)row * (K / 32) + j];          // K/16 words per row = K/32 uint2
         unsigned short sc2 = SC[(size_t)row * (K / 32) + j];
         float d = __half2float(D[(size_t)row * (K / 256) + (j >> 3)]);
         float s0 = d * (float)(signed char)(sc2 & 0xff), s1 = d * (float)(signed char)(sc2 >> 8);
