@@ -1,0 +1,9 @@
+Warning: using the shared project folder; file isolation is disabled.
+Submitted job 1309 (exclusive GPU, gres=gpu:1).
+Log: C:\Users\LukeB\.pcslurm\logs\3080lab-mixbank_ffma_shl-1-1309.log
+queued job 1309; waiting ...
+mixbank_ffma_shl: pop from empty list
+====================================================================================================
+mixbank_ffma_imad: pop from empty list
+====================================================================================================
+

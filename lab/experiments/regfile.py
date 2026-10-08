@@ -149,14 +149,22 @@ class MixBank(Experiment):
         body = sass.loop_body(sass.parse(toolchain.disassemble(cubin)))
         ff = [i for i in body if i.opcode == "FFMA"]
         c = patch.set_regcount(cubin, self.kernel_name, 64)
-        pools = {0: list(SCRATCH_EVEN), 1: list(SCRATCH_ODD)}
+        # ptxas renames chain registers across the unrolled body, so map every
+        # FFMA Rd/Rb through one table (keeps chain structure) into R36..R61.
+        pools = {0: list(range(36, 62, 2)), 1: list(range(37, 62, 2))}
         mapping: dict[int, int] = {}
+
+        def remap(r, want):
+            if r not in mapping:
+                if not pools[want]:
+                    raise SystemExit("mixbank: scratch registers exhausted")
+                mapping[r] = pools[want].pop(0)
+            return mapping[r]
+
         for i in ff:
-            rd, ra = i.lo >> 16 & 0xFF, i.lo >> 24 & 0xFF
+            rd, ra, rb = i.lo >> 16 & 0xFF, i.lo >> 24 & 0xFF, i.lo >> 32 & 0xFF
             want = (ra & 1) ^ 1 if v.params["mode"] == "opp" else ra & 1
-            if rd not in mapping:
-                mapping[rd] = pools[want].pop(0)
-            c = patch.set_regs(c, self.kernel_name, i.offset, rd=mapping[rd], rb=mapping[rd])
+            c = patch.set_regs(c, self.kernel_name, i.offset, rd=remap(rd, want), rb=remap(rb, want))
         return c
 
     def prepare(self, dev, v):
