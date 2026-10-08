@@ -29,7 +29,7 @@ import qwen_fused as F  # noqa: E402
 from qwen_e2e import dev  # noqa: E402
 
 from lab import qwen_kernels as KS  # noqa: E402
-from lab.gguf import GGUF, q4_0_blocks, q6_k_blocks  # noqa: E402
+from lab.gguf import GGUF, q4_0_blocks, q6_k_blocks, q6_k_parts  # noqa: E402
 
 GGUF_PATH = Path.home() / (".cache/huggingface/hub/models--Qwen--Qwen2.5-1.5B-Instruct-GGUF/snapshots/"
                            "91cad51170dc346986eccefdc2dd33a9da36ead9/qwen2.5-1.5b-instruct-q4_0.gguf")
@@ -81,10 +81,26 @@ class GGUFQwen(F.FusedQwen):
                            "gu": gu, "down": to_device_q4(*q4_rows(g, p + "ffn_down.weight"))})
         self.norm = f32("output_norm.weight")
         b, t = g.raw("output.weight")
-        q6, s6 = q6_k_blocks(b)
         K, N = t.dims
-        self.head = (torch.from_numpy(q6.reshape(N, K).copy()).to(dev).contiguous(),
-                     torch.from_numpy(s6.reshape(N, K // 16).astype(np.float32).copy()).to(dev).contiguous())
+        self.head_q6 = "--head-i8" not in sys.argv
+        if self.head_q6:
+            # Q6_K-exact repack, same 6.5625 bits/weight as llama.cpp: low-nibble plane, 2-bit high
+            # plane, raw int8 sub-block scales and fp16 super-block scales
+            q, sc, d = q6_k_parts(b)
+            qq = torch.from_numpy((q.astype(np.int16) + 32).reshape(N, K).astype(np.int64)).to(dev)
+            lo = torch.zeros(N, K // 8, dtype=torch.int64, device=dev)
+            for i in range(8):
+                lo |= (qq[:, i::8] & 15) << (4 * i)
+            hi = torch.zeros(N, K // 16, dtype=torch.int64, device=dev)
+            for i in range(16):
+                hi |= (qq[:, i::16] >> 4) << (2 * i)
+            self.head = (lo.to(torch.int32).contiguous(), hi.to(torch.int32).contiguous(),
+                         torch.from_numpy(sc.reshape(N, K // 16).copy()).to(dev).contiguous(),
+                         torch.from_numpy(d.reshape(N, K // 256).copy()).to(dev).contiguous())
+        else:
+            q6, s6 = q6_k_blocks(b)
+            self.head = (torch.from_numpy(q6.reshape(N, K).copy()).to(dev).contiguous(),
+                         torch.from_numpy(s6.reshape(N, K // 16).astype(np.float32).copy()).to(dev).contiguous())
         rope_theta = m["qwen2.rope.freq_base"]
         self.kc = torch.zeros(nL, self.nkv, Q.MAX_LEN, self.hd, dtype=torch.bfloat16, device=dev)
         self.vc = torch.zeros_like(self.kc)
@@ -102,11 +118,24 @@ class GGUFQwen(F.FusedQwen):
         F.SPLIT.update(SPLIT)
         self.k = {name: F.Kern(KS.gemv_source(SPLIT[name], epi, "g32f16")) for name, epi in
                   (("qkv", "biasf"), ("o", "resid"), ("gu", "swiglu"), ("down", "resid"))}
-        self.k["head"] = F.Kern(KS.gemv_i8_source(SPLIT["head"]))
+        self.k["head"] = F.Kern(KS.gemv_q6_source(SPLIT["head"]) if self.head_q6 else KS.gemv_i8_source(SPLIT["head"]))
         self.k_rms, self.k_emb = F.Kern(KS.RMSNORM_F32W), F.Kern(KS.EMBED_F32)
         attn = "ATTN4" if "--attn-v1" not in sys.argv else "ATTN"
         self.k_attn, self.k_fin = F.Kern(getattr(KS, attn) % {"maxlen": Q.MAX_LEN}), F.Kern(KS.FINISH)
         self.attn_threads = 512 if attn == "ATTN4" else 128
+
+
+def _gemv(self, name, wsplit, X, Y, aux, N, K):
+    if name == "head" and getattr(self, "head_q6", False):
+        Lw, Hw, SCw, Dw = wsplit
+        self.k[name].launch((N + 3) // 4, 32 * F.SPLIT[name],
+                            [Lw.data_ptr(), Hw.data_ptr(), SCw.data_ptr(), Dw.data_ptr(), X.data_ptr(), Y.data_ptr(),
+                             F.ctypes.c_int32(N), F.ctypes.c_int32(K)])
+    else:
+        F.FusedQwen.gemv(self, name, wsplit, X, Y, aux, N, K)
+
+
+GGUFQwen.gemv = _gemv
 
 
 def main():

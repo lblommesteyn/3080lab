@@ -112,3 +112,12 @@ def q6_k_blocks(b: np.ndarray):
     # sub-block scale index: weights [16k, 16k+16) use sc[k]
     s = d * sc
     return q.astype(np.int8), s
+
+
+def q6_k_parts(b: np.ndarray):
+    """-> q int8 [nblk, 256] in [-32, 31], sc int8 [nblk, 16], d fp16 [nblk] (Q6_K's raw fields)."""
+    blk = b.reshape(-1, 210)
+    q, _ = q6_k_blocks(b)
+    sc = blk[:, 192:208].copy().view(np.int8)
+    d = blk[:, 208:210].copy().view(np.float16).reshape(-1)
+    return q, sc, d

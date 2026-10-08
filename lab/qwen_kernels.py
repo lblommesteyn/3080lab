@@ -534,3 +534,76 @@ extern "C" __global__ void __launch_bounds__(512) k(
   if (t < HD) out[h * HD + t] = __float2bfloat16_rn((acc4[0][t] + acc4[1][t] + acc4[2][t] + acc4[3][t]) / sum);
 }
 """
+
+
+def gemv_q6_source(S_: int) -> str:
+    """Q6_K-exact GEMV (6.5625 bits/weight, same bytes as llama.cpp's Q6_K) in a lane-friendly layout:
+      L  uint32 [N, K/8]   low 4 bits of q+32, nibble i of word = weight 8w+i (as the int4 path)
+      Hb uint32 [N, K/16]  high 2 bits of q+32, field i of word = weight 16w+i
+      SC int8   [N, K/16]  Q6_K sub-block scales;   D fp16 [N, K/256] super-block scales
+    weight = D * SC * (q - 32); q - 32 comes out of the magic constant exactly.
+    Split-K over S warps, 4 rows per block, bf16 X, fp32 logits out."""
+    rows = []
+    for r in range(4):
+        rows.append(f"""
+      {{ int row = row0 + {r};
+        if (row < rowEnd) {{
+        uint4 lo = L[(size_t)row * (K / 32) + j];
+        uint2 hi = Hb[(size_t)row * (K / 64) + j];
+        unsigned short sc2 = SC[(size_t)row * (K / 32) + j];
+        float d = __half2float(D[(size_t)row * (K / 256) + (j >> 3)]);
+        float s0 = d * (float)(signed char)(sc2 & 0xff), s1 = d * (float)(signed char)(sc2 >> 8);
+        unsigned lw[4] = {{lo.x, lo.y, lo.z, lo.w}};
+        unsigned hw[2] = {{hi.x, hi.y}};
+        float p0 = 0.f, p1 = 0.f;
+        #pragma unroll
+        for (int u = 0; u < 4; ++u) {{
+          #pragma unroll
+          for (int i = 0; i < 8; ++i) {{
+            int w = 8 * u + i;                                  // weight index within the 32
+            unsigned q = ((lw[u] >> (4 * i)) & 15u) | (((hw[w >> 4] >> (2 * (w & 15))) & 3u) << 4);
+            float v = __int_as_float(q | 0x4B000000) - 8388640.0f;    // (2^23 + q) - (2^23 + 32)
+            if (w < 16) p0 = fmaf(v, xf[w], p0); else p1 = fmaf(v, xf[w], p1);
+          }}
+        }}
+        acc[{r}] = fmaf(s0, p0, fmaf(s1, p1, acc[{r}]));
+        }} }}""")
+    return f"""
+#include <cuda_fp16.h>
+extern "C" __global__ void __launch_bounds__({32 * S_}, 1) k(
+    const uint4* __restrict__ L, const uint2* __restrict__ Hb, const unsigned short* __restrict__ SC,
+    const __half* __restrict__ D, const uint4* __restrict__ X, float* Y, int N, int K)
+{{
+  __shared__ float red[{S_}][4];
+  int ws_ = threadIdx.x >> 5, lane = threadIdx.x & 31;
+  int KW = K / 32;
+  int row0 = blockIdx.x * 4, rowEnd = min(N, row0 + 4);
+  int chunk = (KW + {S_} - 1) / {S_};
+  int kb = ws_ * chunk, ke = min(KW, kb + chunk);
+  float acc[4] = {{0, 0, 0, 0}};
+  for (int j = kb + lane; j < ke; j += 32) {{
+    float xf[32];
+    #pragma unroll
+    for (int t = 0; t < 4; ++t) {{
+      uint4 xv = X[(size_t)j * 4 + t];
+      unsigned xw[4] = {{xv.x, xv.y, xv.z, xv.w}};
+      #pragma unroll
+      for (int i = 0; i < 4; ++i) {{ xf[8 * t + 2 * i] = __uint_as_float(xw[i] << 16); xf[8 * t + 2 * i + 1] = __uint_as_float(xw[i] & 0xffff0000u); }}
+    }}
+    {"".join(rows)}
+  }}
+  #pragma unroll
+  for (int r = 0; r < 4; ++r) {{
+    float a = acc[r];
+    for (int o = 16; o; o >>= 1) a += __shfl_xor_sync(0xffffffffu, a, o);
+    if (lane == 0) red[ws_][r] = a;
+  }}
+  __syncthreads();
+  if (threadIdx.x < 4 && row0 + threadIdx.x < rowEnd) {{
+    float a = 0.f;
+    #pragma unroll
+    for (int s = 0; s < {S_}; ++s) a += red[s][threadIdx.x];
+    Y[row0 + threadIdx.x] = a;
+  }}
+}}
+"""
