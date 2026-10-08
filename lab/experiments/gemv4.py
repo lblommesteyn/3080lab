@@ -95,10 +95,17 @@ extern "C" __global__ void __launch_bounds__({32 * S_}, 1) k(
 """
 
 
+# Qwen2.5-1.5B decode shapes (q/k/v and gate/up fused), lm_head included
+QWEN15_SHAPES = [("qkv", 2048, 1536), ("o", 1536, 1536), ("gate_up", 17920, 1536), ("down", 1536, 8960),
+                 ("lm_head", 151936, 1536)]
+
+
 @dataclass
 class Gemv4(Experiment):
+    shapes: str = "qwen7b"
+
     def __post_init__(self):
-        self.name = "gemv_int4_v4"
+        self.name = "gemv_int4_v4" if self.shapes == "qwen7b" else f"gemv_int4_v4_{self.shapes}"
         self.target_opcode = "FFMA"
         self.description = "int4 GEMV: single-wave row strips + deterministic split-K for small N"
 
@@ -173,7 +180,12 @@ extern "C" __global__ void __launch_bounds__({32 * S_}, 1) k(
 
     def variants(self, opts: dict) -> list[Variant]:
         out = []
-        for name, n, k in SHAPES:
+        for name, n, k in (SHAPES if self.shapes == "qwen7b" else QWEN15_SHAPES):
+            if self.shapes != "qwen7b":
+                for S_ in (1, 2, 4):
+                    out.append(Variant(f"{name}/splitk{S_}", {"N": n, "K": k, "mode": "splitk", "S": S_,
+                                                              "warps": S_, "iters": 1}))
+                continue
             out.append(Variant(f"{name}/rows", {"N": n, "K": k, "mode": "rows", "warps": 4, "iters": 1}))
             for S_ in (2, 4, 8):
                 out.append(Variant(f"{name}/splitk{S_}", {"N": n, "K": k, "mode": "splitk", "S": S_,
@@ -225,5 +237,5 @@ extern "C" __global__ void __launch_bounds__({32 * S_}, 1) k(
 
 
 def registry():
-    e = Gemv4()
-    return {e.name: e}
+    exps = [Gemv4(), Gemv4(shapes="q15")]
+    return {e.name: e for e in exps}
