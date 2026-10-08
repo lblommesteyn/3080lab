@@ -79,4 +79,4 @@ def main(srcs):
 
 if __name__ == "__main__":
     main({"attn_v1": (KS.ATTN % {"maxlen": MAXLEN}, NH, 128),
-          "attn_v3": (KS.ATTN3 % {"maxlen": MAXLEN}, NH, 512)})
+          "attn_v4": (KS.ATTN4 % {"maxlen": MAXLEN}, NH, 512)})

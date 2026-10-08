@@ -444,3 +444,93 @@ extern "C" __global__ void __launch_bounds__(512) k(
   if (t < HD) out[h * HD + t] = __float2bfloat16_rn((acc4[0][t] + acc4[1][t] + acc4[2][t] + acc4[3][t]) / sum);
 }
 """
+
+ATTN4 = r"""
+#include <cuda_bf16.h>
+#define HD 128
+#define MAXLEN %(maxlen)d
+extern "C" __global__ void __launch_bounds__(512) k(
+    const __nv_bfloat16* __restrict__ qkv, const float* __restrict__ cosT, const float* __restrict__ sinT,
+    const long long* posp, __nv_bfloat16* __restrict__ kc, __nv_bfloat16* __restrict__ vc,
+    __nv_bfloat16* __restrict__ out, int NH, int NKV, float scale)
+{
+  __shared__ float q[HD], kn[HD], vn[HD], sc[MAXLEN], red[16], acc4[4][HD];
+  int h = blockIdx.x, t = threadIdx.x, warp = t >> 5, lane = t & 31;
+  int grp = NH / NKV, kvh = h / grp;
+  int pos = (int)posp[0];
+  __nv_bfloat16* kbase = kc + (size_t)kvh * MAXLEN * HD;
+  __nv_bfloat16* vbase = vc + (size_t)kvh * MAXLEN * HD;
+  if (t < HD) {
+    int d = t, half = HD / 2, dd = d %% half;
+    float cs = cosT[pos * half + dd], sn = sinT[pos * half + dd];
+    float qa = __bfloat162float(qkv[h * HD + d]);
+    float qb = __bfloat162float(qkv[h * HD + (d < half ? d + half : d - half)]);
+    q[d] = __bfloat162float(__float2bfloat16_rn(d < half ? qa * cs - qb * sn : qa * cs + qb * sn));
+    const __nv_bfloat16* kp = qkv + NH * HD + kvh * HD;
+    float ka = __bfloat162float(kp[d]), kb = __bfloat162float(kp[d < half ? d + half : d - half]);
+    kn[d] = __bfloat162float(__float2bfloat16_rn(d < half ? ka * cs - kb * sn : ka * cs + kb * sn));
+    vn[d] = __bfloat162float(__float2bfloat16_rn(__bfloat162float(qkv[(NH + NKV) * HD + kvh * HD + d])));
+    if (h %% grp == 0) {
+      kbase[(size_t)pos * HD + d] = __float2bfloat16_rn(kn[d]);
+      vbase[(size_t)pos * HD + d] = __float2bfloat16_rn(vn[d]);
+    }
+  }
+  __syncthreads();
+  float q0 = q[4 * lane], q1 = q[4 * lane + 1], q2 = q[4 * lane + 2], q3 = q[4 * lane + 3];
+  // scores: 4 positions per warp per step, loads issued before the shuffle reductions (ILP)
+  for (int j0 = warp; j0 <= pos; j0 += 64) {
+    uint2 w[4]; float s[4];
+    #pragma unroll
+    for (int u = 0; u < 4; ++u) {
+      int j = j0 + 16 * u;
+      w[u] = (j < pos) ? *reinterpret_cast<const uint2*>(kbase + (size_t)j * HD + 4 * lane) : make_uint2(0u, 0u);
+    }
+    #pragma unroll
+    for (int u = 0; u < 4; ++u) {
+      int j = j0 + 16 * u;
+      s[u] = (j == pos) ? q0 * kn[4 * lane] + q1 * kn[4 * lane + 1] + q2 * kn[4 * lane + 2] + q3 * kn[4 * lane + 3]
+           : q0 * __uint_as_float(w[u].x << 16) + q1 * __uint_as_float(w[u].x & 0xffff0000u)
+           + q2 * __uint_as_float(w[u].y << 16) + q3 * __uint_as_float(w[u].y & 0xffff0000u);
+    }
+    #pragma unroll
+    for (int o = 16; o; o >>= 1) {
+      #pragma unroll
+      for (int u = 0; u < 4; ++u) s[u] += __shfl_xor_sync(0xffffffffu, s[u], o);
+    }
+    if (lane == 0) {
+      #pragma unroll
+      for (int u = 0; u < 4; ++u) if (j0 + 16 * u <= pos) sc[j0 + 16 * u] = s[u] * scale;
+    }
+  }
+  __syncthreads();
+  float mx = -1e30f;
+  for (int j = t; j <= pos; j += 512) mx = fmaxf(mx, sc[j]);
+  for (int o = 16; o; o >>= 1) mx = fmaxf(mx, __shfl_xor_sync(0xffffffffu, mx, o));
+  if (lane == 0) red[warp] = mx;
+  __syncthreads();
+  mx = red[0];
+  for (int i = 1; i < 16; ++i) mx = fmaxf(mx, red[i]);
+  __syncthreads();
+  float sum = 0.f;
+  for (int j = t; j <= pos; j += 512) { float e = __expf(sc[j] - mx); sc[j] = e; sum += e; }
+  for (int o = 16; o; o >>= 1) sum += __shfl_xor_sync(0xffffffffu, sum, o);
+  if (lane == 0) red[warp] = sum;
+  __syncthreads();
+  sum = 0.f;
+  for (int i = 0; i < 16; ++i) sum += red[i];
+  int pg = t >> 7, d = t & 127;
+  float o0 = 0.f, o1 = 0.f, o2 = 0.f, o3 = 0.f;   // 4 independent accumulators: loads overlap
+  int j = pg;
+  for (; j + 12 < pos; j += 16) {
+    float v0 = __bfloat162float(vbase[(size_t)j * HD + d]), v1 = __bfloat162float(vbase[(size_t)(j + 4) * HD + d]);
+    float v2 = __bfloat162float(vbase[(size_t)(j + 8) * HD + d]), v3 = __bfloat162float(vbase[(size_t)(j + 12) * HD + d]);
+    o0 += sc[j] * v0; o1 += sc[j + 4] * v1; o2 += sc[j + 8] * v2; o3 += sc[j + 12] * v3;
+  }
+  for (; j < pos; j += 4) o0 += sc[j] * __bfloat162float(vbase[(size_t)j * HD + d]);
+  float o_ = (o0 + o1) + (o2 + o3);
+  if (pos %% 4 == pg) o_ += sc[pos] * vn[d];
+  acc4[pg][d] = o_;
+  __syncthreads();
+  if (t < HD) out[h * HD + t] = __float2bfloat16_rn((acc4[0][t] + acc4[1][t] + acc4[2][t] + acc4[3][t]) / sum);
+}
+"""
