@@ -26,6 +26,7 @@ from .sass import Instr
 BRANCH_TAKEN_PENALTY = 7      # fitted: dependent_ffma loop = sum(stalls) + 7
 STALL0_CYCLES = 32            # stall field 0 behaves like ~32 (stall probes: 32.8/op)
 READ_BARRIER = 2
+REUSE_SCOPE = "partition"          # "warp": each warp keeps its own reuse slots; "partition": any other warp's issue clears them
 
 MEM_LATENCY = {"L1": 35, "L2": 238, "DRAM": 498, "SMEM": 23}
 SB_LATENCY = {  # issue -> dependent may issue, for scoreboarded producers
@@ -123,7 +124,8 @@ def simulate(body: list[Instr], warps: int, iters: int, mem_level: str = "L1",
         from . import operands as _opnd
         cache = _opnd._load_cache()
         ops_of = [_opnd.operands(i, cache) for i in body]
-    reuse = [dict() for _ in range(4)]
+    reuse = [dict() for _ in range(4)]          # partition scope
+    reuse_w = [dict() for _ in range(warps)]    # warp scope
     pof = port_of_v1 if version >= 1 else port_of
     ws = [Warp(w) for w in range(warps)]
     part_port: list[dict] = [dict() for _ in range(4)]
@@ -150,14 +152,15 @@ def simulate(body: list[Instr], warps: int, iters: int, mem_level: str = "L1",
                 if version >= 1:
                     if part_port[p].get("rf", 0) > t:
                         continue
-                    rc = rf_cycles(ops_of[w.pc], reuse[p], w.wid)
+                    rcache = reuse_w[w.wid] if REUSE_SCOPE == "warp" else reuse[p]
+                    rc = rf_cycles(ops_of[w.pc], rcache, w.wid)
                     part_port[p]["rf"] = t + rc
                     o = ops_of[w.pc]
-                    reuse[p] = {}
+                    rcache.clear()
                     if o is not None and o.complete and not o.wide:
                         for slot, reg in o.srcs:
                             if ins.reuse >> "abc".index(slot) & 1:
-                                reuse[p][slot] = (w.wid, reg)
+                                rcache[slot] = (w.wid, reg)
                 part_port[p][port] = t + cost
                 if smp:
                     sm_port[smp] = t + smc

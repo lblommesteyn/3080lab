@@ -48,6 +48,17 @@
   "opcode": "LEA",
   "tokens": 3
  },
+ "212": {
+  "example": "LOP3.LUT R3, R3, R7, RZ, 0x3c, !PT",
+  "fields": {
+   "a": 1,
+   "b": 2,
+   "c": 3,
+   "d": 0
+  },
+  "opcode": "LOP3.LUT",
+  "tokens": 4
+ },
  "219": {
   "example": "SHF.L.U32 R13, R13, R8, RZ",
   "fields": {
@@ -122,6 +133,17 @@
   "opcode": "DFMA",
   "tokens": 4
  },
+ "231": {
+  "example": "HFMA2 R13, R13, R6.reuse, R7.reuse",
+  "fields": {
+   "a": 1,
+   "b": 2,
+   "c": 3,
+   "d": 0
+  },
+  "opcode": "HFMA2",
+  "tokens": 4
+ },
  "245": {
   "example": "I2FP.F32.U32 R10, R6",
   "fields": {
@@ -139,6 +161,32 @@
   },
   "opcode": "MUFU.RSQ",
   "tokens": 2
+ },
+ "312": {
+  "example": "I2F.F64.U32 R24, R0",
+  "fields": {
+   "b": 1,
+   "d": 0
+  },
+  "opcode": "I2F.F64.U32",
+  "tokens": 2
+ },
+ "388": {
+  "example": "STS [R0.X4], R5",
+  "fields": {
+   "a": 0,
+   "b": 1
+  },
+  "opcode": "STS",
+  "tokens": 2
+ },
+ "3c2": {
+  "example": "R2UR UR4, R12",
+  "fields": {
+   "a": 0
+  },
+  "opcode": "R2UR",
+  "tokens": 1
  },
  "424": {
   "example": "IMAD.MOV.U32 R11, RZ, RZ, 0x4",
@@ -234,6 +282,15 @@
   "opcode": "SHF.R.S32.HI",
   "tokens": 3
  },
+ "820": {
+  "example": "FMUL.RZ R13, R13, 0.15915493667125701904",
+  "fields": {
+   "a": 1,
+   "d": 0
+  },
+  "opcode": "FMUL.RZ",
+  "tokens": 2
+ },
  "824": {
   "example": "IMAD.IADD R17, R15, 0x1, R0",
   "fields": {
@@ -244,6 +301,16 @@
   "opcode": "IMAD.IADD",
   "tokens": 3
  },
+ "825": {
+  "example": "IMAD.WIDE R10, R15, 0x4, RZ",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "IMAD.WIDE",
+  "tokens": 3
+ },
  "919": {
   "example": "S2R R6, SR_TID.X",
   "fields": {
@@ -252,6 +319,15 @@
   "opcode": "S2R",
   "tokens": 1
  },
+ "980": {
+  "example": "LD.E.64 R6, [R6.64]",
+  "fields": {
+   "a": 1,
+   "d": 0
+  },
+  "opcode": "LD.E.64",
+  "tokens": 2
+ },
  "981": {
   "example": "LDG.E R11, [R2.64]",
   "fields": {
@@ -259,6 +335,15 @@
    "d": 0
   },
   "opcode": "LDG.E",
+  "tokens": 2
+ },
+ "984": {
+  "example": "LDS R13, [R13]",
+  "fields": {
+   "a": 1,
+   "d": 0
+  },
+  "opcode": "LDS",
   "tokens": 2
  },
  "986": {
@@ -286,6 +371,16 @@
   "opcode": "ISETP.GE.AND",
   "tokens": 1
  },
+ "a10": {
+  "example": "IADD3 R0, R0, c[0x0][0x0], RZ",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "IADD3",
+  "tokens": 3
+ },
  "a11": {
   "example": "LEA R8, P1, R9, c[0x0][0x160], 0x7",
   "fields": {
@@ -304,6 +399,15 @@
   },
   "opcode": "IMAD",
   "tokens": 3
+ },
+ "b82": {
+  "example": "LDC.64 R2, c[0x0][R2+0x160]",
+  "fields": {
+   "a": 1,
+   "d": 0
+  },
+  "opcode": "LDC.64",
+  "tokens": 2
  },
  "c02": {
   "example": "MOV R7, UR7",

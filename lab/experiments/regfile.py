@@ -28,11 +28,13 @@ SCRATCH_ODD = [37, 39, 41, 43, 45, 47, 49, 51]
 
 @dataclass
 class BankProbe(Chain):
+    probe_op: str = "ffma"
+
     def __post_init__(self):
-        self.op, self.chains, self.body = "ffma", 8, 64
+        self.op, self.chains, self.body = self.probe_op, 8, 64
         super().__post_init__()
-        self.name = "regbank_ffma"
-        self.description = "FFMA S,A,S,C with chosen register-bank parity and reuse flags"
+        self.name = f"regbank_{self.probe_op}"
+        self.description = f"{self.target_opcode} S,A,S,C with chosen register-bank parity and reuse flags"
 
     def variants(self, opts: dict) -> list[Variant]:
         warps = opts.get("warps") or [4, 32]
@@ -91,12 +93,12 @@ class BankProbe(Chain):
         C = 34 if cp == "E" else 35
         body = sass.loop_body(sass.parse(toolchain.disassemble(cubin)))
         c = patch.set_regcount(cubin, self.kernel_name, 64)
-        for n, ins in enumerate(i for i in body if i.opcode == "FFMA"):
+        for n, ins in enumerate(i for i in body if i.opcode == self.target_opcode):
             s = S[n % 8]
             c = patch.set_regs(c, self.kernel_name, ins.offset, rd=s, ra=A, rb=s, rc=C)
             c = patch.set_control(c, self.kernel_name, {ins.offset: {"reuse": 0b101 if reuse == "reuseAC" else 0}})
         # sanity: the rewrite must disassemble to exactly what we intended
-        got = [i for i in sass.loop_body(sass.parse(toolchain.disassemble(c))) if i.opcode == "FFMA"]
+        got = [i for i in sass.loop_body(sass.parse(toolchain.disassemble(c))) if i.opcode == self.target_opcode]
         want = f"R{A}" + (".reuse" if reuse == "reuseAC" else "")
         if not all(f", {want}, " in g.text for g in got):
             raise SystemExit(f"register rewrite failed: {got[0].text}")
@@ -178,5 +180,5 @@ class MixBank(Experiment):
 
 
 def registry():
-    exps = [BankProbe(), MixBank(partner="shl"), MixBank(partner="imad")]
+    exps = [BankProbe(), BankProbe(probe_op="imad"), MixBank(partner="shl"), MixBank(partner="imad")]
     return {e.name: e for e in exps}
