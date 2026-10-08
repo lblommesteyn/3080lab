@@ -138,5 +138,7 @@ extern "C" __global__ void k(float* out, long long* cyc, unsigned long long* ns,
 
 
 def registry():
-    e = RandomKernels()
-    return {e.name: e}
+    a = RandomKernels()
+    b = RandomKernels(seed0=2000)  # held-out set for model versions tuned on set A
+    b.name = "rand_kernels_b"
+    return {a.name: a, b.name: b}

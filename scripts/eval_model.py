@@ -19,7 +19,11 @@ for f in sorted(RESULTS.glob("*/record.json")):
     rec = json.loads(f.read_text())
     latest[rec["experiment"]] = (f.parent, rec)
 
-prefixes = sys.argv[1:]
+args = sys.argv[1:]
+version = 1
+if args and args[0].startswith("--v"):
+    version = int(args.pop(0)[3:])
+prefixes = args
 rows = []
 for name, (d, rec) in sorted(latest.items()):
     if name.startswith(SKIP) or (prefixes and not name.startswith(tuple(prefixes))):
@@ -39,7 +43,7 @@ for name, (d, rec) in sorted(latest.items()):
         if not body:
             continue
         pred = model.simulate(body, warps=p.get("warps", 1), iters=p["iters"],
-                              mem_level=model.mem_level_for(p, name))
+                              mem_level=model.mem_level_for(p, name), version=version)
         meas = s["metrics"]["cycles"]["median"]
         rows.append((name, label, meas, pred["cycles"], (pred["cycles"] - meas) / meas))
 

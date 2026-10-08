@@ -1,0 +1,326 @@
+{
+ "202": {
+  "example": "MOV R15, R12.reuse",
+  "fields": {
+   "b": 1,
+   "d": 0
+  },
+  "opcode": "MOV",
+  "tokens": 2
+ },
+ "207": {
+  "example": "@!P0 SEL R9, R9, RZ, P2",
+  "fields": {
+   "a": 1,
+   "b": 2,
+   "d": 0
+  },
+  "opcode": "SEL",
+  "tokens": 3
+ },
+ "20c": {
+  "example": "ISETP.NE.AND P0, PT, R0, RZ, PT",
+  "fields": {
+   "a": 0,
+   "b": 1
+  },
+  "opcode": "ISETP.NE.AND",
+  "tokens": 2
+ },
+ "210": {
+  "example": "IADD3 R13, R13, R6, RZ",
+  "fields": {
+   "a": 1,
+   "b": 2,
+   "c": 3,
+   "d": 0
+  },
+  "opcode": "IADD3",
+  "tokens": 4
+ },
+ "211": {
+  "example": "LEA R19, R0.reuse, R17, 0x1",
+  "fields": {
+   "a": 1,
+   "b": 2,
+   "d": 0
+  },
+  "opcode": "LEA",
+  "tokens": 3
+ },
+ "219": {
+  "example": "SHF.L.U32 R13, R13, R8, RZ",
+  "fields": {
+   "a": 1,
+   "b": 2,
+   "c": 3,
+   "d": 0
+  },
+  "opcode": "SHF.L.U32",
+  "tokens": 4
+ },
+ "220": {
+  "example": "FMUL R15, R0.reuse, R15",
+  "fields": {
+   "a": 1,
+   "b": 2,
+   "d": 0
+  },
+  "opcode": "FMUL",
+  "tokens": 3
+ },
+ "221": {
+  "example": "FADD R12, R10, R11",
+  "fields": {
+   "a": 1,
+   "b": 2,
+   "d": 0
+  },
+  "opcode": "FADD",
+  "tokens": 3
+ },
+ "223": {
+  "example": "FFMA R12, R0, R12, R7",
+  "fields": {
+   "a": 1,
+   "b": 2,
+   "c": 3,
+   "d": 0
+  },
+  "opcode": "FFMA",
+  "tokens": 4
+ },
+ "224": {
+  "example": "IMAD R13, R8, R13, R9",
+  "fields": {
+   "a": 1,
+   "b": 2,
+   "c": 3,
+   "d": 0
+  },
+  "opcode": "IMAD",
+  "tokens": 4
+ },
+ "229": {
+  "example": "DADD R10, RZ, R8",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "DADD",
+  "tokens": 3
+ },
+ "22b": {
+  "example": "DFMA R10, R2, R10, R4",
+  "fields": {
+   "a": 1,
+   "b": 2,
+   "c": 3,
+   "d": 0
+  },
+  "opcode": "DFMA",
+  "tokens": 4
+ },
+ "245": {
+  "example": "I2FP.F32.U32 R10, R6",
+  "fields": {
+   "b": 1,
+   "d": 0
+  },
+  "opcode": "I2FP.F32.U32",
+  "tokens": 2
+ },
+ "308": {
+  "example": "MUFU.RSQ R16, R16",
+  "fields": {
+   "b": 1,
+   "d": 0
+  },
+  "opcode": "MUFU.RSQ",
+  "tokens": 2
+ },
+ "424": {
+  "example": "IMAD.MOV.U32 R11, RZ, RZ, 0x4",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "IMAD.MOV.U32",
+  "tokens": 3
+ },
+ "589": {
+  "example": "SHFL.IDX PT, R15, R14, R11, 0x1f",
+  "fields": {
+   "a": 1,
+   "b": 2,
+   "d": 0
+  },
+  "opcode": "SHFL.IDX",
+  "tokens": 3
+ },
+ "624": {
+  "example": "IMAD.MOV.U32 R1, RZ, RZ, c[0x0][0x28]",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "IMAD.MOV.U32",
+  "tokens": 3
+ },
+ "625": {
+  "example": "IMAD.WIDE R6, R0, R13, c[0x0][0x160]",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "IMAD.WIDE",
+  "tokens": 3
+ },
+ "802": {
+  "example": "MOV R13, 0x4",
+  "fields": {
+   "d": 0
+  },
+  "opcode": "MOV",
+  "tokens": 1
+ },
+ "805": {
+  "example": "CS2R R2, SR_GLOBALTIMERLO",
+  "fields": {
+   "d": 0
+  },
+  "opcode": "CS2R",
+  "tokens": 1
+ },
+ "80c": {
+  "example": "ISETP.GE.AND P0, PT, R10, 0x1, PT",
+  "fields": {
+   "a": 0
+  },
+  "opcode": "ISETP.GE.AND",
+  "tokens": 1
+ },
+ "810": {
+  "example": "IADD3 R11, R6, 0x1, RZ",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "IADD3",
+  "tokens": 3
+ },
+ "812": {
+  "example": "LOP3.LUT R11, R11, 0x1f, RZ, 0xc0, !PT",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "LOP3.LUT",
+  "tokens": 3
+ },
+ "819": {
+  "example": "SHF.R.S32.HI R0, RZ, 0x5, R0",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "SHF.R.S32.HI",
+  "tokens": 3
+ },
+ "824": {
+  "example": "IMAD.IADD R17, R15, 0x1, R0",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "IMAD.IADD",
+  "tokens": 3
+ },
+ "919": {
+  "example": "S2R R6, SR_TID.X",
+  "fields": {
+   "d": 0
+  },
+  "opcode": "S2R",
+  "tokens": 1
+ },
+ "981": {
+  "example": "LDG.E R11, [R2.64]",
+  "fields": {
+   "a": 1,
+   "d": 0
+  },
+  "opcode": "LDG.E",
+  "tokens": 2
+ },
+ "986": {
+  "example": "STG.E [R6.64], R15",
+  "fields": {
+   "a": 0,
+   "b": 1
+  },
+  "opcode": "STG.E",
+  "tokens": 2
+ },
+ "a02": {
+  "example": "MOV R1, c[0x0][0x28]",
+  "fields": {
+   "d": 0
+  },
+  "opcode": "MOV",
+  "tokens": 1
+ },
+ "a0c": {
+  "example": "ISETP.GE.AND P0, PT, R10, c[0x0][0x188], PT",
+  "fields": {
+   "a": 0
+  },
+  "opcode": "ISETP.GE.AND",
+  "tokens": 1
+ },
+ "a11": {
+  "example": "LEA R8, P1, R9, c[0x0][0x160], 0x7",
+  "fields": {
+   "a": 1,
+   "d": 0
+  },
+  "opcode": "LEA",
+  "tokens": 2
+ },
+ "a24": {
+  "example": "IMAD R0, R7, c[0x0][0x0], R6",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "IMAD",
+  "tokens": 3
+ },
+ "c02": {
+  "example": "MOV R7, UR7",
+  "fields": {
+   "d": 0
+  },
+  "opcode": "MOV",
+  "tokens": 1
+ },
+ "e24": {
+  "example": "IMAD.U32 R6, RZ, RZ, UR6",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "IMAD.U32",
+  "tokens": 3
+ }
+}

@@ -48,6 +48,39 @@ PORTS = [
 ]
 
 
+# v1: FFMA-class ops can use either FMA pipe (pooled: cost 1 per warp-instr);
+# IMAD/HFMA2 are half rate on the FMA pool; integer ALU ops have their own pipe.
+PORTS_V1 = [
+    ("FFMA", "fma", 1), ("FADD", "fma", 1), ("FMUL", "fma", 1), ("HFMA2", "fma", 2), ("HADD2", "fma", 2),
+    ("HMUL2", "fma", 2), ("IMAD", "fma", 2),
+    ("IADD3", "alu", 2), ("LOP3", "alu", 2), ("SHF", "alu", 2), ("ISETP", "alu", 2), ("LEA", "alu", 2),
+    ("SEL", "alu", 2), ("PLOP3", "alu", 2), ("MOV", "alu", 2), ("FSETP", "alu", 2), ("FMNMX", "alu", 2),
+    ("FSEL", "alu", 2), ("IMNMX", "alu", 2),
+]
+
+
+def port_of_v1(op: str):
+    for prefix, port, cost in PORTS_V1:
+        if op == prefix or op.startswith(prefix + "."):
+            return port, cost, None, 0
+    return port_of(op)
+
+
+def rf_cycles(ops, reuse_cache: dict, wid: int) -> int:
+    """Register-file read cycles: 2 banks (parity), one read per bank per cycle;
+    operands supplied by the reuse cache (same warp, same slot, same register) are free."""
+    if ops is None or ops.wide or not ops.complete:
+        return 1
+    banks = [0, 0]
+    for slot, reg in ops.srcs:
+        if reg == 255:
+            continue
+        if reuse_cache.get(slot) == (wid, reg):
+            continue
+        banks[reg & 1] += 1
+    return max(1, max(banks))
+
+
 def port_of(op: str):
     for prefix, port, cost, smport, smcost in PORTS:
         if op == prefix or op.startswith(prefix + "."):
@@ -80,9 +113,18 @@ class Warp:
 
 
 def simulate(body: list[Instr], warps: int, iters: int, mem_level: str = "L1",
-             sim_iters: int = 6) -> dict:
-    """Predict cycles for `iters` trips through `body` with `warps` warps in one block."""
+             sim_iters: int = 6, version: int = 1) -> dict:
+    """Predict cycles for `iters` trips through `body` with `warps` warps in one block.
+    version 0: one shared dispatch port, no register file. version 1: fma/alu pipes,
+    register-bank read ports and the operand reuse cache."""
     n_sim = min(iters, sim_iters)
+    ops_of = [None] * len(body)
+    if version >= 1:
+        from . import operands as _opnd
+        cache = _opnd._load_cache()
+        ops_of = [_opnd.operands(i, cache) for i in body]
+    reuse = [dict() for _ in range(4)]
+    pof = port_of_v1 if version >= 1 else port_of
     ws = [Warp(w) for w in range(warps)]
     part_port: list[dict] = [dict() for _ in range(4)]
     sm_port: dict = {}
@@ -102,9 +144,20 @@ def simulate(body: list[Instr], warps: int, iters: int, mem_level: str = "L1",
                 ins = body[w.pc]
                 if any(ins.wait >> b & 1 and w.bar_release[b] > t for b in range(6)):
                     continue
-                port, cost, smp, smc = port_of(ins.opcode)
+                port, cost, smp, smc = pof(ins.opcode)
                 if part_port[p].get(port, 0) > t or (smp and sm_port.get(smp, 0) > t):
                     continue
+                if version >= 1:
+                    if part_port[p].get("rf", 0) > t:
+                        continue
+                    rc = rf_cycles(ops_of[w.pc], reuse[p], w.wid)
+                    part_port[p]["rf"] = t + rc
+                    o = ops_of[w.pc]
+                    reuse[p] = {}
+                    if o is not None and o.complete and not o.wide:
+                        for slot, reg in o.srcs:
+                            if ins.reuse >> "abc".index(slot) & 1:
+                                reuse[p][slot] = (w.wid, reg)
                 part_port[p][port] = t + cost
                 if smp:
                     sm_port[smp] = t + smc
