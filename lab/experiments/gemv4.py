@@ -83,7 +83,7 @@ extern "C" __global__ void __launch_bounds__(128) k(
         S_ = v.params["S"]
         body = _inner(4, "kb + lane", "ke", "32")
         return f"""
-extern "C" __global__ void __launch_bounds__({32 * S_}) k(
+extern "C" __global__ void __launch_bounds__({32 * S_}, 1) k(
     const uint4* __restrict__ W, const float* __restrict__ S, const float4* __restrict__ X,
     float* __restrict__ Y, unsigned long long* T, int N, int K, int RPW)
 {{
