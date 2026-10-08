@@ -111,9 +111,31 @@ def calibrate_dram_latency() -> int:
     return best[0]
 
 
+SPLIT_SECTOR_EFF = 441 / 723   # mem_split_gap: halves of a sector requested >= 8 loads apart
+
+
+def straight_parts(instrs: list) -> tuple[list, list]:
+    """(prologue, epilogue) around the largest loop: what a warp executes once."""
+    from . import sass as _s
+    body = _s.loop_body(instrs)
+    if not body:
+        return instrs, []
+    i0 = instrs.index(body[0])
+    i1 = instrs.index(body[-1]) + 1
+    post = []
+    for x in instrs[i1:]:
+        post.append(x)
+        if x.opcode == "EXIT" and not x.text.strip().startswith("@"):
+            break
+    return instrs[:i0], post
+
+
 def predict_sim(body, *, total_bytes: float, warps_total: int, threads_per_block: int, regs: int,
-                trips_per_warp: int, mem: MemFit, dram_lat: int, l1_lines: dict | None = None) -> dict:
-    """T = max(SM simulation with DRAM-latency loads, total_bytes / peak)."""
+                trips_per_warp: int, mem: MemFit, dram_lat: int, l1_lines: dict | None = None,
+                split_sector: bool = False, straight: tuple | None = None) -> dict:
+    """T = max(SM simulation with DRAM-latency loads, total_bytes / effective peak).
+    split_sector: weight halves of each sector requested far apart (bandwidth x SPLIT_SECTOR_EFF).
+    straight: (prologue, epilogue) instruction lists simulated once per warp wave and added."""
     from . import model
     model.MEM_LATENCY["DRAM"] = dram_lat
     wres = resident_warps_per_sm(regs, threads_per_block)
@@ -124,7 +146,12 @@ def predict_sim(body, *, total_bytes: float, warps_total: int, threads_per_block
     sim = model.simulate(body, warps=w_sim, iters=max(1, trips_per_warp), mem_level="DRAM",
                          sim_iters=min(6, max(1, trips_per_warp)), version=1, l1_lines=l1_lines)
     t_sm = waves * sim["cycles"] / F_CLK_GHZ          # ns
-    t_bw = total_bytes / mem.peak_gbps                # ns
+    if straight:
+        once = [x for part in straight for x in part]
+        if once:
+            s2 = model.simulate(once, warps=w_sim, iters=1, mem_level="DRAM", sim_iters=1, version=1)
+            t_sm += -(-per_sm // w_sim) * s2["cycles"] / F_CLK_GHZ
+    t_bw = total_bytes / (mem.peak_gbps * (SPLIT_SECTOR_EFF if split_sector else 1.0))   # ns
     return {"us": max(t_sm, t_bw) / 1e3, "t_sm_us": t_sm / 1e3, "t_bw_us": t_bw / 1e3,
             "bound": "sm" if t_sm >= t_bw else "bw", "w_sim": w_sim, "waves": waves}
 

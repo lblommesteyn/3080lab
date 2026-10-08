@@ -16,6 +16,8 @@ R = Path(__file__).resolve().parents[1] / "results"
 F_CLK_GHZ = 1.95
 import sys as _sys
 USE_L1 = "--no-l1" not in _sys.argv
+USE_SPLIT = "--no-split" not in _sys.argv
+USE_STRAIGHT = "--no-straight" not in _sys.argv
 
 
 def gemv_spec(exp: str, p: dict):
@@ -105,11 +107,18 @@ def main():
             body = model.body_from_listing(d / f"{s['kernel_artifact']}.sass.json")
             l1 = (l1_map((d / f"{s['kernel_artifact']}.cubin").read_bytes(), exp, active_fraction(exp, p),
                          p.get("U", 1)) if USE_L1 else None)
+            allins = model.body_from_listing.__globals__["Instr"]  # noqa: F841 (type only)
+            rows_json = json.loads((d / f"{s['kernel_artifact']}.sass.json").read_text())
+            from lab.sass import Instr as _I
+            full = [_I(r_["offset"], r_["text"], int(r_["raw"], 16) & (2**64 - 1), int(r_["raw"], 16) >> 64, r_.get("label"))
+                    for r_ in rows_json]
+            split = exp == "gemv_int4_v3" and p.get("U", 1) > 1 and p.get("worder") != "lane_contig"
             pr = G.predict_sim(body, total_bytes=total, warps_total=warps, threads_per_block=tpb,
                                regs=s["resources"]["registers"], trips_per_warp=trips, mem=mem, dram_lat=lat,
-                               l1_lines=l1)
+                               l1_lines=l1, split_sector=split and USE_SPLIT,
+                               straight=G.straight_parts(full) if USE_STRAIGHT else None)
             meas = s["metrics"]["us"]["median"]
-            pr["us"] += fixed
+            pr["us"] += 0.0 if USE_STRAIGHT else fixed   # straight-line simulation replaces the constant
             rows.append((exp, lab, meas, pr["us"], (pr["us"] - meas) / meas, pr["bound"], pr["waves"]))
     e = np.abs([r[4] for r in rows])
     print()
