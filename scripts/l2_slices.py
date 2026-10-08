@@ -43,11 +43,17 @@ extern "C" __global__ void k(const unsigned char* __restrict__ B, int nlines, in
     return;
   }
   if (!hammer) return;
-  const unsigned char* a = B + (size_t)ref * 128 + (threadIdx.x & 31) * 4;
+  // wait for go, polling rarely (each poll is itself L2 traffic to the flag's slice)
+  for (unsigned long long it = 0; it < 200000000ull; ++it) {
+    if ((it & 1023) == 0 && done[1] != 0u) break;
+  }
   unsigned acc = 0;
-  for (unsigned long long it = 0; it < 2000000000ull && done[1] == 0u; ++it) { }   // wait for go (capped)
-  for (unsigned long long it = 0; it < 2000000000ull && done[0] == 0u; ++it) {     // hammer until done (capped)
-    unsigned v; asm volatile("ld.global.cg.u32 %0, [%1];" : "=r"(v) : "l"(a)); acc += v;
+  const unsigned char* line = B + (size_t)ref * 128;
+  for (unsigned long long it = 0; it < 2000000000ull; ++it) {             // capped
+    // varying word in the same line: loop-variant address, so ptxas cannot hoist the load
+    unsigned v; asm volatile("ld.global.cg.u32 %0, [%1];" : "=r"(v) : "l"(line + ((threadIdx.x + it) & 31) * 4));
+    acc += v;
+    if ((it & 1023) == 0 && done[0] != 0u) break;
   }
   if (acc == 0x12345u) lat[0] = 1;
 }
