@@ -38,10 +38,11 @@ class BankProbe(Chain):
         warps = opts.get("warps") or [4, 32]
         iters = max(1, int(opts.get("iters") or 1_000_000) // self.body)
         out = [Variant(f"w{w}/orig", {"warps": w, "iters": iters, "pattern": None}) for w in warps]
-        out += [Variant(f"w{w}/diag_{d}", {"warps": w, "iters": iters, "pattern": d})
-                for w in warps for d in ("regcount_only", "reuse_only", "one_ffma", "rd_only", "ra_only",
-                                         "rc_only", "low_regs", "rd_ra", "rd_rc", "ra_rc", "all3",
-                                         "all3_reuse0", "all3_reuse5", "r56", "r60", "r61", "r62", "r63")]
+        if opts.get("diag"):  # bisection variants; r62/r63 fault on purpose
+            out += [Variant(f"w{w}/diag_{d}", {"warps": w, "iters": iters, "pattern": d})
+                    for w in warps for d in ("regcount_only", "reuse_only", "one_ffma", "rd_only", "ra_only",
+                                             "rc_only", "low_regs", "rd_ra", "rd_rc", "ra_rc", "all3",
+                                             "all3_reuse0", "all3_reuse5", "r56", "r60", "r61", "r62", "r63")]
         for w in warps:
             for sp, ap, cp in itertools.product("EO", repeat=3):
                 for reuse in ("noreuse", "reuseAC"):

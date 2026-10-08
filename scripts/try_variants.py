@@ -11,7 +11,7 @@ if len(sys.argv) > 2 and sys.argv[1] == "--one":
     from lab.experiments import registry
     from lab.gpu import Device, Kernel
     exp = registry()[sys.argv[2]]
-    v = next(x for x in exp.variants({"iters": 4096}) if x.label == sys.argv[3])
+    v = next(x for x in exp.variants({"iters": 4096, "diag": True}) if x.label == sys.argv[3])
     b = toolchain.build(exp.source(v), ptxas_flags=exp.ptxas_flags)
     cubin = exp.transform(b.cubin, v)
     dev = Device()
@@ -26,7 +26,7 @@ if len(sys.argv) > 2 and sys.argv[1] == "--one":
 from lab.experiments import registry  # noqa: E402
 
 name, subs = sys.argv[1], sys.argv[2:]
-for v in registry()[name].variants({"iters": 4096}):
+for v in registry()[name].variants({"iters": 4096, "diag": True}):
     if subs and not any(s in v.label for s in subs):
         continue
     r = subprocess.run([sys.executable, __file__, "--one", name, v.label], capture_output=True, text=True)
