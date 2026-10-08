@@ -28,21 +28,71 @@ SMS = 68
 MAX_WARPS_PER_SM = 48
 
 
-def _inner(R: int, kexpr_start: str, kexpr_end: str, step: str) -> str:
-    """Accumulate rows row0..row0+R-1 over uint4 index range [start, end) with stride step."""
+def _inner(R: int, kexpr_start: str, kexpr_end: str, step: str, io: str = "f32") -> str:
+    """Accumulate rows row0..row0+R-1 over uint4 index range [start, end) with stride step.
+    io="bf16": x is packed bf16 (8 per uint4), widened exactly to fp32 by shift/mask."""
     L = [f"for (int j = {kexpr_start}; j < {kexpr_end}; j += {step}) {{"]
     for r in range(R):
         L.append(f"  uint4 w{r}_0 = (row0 + {r} < rowEnd) ? W[(size_t)(row0 + {r}) * KW + j]"
                  f" : make_uint4(0x88888888u,0x88888888u,0x88888888u,0x88888888u);")
-    L.append("  const float4* xp0 = X + (size_t)j * 8;")
-    for k in range(4):
-        L.append(f"  float4 xa0_{k} = xp0[{2 * k}]; float4 xb0_{k} = xp0[{2 * k + 1}];")
+    if io == "f32":
+        L.append("  const float4* xp0 = X + (size_t)j * 8;")
+        for k in range(4):
+            L.append(f"  float4 xa0_{k} = xp0[{2 * k}]; float4 xb0_{k} = xp0[{2 * k + 1}];")
+    else:
+        L.append("  const uint4* xq0 = reinterpret_cast<const uint4*>(X) + (size_t)j * 4;")
+        for k in range(4):
+            L.append(f"  uint4 t{k} = xq0[{k}];"
+                     f" float4 xa0_{k} = make_float4(__uint_as_float(t{k}.x << 16), __uint_as_float(t{k}.x & 0xffff0000u),"
+                     f" __uint_as_float(t{k}.y << 16), __uint_as_float(t{k}.y & 0xffff0000u));"
+                     f" float4 xb0_{k} = make_float4(__uint_as_float(t{k}.z << 16), __uint_as_float(t{k}.z & 0xffff0000u),"
+                     f" __uint_as_float(t{k}.w << 16), __uint_as_float(t{k}.w & 0xffff0000u));")
     for r in range(R):
         L.append("  { float part = 0.f;")
         L += ["    " + s for s in _deq("magic", f"w{r}_0", 0)]
         L.append(f"    if (row0 + {r} < rowEnd) acc[{r}] = fmaf(S[(size_t)(row0 + {r}) * (K / 128) + (j >> 2)], part, acc[{r}]); }}")
     L.append("}")
     return "\n      ".join(L)
+
+
+def splitk_source(S_: int, io: str = "f32") -> str:
+    """Deterministic split-K int4 GEMV: block = S warps on one 4-row group.
+    io: "f32" (float X, float Y) or "bf16" (bf16 X, bf16 Y, fp32 accumulation)."""
+    body = _inner(4, "kb + lane", "ke", "32", io)
+    ytype = "float" if io == "f32" else "__nv_bfloat16"
+    xtype = "float4" if io == "f32" else "uint4"
+    store = "Y[row0 + threadIdx.x] = a;" if io == "f32" else "Y[row0 + threadIdx.x] = __float2bfloat16_rn(a);"
+    return f"""
+#include <cuda_bf16.h>
+extern "C" __global__ void __launch_bounds__({32 * S_}, 1) k(
+    const uint4* __restrict__ W, const float* __restrict__ S, const {xtype}* __restrict__ X,
+    {ytype}* __restrict__ Y, unsigned long long* T, int N, int K, int RPW)
+{{
+  __shared__ float red[{S_}][4];
+  int ws = threadIdx.x >> 5, lane = threadIdx.x & 31;
+  int KW = K / 32;
+  int row0 = blockIdx.x * 4, rowEnd = min(N, row0 + 4);
+  int chunk = (KW + {S_} - 1) / {S_};
+  int kb = ws * chunk, ke = min(KW, kb + chunk);
+  float acc[4] = {{0, 0, 0, 0}};
+      {body}
+  #pragma unroll
+  for (int r = 0; r < 4; ++r) {{
+    float a = acc[r];
+    for (int o = 16; o; o >>= 1) a += __shfl_xor_sync(0xffffffffu, a, o);
+    if (lane == 0) red[ws][r] = a;
+  }}
+  __syncthreads();
+  if (threadIdx.x < 4 && row0 + threadIdx.x < rowEnd) {{
+    float a = 0.f;
+    #pragma unroll
+    for (int s = 0; s < {S_}; ++s) a += red[s][threadIdx.x];
+    {store}
+  }}
+  if (T != 0 && threadIdx.x == 0) {{ unsigned long long g; asm volatile("mov.u64 %0, %%globaltimer;" : "=l"(g));
+    T[blockIdx.x] = g; }}
+}}
+"""
 
 
 @dataclass
@@ -80,6 +130,9 @@ extern "C" __global__ void __launch_bounds__(128) k(
     T[2 * blockIdx.x] = g0; T[2 * blockIdx.x + 1] = g1; }}
 }}
 """
+        return self._splitk_timed(v)  # experiment keeps per-block start/end timing
+
+    def _splitk_timed(self, v):
         S_ = v.params["S"]
         body = _inner(4, "kb + lane", "ke", "32")
         return f"""

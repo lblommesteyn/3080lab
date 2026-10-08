@@ -25,7 +25,7 @@ sys.path.append(str(site))  # cuda-python + nvidia wheels from the lab venv
 from cuda.bindings import driver as cu  # noqa: E402
 
 from lab import toolchain  # noqa: E402
-from lab.experiments.gemv3 import Gemv3  # noqa: E402
+from lab.experiments.gemv4 import Gemv4  # noqa: E402
 from lab.experiments.base import Variant  # noqa: E402
 
 SHAPES = [("qkv_kv", 512, 3584), ("q_o", 3584, 3584), ("gate_up", 18944, 3584), ("down", 3584, 18944)]
@@ -79,7 +79,7 @@ def main():
     check(cu.cuInit(0))
     ctx = check(cu.cuDevicePrimaryCtxRetain(check(cu.cuDeviceGet(0))))
     check(cu.cuCtxSetCurrent(ctx))
-    g = Gemv3()
+    g = Gemv4()
     out = {}
     for name, N, K in SHAPES:
         gen = torch.Generator().manual_seed(N + K)
@@ -104,14 +104,13 @@ def main():
         Sd = scale.float().contiguous().to(dev)
         Xd = x.float().to(dev)
         Yd = torch.empty(N, device=dev)
-        rows_per_block = 4 * 4
-        blocks = (N + rows_per_block - 1) // rows_per_block
+        blocks = (N + 3) // 4  # split-K: one 4-row group per block of 4 warps
         Td = torch.empty(2 * blocks, dtype=torch.int64, device=dev)
-        v = Variant("x", {"N": N, "K": K, "R": 4, "U": 1, "T": 128, "deq": "magic", "warps": 4, "iters": 1})
+        v = Variant("x", {"N": N, "K": K, "mode": "splitk", "S": 4, "warps": 4, "iters": 1})
         b = toolchain.build(g.source(v))
         mod = check(cu.cuModuleLoadData(b.cubin))
         fn = check(cu.cuModuleGetFunction(mod, b"k"))
-        args = [ctypes.c_uint64(t.data_ptr()) for t in (Wd, Sd, Xd, Yd, Td)] + [ctypes.c_int32(N), ctypes.c_int32(K)]
+        args = [ctypes.c_uint64(t.data_ptr()) for t in (Wd, Sd, Xd, Yd, Td)] + [ctypes.c_int32(N), ctypes.c_int32(K), ctypes.c_int32(0)]
         ptrs = (ctypes.c_void_p * len(args))(*[ctypes.addressof(a) for a in args])
         def f_ours():  # always launch on torch's *current* stream (captured inside graphs)
             stream = cu.CUstream(torch.cuda.current_stream().cuda_stream)
