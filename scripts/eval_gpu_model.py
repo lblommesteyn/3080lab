@@ -58,19 +58,30 @@ LINES = {
 }
 
 
-def l1_map(cubin: bytes, exp: str) -> dict:
+def l1_map(cubin: bytes, exp: str, active: float = 1.0) -> dict:
+    """active: average fraction of lanes that issue loads (short split-K chunks idle lanes)."""
     prov = model.load_provenance(cubin)
     out = {}
     for off, params in prov.items():
         role = "W" if 0 in params else "X" if 2 in params else "S" if 1 in params else None
         if role:
-            out[off] = LINES[exp][role]
+            out[off] = max(1, round(LINES[exp][role] * active))
     return out
+
+
+def active_fraction(exp: str, p: dict) -> float:
+    if exp in ("gemv_int4_v4", "gemv_int4_v4_q15", "gemv_q4_0_blocks") and p.get("S"):
+        chunk = math.ceil((p["K"] / 32) / p["S"])
+        trips = math.ceil(chunk / 32)
+        return chunk / (32 * trips)
+    return 1.0
 
 
 def main():
     mem = G.fit_mlp()
     lat = G.calibrate_dram_latency()
+    fixed = G.calibrate_fixed_overhead(mem)
+    print(f"fixed streaming-kernel overhead from roofline microbenchmarks: {fixed:.2f} us")
     print(f"peak {mem.peak_gbps:.0f} GB/s (mem_mlp); DRAM load latency calibrated on the 1-SM/1-warp point: "
           f"{lat} cycles = {lat / G.F_CLK_GHZ:.0f} ns")
     rows = []
@@ -89,11 +100,13 @@ def main():
                 continue
             warps, tpb, trips, per, total = spec
             body = model.body_from_listing(d / f"{s['kernel_artifact']}.sass.json")
-            l1 = l1_map((d / f"{s['kernel_artifact']}.cubin").read_bytes(), exp) if USE_L1 else None
+            l1 = (l1_map((d / f"{s['kernel_artifact']}.cubin").read_bytes(), exp, active_fraction(exp, p))
+                  if USE_L1 else None)
             pr = G.predict_sim(body, total_bytes=total, warps_total=warps, threads_per_block=tpb,
                                regs=s["resources"]["registers"], trips_per_warp=trips, mem=mem, dram_lat=lat,
                                l1_lines=l1)
             meas = s["metrics"]["us"]["median"]
+            pr["us"] += fixed
             rows.append((exp, lab, meas, pr["us"], (pr["us"] - meas) / meas, pr["bound"], pr["waves"]))
     e = np.abs([r[4] for r in rows])
     print()
@@ -105,7 +118,7 @@ def main():
     print()
     print("worst 12:")
     for r in sorted(rows, key=lambda r: -abs(r[4]))[:12]:
-        print(f"  {r[0]:<18} {r[1]:<22} meas {r[2]:7.1f} us  pred {r[3]:7.1f} us  {r[4]:+.0%}  [{r[5]}-bound, {r[6]} waves]")
+        print(f"  {r[0]:<18} {r[1]:<22} meas {r[2]:7.1f} us  pred {r[3]:7.1f} us  {r[4]:+.0%}  [{r[5]}-bound, {r[6]:.1f} waves]")
     (R / "gpu_model_eval.json").write_text(json.dumps(rows, indent=1))
 
 

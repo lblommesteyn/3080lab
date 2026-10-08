@@ -119,10 +119,24 @@ def predict_sim(body, *, total_bytes: float, warps_total: int, threads_per_block
     wres = resident_warps_per_sm(regs, threads_per_block)
     per_sm = -(-warps_total // SMS)
     w_sim = max(1, min(wres, per_sm))
-    waves = -(-per_sm // w_sim)
+    # throughput-bound: time scales with total work, so a partial last wave counts fractionally
+    waves = per_sm / w_sim
     sim = model.simulate(body, warps=w_sim, iters=max(1, trips_per_warp), mem_level="DRAM",
                          sim_iters=min(6, max(1, trips_per_warp)), version=1, l1_lines=l1_lines)
     t_sm = waves * sim["cycles"] / F_CLK_GHZ          # ns
     t_bw = total_bytes / mem.peak_gbps                # ns
     return {"us": max(t_sm, t_bw) / 1e3, "t_sm_us": t_sm / 1e3, "t_bw_us": t_bw / 1e3,
             "bound": "sm" if t_sm >= t_bw else "bw", "w_sim": w_sim, "waves": waves}
+
+
+def calibrate_fixed_overhead(mem: MemFit) -> float:
+    """Fixed fill/drain cost (us) of a GPU-wide streaming kernel, from the pure-read roofline
+    microbenchmarks (gemv_int4_v3 */roofline): measured - bytes/peak, median over sizes."""
+    r = latest("gemv_int4_v3")
+    oh = []
+    for lab, s in r["summary"].items():
+        if s["params"].get("roofline"):
+            p = s["params"]
+            bytes_ = p["N"] * p["K"] / 2
+            oh.append(s["metrics"]["us"]["median"] - bytes_ / mem.peak_gbps / 1e3)
+    return float(np.median(oh))
