@@ -126,6 +126,10 @@ class GGUFQwen(F.FusedQwen):
         self.k_rms = F.Kern(KS.RMSNORM_F32W_1P if "--rms-2pass" not in sys.argv else KS.RMSNORM_F32W)
         self.k_emb = F.Kern(KS.EMBED_F32)
         attn = "ATTN4" if "--attn-v1" not in sys.argv else "ATTN"
+        self.pf_mb = 0.0
+        for a in sys.argv:
+            if a.startswith("--prefetch-mb="):
+                attn, self.pf_mb = "ATTN4PF", float(a.split("=")[1])
         self.k_attn, self.k_fin = F.Kern(getattr(KS, attn) % {"maxlen": Q.MAX_LEN}), F.Kern(KS.FINISH)
         self.attn_threads = 512 if attn == "ATTN4" else 128
 

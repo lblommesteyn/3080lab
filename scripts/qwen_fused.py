@@ -117,9 +117,20 @@ class FusedQwen:
         for i, L in enumerate(self.L):
             self.rms(L["ln1"], self.x)
             self.gemv("qkv", L["qkv"], self.x, self.qkv, L["qkv_b"].data_ptr(), nq, H)
-            self.k_attn.launch(self.nh, getattr(self, "attn_threads", 128), [self.qkv.data_ptr(), self.cos.data_ptr(), self.sin.data_ptr(),
-                                              self.pos.data_ptr(), self.kc[i].data_ptr(), self.vc[i].data_ptr(),
-                                              self.att.data_ptr(), ctypes.c_int32(self.nh), ctypes.c_int32(self.nkv), scale])
+            aargs = [self.qkv.data_ptr(), self.cos.data_ptr(), self.sin.data_ptr(),
+                     self.pos.data_ptr(), self.kc[i].data_ptr(), self.vc[i].data_ptr(),
+                     self.att.data_ptr(), ctypes.c_int32(self.nh), ctypes.c_int32(self.nkv), scale]
+            grid = self.nh
+            if getattr(self, "pf_mb", 0) > 0:
+                # prefetch: this layer's o-proj (weights + scales) and the first pf_mb MB of gate/up
+                Wo, So = L["o"]
+                Wg, Sg = L["gu"]
+                gu_bytes = int(min(Wg.numel() * 4, self.pf_mb * 2**20))
+                gu_rows = gu_bytes // (Wg.shape[1] * 4)
+                aargs += [Wo.data_ptr(), ctypes.c_uint64(Wo.numel() * 4), So.data_ptr(), ctypes.c_uint64(So.numel() * 2),
+                          Wg.data_ptr(), ctypes.c_uint64(gu_bytes), Sg.data_ptr(), ctypes.c_uint64(gu_rows * Sg.shape[1] * 2)]
+                grid = self.nh + 56
+            self.k_attn.launch(grid, getattr(self, "attn_threads", 128), aargs)
             self.gemv("o", L["o"], self.att, self.h, 0, H, self.nh * self.hd)
             self.rms(L["ln2"], self.x)
             self.gemv("gu", L["gu"], self.x, self.xm, 0, 2 * self.inter, H)
