@@ -34,15 +34,19 @@ def time_graph(fn, reps=100):
     with torch.cuda.graph(g):
         for _ in range(reps):
             fn()
-    g.replay()
-    torch.cuda.synchronize()
+    # warm the clocks: replay for >= 300 ms before timing (short bursty graphs otherwise run at idle P-state clocks)
+    import time
+    t_end = time.perf_counter() + 0.3
+    while time.perf_counter() < t_end:
+        g.replay()
+        torch.cuda.synchronize()
     s, e = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
     s.record()
-    for _ in range(5):
+    for _ in range(20):
         g.replay()
     e.record()
     torch.cuda.synchronize()
-    return s.elapsed_time(e) / (5 * reps) * 1e3  # us
+    return s.elapsed_time(e) / (20 * reps) * 1e3  # us
 
 
 def main():
@@ -58,13 +62,18 @@ def main():
     q4 = lambda N, K: N * K / 2 + N * K / 32 * 2           # noqa: E731  Q4_0 repacked: nibbles + fp16 scales
     rows = []
 
+    import pynvml as nv
+    nv.nvmlInit()
+    hnd = nv.nvmlDeviceGetHandleByIndex(0)
+
     def add(name, per_token, fn, bytes_):
         us = time_graph(fn)
+        mhz = nv.nvmlDeviceGetClockInfo(hnd, nv.NVML_CLOCK_SM)
         floor = bytes_ / BW / 1e3
         rows.append({"kernel": name, "per_token": per_token, "us": us, "floor_us": floor,
                      "gap_us_per_token": (us - floor) * per_token, "share_us_per_token": us * per_token})
         print(f"{name:<12} x{per_token:3d}  {us:7.2f} us  floor {floor:6.2f} us  -> {us * per_token:7.1f} us/token "
-              f"(gap {(us - floor) * per_token:6.1f})", flush=True)
+              f"(gap {(us - floor) * per_token:6.1f})  [SM clock {mhz} MHz]", flush=True)
 
     scale = ctypes.c_float(1.0 / math.sqrt(hd))
     nL = len(m.L)
