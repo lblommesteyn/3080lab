@@ -28,12 +28,25 @@ def _num(tok: str) -> int:
 _RENAMABLE_WIDE_FREE = ("SHFL",)  # in operands.WIDE_HINTS only to skip RF modeling; operands are 32-bit
 
 
+# Opcodes whose register operands are known to be plain 32-bit (apart from
+# explicit [Rn.64] addresses and .64/.128 data suffixes handled below). Anything
+# else may have implicit pair/quad operands (e.g. plain CS2R writes Rn:Rn+1,
+# which once let a rename clobber a clock register) and is pinned.
+SAFE_32 = ("FFMA", "FADD", "FMUL", "FMNMX", "FSETP", "FSEL", "FCHK", "IMAD", "IADD3", "LOP3", "SHF",
+           "LEA", "ISETP", "SEL", "MOV", "I2FP", "I2F", "F2I", "F2F", "MUFU", "SHFL", "HFMA2", "HADD2",
+           "HMUL2", "PRMT", "IABS", "IMNMX", "POPC", "FLO", "BREV", "S2R", "CS2R.32", "LDG", "LDS",
+           "STG", "STS", "LD", "ST", "IDP", "VOTE")
+
+
 def token_widths(i: sass.Instr) -> list[int] | None:
     """Register width (1/2/4) of each register token, or None if unknown (pin all)."""
     toks = opnd.reg_tokens(i.text)
     op = i.opcode
-    if op.startswith(("DFMA", "DADD", "DMUL", "DSETP", "HMMA", "IMMA", "LDSM", "LDGSTS", "ATOM", "RED",
-                      "TEX", "SU", "CALL", "RET", "BSSY", "BSYNC")):
+    if not any(op == s or op.startswith(s + ".") for s in SAFE_32) or op.startswith(("F2F.F64", "I2F.F64",
+                                                                                         "F2I.F64", "MUFU.RCP64",
+                                                                                         "MUFU.RSQ64")):
+        return None
+    if op == "CS2R" or (op.startswith("CS2R") and not op.startswith("CS2R.32")):
         return None
     addr = re.findall(r"\[([^\]]*)\]", i.text)
     addr_toks = []
