@@ -78,6 +78,37 @@ def set_control(cubin: bytes, kernel: str, edits: dict[int, dict[str, int]]) -> 
     return bytes(elf)
 
 
+def set_regcount(cubin: bytes, kernel: str, n: int) -> bytes:
+    """Register count lives in the top byte of .text.<kernel>'s sh_info."""
+    elf = bytearray(cubin)
+    shoff, = struct.unpack_from("<Q", elf, 0x28)
+    shentsize, shnum, _ = struct.unpack_from("<HHH", elf, 0x3A)
+    sec = text_section(elf, kernel)
+    for i in range(shnum):
+        base = shoff + i * shentsize
+        if struct.unpack_from("<Q", elf, base + 0x18)[0] == sec.offset:
+            info, = struct.unpack_from("<I", elf, base + 0x2C)
+            struct.pack_into("<I", elf, base + 0x2C, (info & 0x00FFFFFF) | (n << 24))
+            return bytes(elf)
+    raise ValueError("text section header not found")
+
+
+# Register operand fields of the common 3-source R-R-R ALU encoding (FFMA, IMAD ...):
+# Rd = lo[16:24], Ra = lo[24:32], Rb = lo[32:40], Rc = hi[0:8].
+def set_regs(cubin: bytes, kernel: str, offset: int, rd=None, ra=None, rb=None, rc=None) -> bytes:
+    elf = bytearray(cubin)
+    sec = text_section(elf, kernel)
+    base = sec.offset + offset
+    lo, hi = struct.unpack_from("<QQ", elf, base)
+    for val, shift in ((rd, 16), (ra, 24), (rb, 32)):
+        if val is not None:
+            lo = (lo & ~(0xFF << shift)) | (val << shift)
+    if rc is not None:
+        hi = (hi & ~0xFF) | rc
+    struct.pack_into("<QQ", elf, base, lo, hi)
+    return bytes(elf)
+
+
 def swap(cubin: bytes, kernel: str, off_a: int, off_b: int) -> bytes:
     """Swap two whole instructions (control bits travel with them). Only safe for
     non-branch instructions within one basic block; the caller is responsible
