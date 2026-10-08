@@ -96,7 +96,10 @@ class BankProbe(Chain):
         for n, ins in enumerate(i for i in body if i.opcode == self.target_opcode):
             s = S[n % 8]
             c = patch.set_regs(c, self.kernel_name, ins.offset, rd=s, ra=A, rb=s, rc=C)
-            c = patch.set_control(c, self.kernel_name, {ins.offset: {"reuse": 0b101 if reuse == "reuseAC" else 0}})
+            # reuse is only honored when the raw yield bit is 1 (warp does not yield);
+            # nvdisasm hides .reuse otherwise, matching DeepGEMM's "no reuse when yielded"
+            ctl = {"reuse": 0b101, "yield": 1} if reuse == "reuseAC" else {"reuse": 0}
+            c = patch.set_control(c, self.kernel_name, {ins.offset: ctl})
         # sanity: the rewrite must disassemble to exactly what we intended
         got = [i for i in sass.loop_body(sass.parse(toolchain.disassemble(c))) if i.opcode == self.target_opcode]
         want = f"R{A}" + (".reuse" if reuse == "reuseAC" else "")
