@@ -234,6 +234,33 @@ one FADD instead of IADD3 + I2F) adds ~14% (561 -> 642 GB/s). The half2
 (Marlin-style) variant currently computes wrong results (harness catches it);
 not yet debugged.
 
+### Phase 9: Qwen2.5-1.5B decode, end to end
+
+| decode (batch 1, greedy, ~40-token prompt, 256 new tokens) | tok/s |
+|---|---:|
+| PyTorch eager-style ops + tinygemm int4 linears, one CUDA graph | 207 |
+| llama.cpp b11485, official Q4_0 GGUF, `-fa 0` | 316 |
+| llama.cpp b11485, official Q4_0 GGUF, `-fa 1` | 340.5 |
+| **ours, llama.cpp's exact Q4_0 weights** (`scripts/qwen_gguf.py`) | **437** |
+| ours, own int4 g128 weights incl. int4 lm_head (`scripts/qwen_fused.py`) | 501 |
+
+The win is fusion, not the GEMV: tinygemm is already ~94% of the 705 GB/s
+practical roofline at 7B shapes, and our split-K GEMV ties it. The PyTorch
+decode launches ~1,100 kernels/token; ours ~200 (fused RMSNorm, GEMVs with
+bias / residual / SiLU*mul epilogues, one RoPE + KV-write + GQA attention
+kernel, argmax + position update), all captured in one CUDA graph.
+
+The GGUF run is the fair one: every tensor comes from llama.cpp's file
+(Q4_0 linears repacked bit-exactly, Q6_K output stored exactly as int8 +
+fp32 scale per 16, which reads 292 MB/token vs llama.cpp's 191 MB). Both
+engines produce coherent answers that diverge after 8 words (llama.cpp
+quantizes activations to Q8_1; we keep bf16 + fp32 accumulation). The
+official Qwen GGUF has per-channel scales folded into its norm weights
+(W*diag(norm) matches HF to 9.6% while the norms differ by 65%), so all
+tensors must come from the same file. At 2.29 ms/token we are at ~64% of the
+bandwidth bound (1.03 GB/token at 705 GB/s); the rest is launch overhead and
+small kernels.
+
 ### FP32/INT32 sharing (superseded by the section above)
 
 GA102 has 16 FP32 + 16 FP32/INT32 lanes per partition. If INT ops simply
