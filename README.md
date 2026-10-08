@@ -383,7 +383,13 @@ llama.cpp's Q4_0 weights: 446 -> 463 tok/s, 1.36x llama.cpp (340.5).**
 
 Refuted: folding RMSNorm into the residual GEMVs with a last-block-done tail
 (396 tok/s): the fenced, serialized tail costs ~8.7 us per site against 2.25 us
-for a separate kernel in the graph. Remaining gap to the bandwidth floor (0.52
+for a separate kernel in the graph. Also refuted: prefetching the next GEMVs'
+weights into L2 from idle SMs during attention (505/504/502 tok/s for 1/3/6 MB
+vs 512 without), even though `prefetch.global.L2` (CCTL.E.PF2) demonstrably fills
+L2 (chase after prefetch 279 cycles vs 495). A software grid barrier costs ~1.0 us
+with 68-136 co-resident blocks (1.3 us at 272, 2.3 at 544), the same as a kernel
+boundary in a graph, so a persistent megakernel would not remove the per-kernel
+cost. Hung kernels are not reset by TDR on this machine: spin loops need caps. Remaining gap to the bandwidth floor (0.52
 ms/token) is per-kernel fixed cost: attention 32%, RMSNorm 18%, GEMV tails.
 
 ### FP32/INT32 sharing (superseded by the section above)
