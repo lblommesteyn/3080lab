@@ -81,14 +81,14 @@ def main():
         H * 4 * 2)
     add("rmsnorm", 2 * nL + 1, lambda: m.rms(L["ln1"], m.x), H * 4 * 3)
     add("gemv_qkv", nL, lambda: m.gemv("qkv", L["qkv"], m.x, m.qkv, L["qkv_b"].data_ptr(), nq, H), q4(nq, H))
-    add("attention", nL, lambda: m.k_attn.launch(nh, 128, [m.qkv.data_ptr(), m.cos.data_ptr(), m.sin.data_ptr(),
+    add("attention", nL, lambda: m.k_attn.launch(nh, m.attn_threads, [m.qkv.data_ptr(), m.cos.data_ptr(), m.sin.data_ptr(),
                                                             m.pos.data_ptr(), m.kc[0].data_ptr(), m.vc[0].data_ptr(),
                                                             m.att.data_ptr(), ctypes.c_int32(nh), ctypes.c_int32(nkv), scale]),
         2 * nkv * 150 * hd * 2)
     add("gemv_o", nL, lambda: m.gemv("o", L["o"], m.att, m.h, 0, H, nh * hd), q4(H, nh * hd))
     add("gemv_gu", nL, lambda: m.gemv("gu", L["gu"], m.x, m.xm, 0, 2 * inter, H), q4(2 * inter, H))
     add("gemv_down", nL, lambda: m.gemv("down", L["down"], m.xm, m.h, 0, H, inter), q4(H, inter))
-    add("gemv_head", 1, lambda: m.gemv("head", m.head, m.x, m.logits, 0, m.V, H), m.V * H * 1.25)
+    add("gemv_head", 1, lambda: m.gemv("head", m.head, m.x, m.logits, 0, m.V, H), m.V * H * 6.5625 / 8)
     add("finish", 1, lambda: m.k_fin.launch(1, 1024, [m.logits.data_ptr(), ctypes.c_int32(m.V), m.tok.data_ptr(),
                                                      m.pos.data_ptr()]), m.V * 4)
     tot = sum(r["share_us_per_token"] for r in rows)
