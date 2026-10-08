@@ -79,7 +79,10 @@ extern "C" __global__ void k(const uint4* __restrict__ W, const float* S, const 
         L.append("for (int j = lane * %d; j < K / 32; j += 32 * %d) {" % (U, U))
         for u in range(U):
             for r in range(R):
-                L.append(f"  uint4 w{r}_{u} = (j + {u} < K / 32) ? W[(size_t)(row0 + {r}) * (K / 32) + j + {u}] : make_uint4(0x88888888u,0x88888888u,0x88888888u,0x88888888u);")
+                wexpr = f"W[(size_t)(row0 + {r}) * (K / 32) + j + {u}]"
+                if v.params.get("wc") == "cg":   # weights bypass L1 (no pollution of the reused x lines)
+                    wexpr = f"__ldcg(&{wexpr})"
+                L.append(f"  uint4 w{r}_{u} = (j + {u} < K / 32) ? {wexpr} : make_uint4(0x88888888u,0x88888888u,0x88888888u,0x88888888u);")
         for u in range(U):
             L.append(f"  const float4* xp{u} = X + (size_t)(j + {u}) * 8;")
             for k in range(4):
@@ -180,6 +183,27 @@ extern "C" __global__ void __launch_bounds__({Tn}) k(
             dev.free(st[key])
 
 
+@dataclass
+class Gemv3WC(Gemv3):
+    """Does weight traffic evict the reused x vector from L1? Same kernels, weights via .nc vs .cg."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.name = "gemv_l1_pollution"
+        self.description = "int4 GEMV with weight loads through L1 (.nc) vs bypassing it (.cg)"
+
+    def variants(self, opts):
+        out = []
+        for name, n, k in SHAPES:
+            if name not in ("gate_up", "down"):
+                continue
+            for R, U in ((4, 1), (4, 2), (8, 1), (8, 2)):
+                for wc in ("nc", "cg"):
+                    out.append(Variant(f"{name}/R{R}U{U}/{wc}", {"N": n, "K": k, "R": R, "U": U, "T": 128,
+                                                                "deq": "magic", "wc": wc, "warps": 4, "iters": 1}))
+        return out
+
+
 def registry():
-    e = Gemv3()
-    return {e.name: e}
+    exps = [Gemv3(), Gemv3WC()]
+    return {e.name: e for e in exps}

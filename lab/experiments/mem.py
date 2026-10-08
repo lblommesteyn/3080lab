@@ -157,7 +157,8 @@ extern "C" __global__ void k(const unsigned long long* arr, long long* cyc, unsi
 
 def registry() -> dict[str, Experiment]:
     exps = [Chase(space="global"), Chase(space="global", cache="cg"), Chase(space="global", cache="plain"),
-            Chase(space="shared", stride=4), Chase(space="global", pattern="seq"), Carveout(space="global")]
+            Chase(space="shared", stride=4), Chase(space="global", pattern="seq"), Carveout(space="global"),
+            CarveoutFine(space="global")]
     return {e.name: e for e in exps}
 
 
@@ -182,3 +183,19 @@ class Carveout(Chase):
     def kernel_attrs(self, v: Variant) -> dict[str, int]:
         c = v.params["carveout"]
         return {} if c < 0 else {"PREFERRED_SHARED_MEMORY_CARVEOUT": c}
+
+
+
+@dataclass
+class CarveoutFine(Carveout):
+    """Fine L1 capacity vs carveout: is L1 = min(128 KB - carveout, ~104 KB)?"""
+    carveouts: tuple = (0, 8, 16, 24, 32, 40)
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.name = "l1_carveout_fine"
+
+    def variants(self, opts):
+        sizes = [k * KB for k in range(64, 133, 4)]
+        return [Variant(f"c{c}/{_fmt(s)}", {"bytes": s, "iters": 50_000 // self.body, "warps": 1, "cold": False,
+                                            "carveout": c}) for c in self.carveouts for s in sizes]
