@@ -1,10 +1,8 @@
-from . import alu, cache, mem, regfile
+from . import alu, cache, mem, randk, regfile
 
 
 def registry():
     reg = {}
-    reg.update(alu.registry())
-    reg.update(mem.registry())
-    reg.update(cache.registry())
-    reg.update(regfile.registry())
+    for mod in (alu, mem, cache, regfile, randk):
+        reg.update(mod.registry())
     return reg
