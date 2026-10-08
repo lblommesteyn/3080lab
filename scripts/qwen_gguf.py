@@ -142,6 +142,7 @@ GGUFQwen.gemv = _gemv
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     from transformers import AutoTokenizer
     tok = AutoTokenizer.from_pretrained(str(next(Q.MODEL.iterdir())))
     msgs = [{"role": "user", "content": "Explain in three sentences why GPUs are good at matrix multiplication."}]
