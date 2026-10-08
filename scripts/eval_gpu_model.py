@@ -49,7 +49,9 @@ def gemv_spec(exp: str, p: dict):
 
 def main():
     mem = G.fit_mlp()
-    print(f"mem fit from mem_mlp: peak {mem.peak_gbps:.0f} GB/s, loaded latency {mem.lat_ns:.0f} ns")
+    lat = G.calibrate_dram_latency()
+    print(f"peak {mem.peak_gbps:.0f} GB/s (mem_mlp); DRAM load latency calibrated on the 1-SM/1-warp point: "
+          f"{lat} cycles = {lat / G.F_CLK_GHZ:.0f} ns")
     rows = []
     for exp in ("gemv_int4_v3", "gemv_int4_v4", "gemv_int4_v4_q15", "gemv_q4_0_blocks"):
         f = sorted(R.glob(f"*_{exp}/record.json"))
@@ -65,25 +67,23 @@ def main():
             if spec is None:
                 continue
             warps, tpb, trips, per, total = spec
-            regs = s["resources"]["registers"]
-            wres = G.resident_warps_per_sm(regs, tpb)
             body = model.body_from_listing(d / f"{s['kernel_artifact']}.sass.json")
-            sim = model.simulate(body, warps=min(wres, 32), iters=4, mem_level="L1", sim_iters=4, version=1)
-            issue_ns = sim["per_iter"] / F_CLK_GHZ * (wres / min(wres, 32))
-            pr = G.predict_stream(total_bytes=total, warps_total=warps, bytes_per_warp_iter=per, trips_per_warp=trips,
-                                  warps_per_sm_resident=wres, issue_ns_per_trip=issue_ns, mem=mem)
-            pred = pr["us"] - G.LAUNCH_US
+            pr = G.predict_sim(body, total_bytes=total, warps_total=warps, threads_per_block=tpb,
+                               regs=s["resources"]["registers"], trips_per_warp=trips, mem=mem, dram_lat=lat)
             meas = s["metrics"]["us"]["median"]
-            rows.append((exp, lab, meas, pred, (pred - meas) / meas, pr["bound"], pr["inflight_kb"]))
+            rows.append((exp, lab, meas, pr["us"], (pr["us"] - meas) / meas, pr["bound"], pr["waves"]))
     e = np.abs([r[4] for r in rows])
-    print(f"\nGEMV variants: n={len(rows)}  median |err| {np.median(e):.1%}  within 10%: {np.mean(e < .10):.0%}  "
+    print()
+    print(f"GEMV variants: n={len(rows)}  median |err| {np.median(e):.1%}  within 10%: {np.mean(e < .10):.0%}  "
           f"within 20%: {np.mean(e < .20):.0%}")
     for exp in sorted({r[0] for r in rows}):
         ee = np.abs([r[4] for r in rows if r[0] == exp])
         print(f"  {exp:<20} n={len(ee):3d} median {np.median(ee):.1%}")
-    print("\nworst 12:")
+    print()
+    print("worst 12:")
     for r in sorted(rows, key=lambda r: -abs(r[4]))[:12]:
-        print(f"  {r[0]:<18} {r[1]:<22} meas {r[2]:7.1f} us  pred {r[3]:7.1f} us  {r[4]:+.0%}  [{r[5]}, {r[6]:.0f} KB in flight]")
+        print(f"  {r[0]:<18} {r[1]:<22} meas {r[2]:7.1f} us  pred {r[3]:7.1f} us  {r[4]:+.0%}  [{r[5]}-bound, {r[6]} waves]")
+    (R / "gpu_model_eval.json").write_text(json.dumps(rows, indent=1))
 
 
 if __name__ == "__main__":

@@ -265,5 +265,72 @@ extern "C" __global__ void __launch_bounds__(1024) k(int stride, int iters, unsi
 
 
 def registry():
-    exps = [Coalesce(), Width(), MLP(), SmemBanks()]
+    exps = [Coalesce(), Width(), MLP(), SmemBanks(), L1Wavefronts()]
     return {e.name: e for e in exps}
+
+
+@dataclass
+class L1Wavefronts(Experiment):
+    """L1-hit load throughput vs lane stride on one SM: how many cycles an LDG costs when the
+    warp's 32 addresses touch k distinct 128 B lines (k = 1..32). 16 KB buffer, ld.ca (L1)."""
+
+    def __post_init__(self):
+        self.name = "l1_wavefronts"
+        self.description = "L1-hit LDG throughput vs lane stride (lines touched per instruction), one SM"
+
+    def source(self, v):
+        w = v.params["width"]
+        ty, n = {4: ("u32", 1), 16: ("v4.u32", 4)}[w]
+        regs = ", ".join(f"%{i}" for i in range(n))
+        dst = "{" + regs + "}" if n > 1 else "%0"
+        outs = ", ".join(f'"=r"(r{i})' for i in range(n))
+        decl = " ".join(f"unsigned r{i};" for i in range(n))
+        fold = " ^ ".join(f"r{i}" for i in range(n))
+        return f"""
+extern "C" __global__ void __launch_bounds__(1024) k(const unsigned char* __restrict__ B, int stride, int iters,
+                                                    unsigned* sink, long long* cyc)
+{{
+  unsigned lane = threadIdx.x & 31, acc = 0;
+  long long t0 = clock64();
+  #pragma unroll 1
+  for (int i = 0; i < iters; ++i) {{
+    unsigned off = ((lane * stride) + (i & 7) * 4096 + (threadIdx.x >> 5) * 16) & 16383;
+    {decl}
+    asm volatile("ld.global.ca.{ty} {dst}, [%{n}];" : {outs} : "l"(B + off));
+    acc ^= {fold};
+  }}
+  long long t1 = clock64();
+  if (acc == 0x9e3779b9u) sink[0] = acc;
+  if (threadIdx.x == 0) cyc[0] = t1 - t0;
+}}
+"""
+
+    def expected(self, v):
+        return {}
+
+    def variants(self, opts):
+        out = []
+        for w in (4, 16):
+            for s in (w, 32, 64, 128, 256):
+                out.append(Variant(f"{w}B/stride{s}", {"width": w, "stride": s, "iters": 4096, "warps": 32}))
+        return out
+
+    def prepare(self, dev, v):
+        st = {"B": dev.alloc(16384), "sink": dev.alloc(4), "cyc": dev.alloc(8)}
+        dev.memset(st["B"], 16384)
+        st["launch"] = dict(grid=1, block=1024, args=[ctypes.c_uint64(st["B"]), ctypes.c_int32(v.params["stride"]),
+                                                      ctypes.c_int32(v.params["iters"]), ctypes.c_uint64(st["sink"]),
+                                                      ctypes.c_uint64(st["cyc"])])
+        return st
+
+    def collect(self, dev, v, st):
+        cyc = int(dev.dtoh(np.zeros(1, np.int64), st["cyc"])[0])
+        instr = 32 * v.params["iters"]
+        lines = min(32, max(1, 32 * v.params["stride"] // 128)) if v.params["stride"] >= 4 else 1
+        return {"cycles": cyc, "ops_per_thread": v.params["iters"], "cycles_per_op": cyc / v.params["iters"],
+                "warp_ops_per_cycle": instr / cyc, "cycles_per_ldg_sm": cyc / instr,
+                "lines_per_instr": lines, "sm_mhz_inkernel": 0.0}
+
+    def release(self, dev, st):
+        for x in ("B", "sink", "cyc"):
+            dev.free(st[x])

@@ -39,13 +39,26 @@ class MemFit:
         return min(self.peak_gbps, inflight_bytes / self.lat_ns)   # bytes/ns == GB/s
 
 
+def loads_per_iter(sass_json: Path) -> tuple[int, int]:
+    """(number of global loads, bytes per lane) in the SASS loop body, i.e. what one warp has
+    in flight per trip when all of an iteration's loads issue before the first use."""
+    from . import model
+    body = model.body_from_listing(sass_json)
+    lds = [i for i in body if i.opcode.startswith(("LDG", "LD."))]
+    width = lambda op: 16 if ".128" in op else 8 if ".64" in op else 4  # noqa: E731
+    return len(lds), sum(width(i.opcode) for i in lds)
+
+
 def fit_mlp() -> MemFit:
-    """Fit BW = min(peak, q/L) to mem_mlp (q = sms * warps * 32 lanes * 16 B)."""
-    r = latest("mem_mlp")
+    """Fit BW = min(peak, q/L) to mem_mlp, with q = SMs x warps x 32 lanes x bytes-per-lane in
+    flight per loop trip (read from the kernel's SASS: ptxas unrolls the loop)."""
+    f = sorted(RESULTS.glob("*_mem_mlp/record.json"))[-1]
+    r = json.loads(f.read_text())
     q, bw = [], []
     for lab, s in r["summary"].items():
         p = s["params"]
-        q.append(p["sms"] * p["wps"] * 32 * 16)
+        _, per_lane = loads_per_iter(f.parent / f"{s['kernel_artifact']}.sass.json")
+        q.append(p["sms"] * p["wps"] * 32 * per_lane)
         bw.append(s["metrics"]["gbps"]["median"])
     q, bw = np.array(q, float), np.array(bw, float)
     peak = float(np.percentile(bw, 98))
@@ -72,3 +85,44 @@ def predict_stream(*, total_bytes: float, warps_total: int, bytes_per_warp_iter:
     t_issue = waves * trips_per_warp * issue_ns_per_trip
     return {"us": (max(t_mem, t_issue)) / 1e3 + LAUNCH_US, "t_mem_us": t_mem / 1e3, "t_issue_us": t_issue / 1e3,
             "inflight_kb": inflight / 1024, "bw_gbps": mem.bw(inflight), "bound": "mem" if t_mem >= t_issue else "issue"}
+
+
+F_CLK_GHZ = 1.95
+
+
+def calibrate_dram_latency() -> int:
+    """Pick the DRAM load latency (cycles) at which the SM simulator reproduces the measured
+    1-SM x 1-warp mem_mlp bandwidth. Only microbenchmark data is used."""
+    from . import model
+    f = sorted(RESULTS.glob("*_mem_mlp/record.json"))[-1]
+    r = json.loads(f.read_text())
+    s = r["summary"]["sms1/w1"]
+    body = model.body_from_listing(f.parent / f"{s['kernel_artifact']}.sass.json")
+    _, per_lane = loads_per_iter(f.parent / f"{s['kernel_artifact']}.sass.json")
+    target = s["metrics"]["gbps"]["median"]                  # GB/s == bytes/ns
+    best = None
+    for lat in range(200, 1600, 10):
+        model.MEM_LATENCY["DRAM"] = lat
+        pi = model.simulate(body, warps=1, iters=8, mem_level="DRAM", sim_iters=6)["per_iter"]
+        bw = 32 * per_lane / (pi / F_CLK_GHZ)
+        if best is None or abs(bw - target) < best[1]:
+            best = (lat, abs(bw - target), bw)
+    model.MEM_LATENCY["DRAM"] = best[0]
+    return best[0]
+
+
+def predict_sim(body, *, total_bytes: float, warps_total: int, threads_per_block: int, regs: int,
+                trips_per_warp: int, mem: MemFit, dram_lat: int) -> dict:
+    """T = max(SM simulation with DRAM-latency loads, total_bytes / peak)."""
+    from . import model
+    model.MEM_LATENCY["DRAM"] = dram_lat
+    wres = resident_warps_per_sm(regs, threads_per_block)
+    per_sm = -(-warps_total // SMS)
+    w_sim = max(1, min(wres, per_sm))
+    waves = -(-per_sm // w_sim)
+    sim = model.simulate(body, warps=w_sim, iters=max(1, trips_per_warp), mem_level="DRAM",
+                         sim_iters=min(6, max(1, trips_per_warp)), version=1)
+    t_sm = waves * sim["cycles"] / F_CLK_GHZ          # ns
+    t_bw = total_bytes / mem.peak_gbps                # ns
+    return {"us": max(t_sm, t_bw) / 1e3, "t_sm_us": t_sm / 1e3, "t_bw_us": t_bw / 1e3,
+            "bound": "sm" if t_sm >= t_bw else "bw", "w_sim": w_sim, "waves": waves}
