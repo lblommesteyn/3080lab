@@ -117,7 +117,7 @@ class FusedQwen:
         for i, L in enumerate(self.L):
             self.rms(L["ln1"], self.x)
             self.gemv("qkv", L["qkv"], self.x, self.qkv, L["qkv_b"].data_ptr(), nq, H)
-            self.k_attn.launch(self.nh, 128, [self.qkv.data_ptr(), self.cos.data_ptr(), self.sin.data_ptr(),
+            self.k_attn.launch(self.nh, getattr(self, "attn_threads", 128), [self.qkv.data_ptr(), self.cos.data_ptr(), self.sin.data_ptr(),
                                               self.pos.data_ptr(), self.kc[i].data_ptr(), self.vc[i].data_ptr(),
                                               self.att.data_ptr(), ctypes.c_int32(self.nh), ctypes.c_int32(self.nkv), scale])
             self.gemv("o", L["o"], self.att, self.h, 0, H, self.nh * self.hd)

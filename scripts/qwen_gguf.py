@@ -104,7 +104,9 @@ class GGUFQwen(F.FusedQwen):
                   (("qkv", "biasf"), ("o", "resid"), ("gu", "swiglu"), ("down", "resid"))}
         self.k["head"] = F.Kern(KS.gemv_i8_source(SPLIT["head"]))
         self.k_rms, self.k_emb = F.Kern(KS.RMSNORM_F32W), F.Kern(KS.EMBED_F32)
-        self.k_attn, self.k_fin = F.Kern(KS.ATTN % {"maxlen": Q.MAX_LEN}), F.Kern(KS.FINISH)
+        attn = "ATTN4" if "--attn-v1" not in sys.argv else "ATTN"
+        self.k_attn, self.k_fin = F.Kern(getattr(KS, attn) % {"maxlen": Q.MAX_LEN}), F.Kern(KS.FINISH)
+        self.attn_threads = 512 if attn == "ATTN4" else 128
 
 
 def main():
@@ -118,7 +120,7 @@ def main():
     F.check(F.cu.cuCtxSetCurrent(F.check(F.cu.cuDevicePrimaryCtxRetain(F.check(F.cu.cuDeviceGet(0))))))
     F.FusedQwen = GGUFQwen  # run_fused instantiates FusedQwen
     res = []
-    for _ in range(2):
+    for _ in range(3):
         r = F.run_fused(ids)
         res.append(r)
         print(f"ours(gguf) {r['tok_per_s']:7.1f} tok/s  {r['ms_per_token']:.3f} ms/token", flush=True)
