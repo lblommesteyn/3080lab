@@ -79,18 +79,37 @@ def set_control(cubin: bytes, kernel: str, edits: dict[int, dict[str, int]]) -> 
 
 
 def set_regcount(cubin: bytes, kernel: str, n: int) -> bytes:
-    """Register count lives in the top byte of .text.<kernel>'s sh_info."""
+    """The register count is stored twice: the top byte of .text.<kernel>'s sh_info
+    (what nvdisasm shows) and EIATTR_REGCOUNT (0x2f) in .nv.info, keyed by the
+    kernel's symbol index (what the driver allocates from). Patch both."""
     elf = bytearray(cubin)
     shoff, = struct.unpack_from("<Q", elf, 0x28)
     shentsize, shnum, _ = struct.unpack_from("<HHH", elf, 0x3A)
     sec = text_section(elf, kernel)
+    sym = None
     for i in range(shnum):
         base = shoff + i * shentsize
         if struct.unpack_from("<Q", elf, base + 0x18)[0] == sec.offset:
             info, = struct.unpack_from("<I", elf, base + 0x2C)
             struct.pack_into("<I", elf, base + 0x2C, (info & 0x00FFFFFF) | (n << 24))
-            return bytes(elf)
-    raise ValueError("text section header not found")
+            sym = info & 0x00FFFFFF
+    if sym is None:
+        raise ValueError("text section header not found")
+    nvi = sections(elf)[".nv.info"]
+    i, end, hit = nvi.offset, nvi.offset + nvi.size, False
+    while i < end:
+        fmt, attr = elf[i], elf[i + 1]
+        if fmt == 4:
+            size, = struct.unpack_from("<H", elf, i + 2)
+            if attr == 0x2F and struct.unpack_from("<I", elf, i + 4)[0] == sym:
+                struct.pack_into("<I", elf, i + 8, n)
+                hit = True
+            i += 4 + size
+        else:
+            i += {1: 2, 2: 3, 3: 4}[fmt]
+    if not hit:
+        raise ValueError("EIATTR_REGCOUNT for kernel not found")
+    return bytes(elf)
 
 
 # Register operand fields of the common 3-source R-R-R ALU encoding (FFMA, IMAD ...):
