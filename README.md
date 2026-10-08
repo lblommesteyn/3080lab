@@ -357,7 +357,11 @@ Fix (predicted, then measured): lane-contiguous U loads -> gate_up R8U2
 94.2 -> 55.3 us (1.70x), q_o 15.4 -> 12.3, down 65.5 -> 59.4.
 
 **Predictor**: adding the split-sector rule (efficiency 0.61 from the
-microbenchmark) takes the GEMV median error to 12.8% (77% within 20%).
+microbenchmark) takes the GEMV median error to 12.8% (77% within 20%); simulating
+each kernel's prologue/epilogue once (later waves' straight-line code overlaps
+other warps' loops) brings it to **11.5% median, 79% within 20%** on 131 variants
+(7B split-K family 6.8%). Residual: ~1.3 us on 4 us kernels (block-dispatch ramp
+and the __syncthreads/shared-memory reduction, not modeled).
 
 **Predictor-guided Qwen work** (`scripts/qwen_kernel_times.py`): per-kernel
 cost vs bandwidth floor (with clocks warmed; the first attempt ran at the 210 MHz

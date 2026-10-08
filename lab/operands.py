@@ -114,6 +114,9 @@ def operands(ins: sass.Instr, cache: dict) -> Operands:
     if not info:
         return Operands(None, [], wide, False)
     f = info["fields"]
+    if any(t >= len(toks) for t in f.values()):
+        # same form key, different operand shape (seen in prologue/epilogue code): unknown, be conservative
+        return Operands(None, [], wide, False)
     by_tok = {t: fld for fld, t in f.items()}
     num = lambda s: 255 if s == "RZ" else int(s[1:])  # noqa: E731
     dest = num(toks[f["d"]]) if "d" in f else None

@@ -120,8 +120,9 @@ def straight_parts(instrs: list) -> tuple[list, list]:
     body = _s.loop_body(instrs)
     if not body:
         return instrs, []
-    i0 = instrs.index(body[0])
-    i1 = instrs.index(body[-1]) + 1
+    offs = [x.offset for x in instrs]
+    i0 = offs.index(body[0].offset)
+    i1 = offs.index(body[-1].offset) + 1
     post = []
     for x in instrs[i1:]:
         post.append(x)
@@ -150,7 +151,9 @@ def predict_sim(body, *, total_bytes: float, warps_total: int, threads_per_block
         once = [x for part in straight for x in part]
         if once:
             s2 = model.simulate(once, warps=w_sim, iters=1, mem_level="DRAM", sim_iters=1, version=1)
-            t_sm += -(-per_sm // w_sim) * s2["cycles"] / F_CLK_GHZ
+            # prologue/epilogue of later waves overlap other warps' loops: only the first
+            # fill and the last drain are exposed, i.e. once per kernel
+            t_sm += s2["cycles"] / F_CLK_GHZ
     t_bw = total_bytes / (mem.peak_gbps * (SPLIT_SECTOR_EFF if split_sector else 1.0))   # ns
     return {"us": max(t_sm, t_bw) / 1e3, "t_sm_us": t_sm / 1e3, "t_bw_us": t_bw / 1e3,
             "bound": "sm" if t_sm >= t_bw else "bw", "w_sim": w_sim, "waves": waves}
