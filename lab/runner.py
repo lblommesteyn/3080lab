@@ -138,6 +138,10 @@ def run(exp, opts: dict) -> dict:
         rs = pv["results"]
         metrics = {k: stats([r[k] for r in rs]) for k in rs[0]
                    if isinstance(rs[0][k], (int, float)) and not isinstance(rs[0][k], bool)}
+        # timing self-consistency: clock64 cycles vs globaltimer ns must imply a sane SM clock
+        mhz = [r["cycles"] / r["ns"] * 1e3 for r in rs if r.get("ns") and r.get("sm_mhz_inkernel")]
+        if mhz and not all(200 < m < 2500 for m in mhz):
+            warnings.append(f"[{label}] clock64/globaltimer inconsistent (implied {min(mhz):.0f}-{max(mhz):.0f} MHz): timing registers corrupt?")
         checks = [r["correct"] for r in rs if r.get("correct") is not None]
         if checks and not all(checks):
             warnings.append(f"[{label}] WRONG RESULT in {checks.count(False)}/{len(checks)} trials")
