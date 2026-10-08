@@ -19,7 +19,7 @@ import itertools
 from dataclasses import dataclass
 
 from .alu import Chain
-from .base import Variant
+from .base import Experiment, Variant
 
 # With regcount N only R0..R(N-3) are usable: R62/R63 fault at N=64 (diag_r62, diag_r63).
 SCRATCH_EVEN = [36, 38, 40, 42, 44, 46, 48, 50]
@@ -110,6 +110,65 @@ class BankProbe(Chain):
         return r
 
 
+@dataclass
+class MixBank(Experiment):
+    """Is the FFMA:SHF mix ceiling (2.65 of 4) a register-bank conflict?
+
+    In the mix kernels ptxas can only keep one FFMA operand in the reuse cache
+    (the interleaved SHF evicts the other slot), and the two FFMA operands read
+    from the register file sit in the same bank. Rewrite each FFMA's chain
+    register (Rd=Rb) to a scratch register in the OPPOSITE bank from its Ra
+    ("opp") or the SAME bank ("same", control). Timing only."""
+    partner: str = "shl"
+
+    def __post_init__(self):
+        from .probes import Mix
+        self._mix = Mix(partner=self.partner)
+        self.name = f"mixbank_ffma_{self.partner}"
+        self.target_opcode = "FFMA"
+        self.description = f"FFMA:{self._mix.partner_opcode} mix with FFMA chain registers moved to opposite/same bank"
+
+    def source(self, v):
+        return self._mix.source(v)
+
+    def expected(self, v):
+        return self._mix.expected(v)
+
+    def variants(self, opts):
+        base = self._mix.variants(opts)
+        return [Variant(f"{b.label}/{mode}", {**b.params, "mode": mode})
+                for b in base if 0 < b.params["ffma_chains"] for mode in ("orig", "opp", "same")]
+
+    def build_key(self, v):
+        return v.params["mode"]
+
+    def transform(self, cubin: bytes, v: Variant) -> bytes:
+        from .. import patch, sass, toolchain
+        if v.params["mode"] == "orig":
+            return cubin
+        body = sass.loop_body(sass.parse(toolchain.disassemble(cubin)))
+        ff = [i for i in body if i.opcode == "FFMA"]
+        c = patch.set_regcount(cubin, self.kernel_name, 64)
+        pools = {0: list(SCRATCH_EVEN), 1: list(SCRATCH_ODD)}
+        mapping: dict[int, int] = {}
+        for i in ff:
+            rd, ra = i.lo >> 16 & 0xFF, i.lo >> 24 & 0xFF
+            want = (ra & 1) ^ 1 if v.params["mode"] == "opp" else ra & 1
+            if rd not in mapping:
+                mapping[rd] = pools[want].pop(0)
+            c = patch.set_regs(c, self.kernel_name, i.offset, rd=mapping[rd], rb=mapping[rd])
+        return c
+
+    def prepare(self, dev, v):
+        return self._mix.prepare(dev, v)
+
+    def collect(self, dev, v, st):
+        return self._mix.collect(dev, v, st)
+
+    def release(self, dev, st):
+        self._mix.release(dev, st)
+
+
 def registry():
-    e = BankProbe()
-    return {e.name: e}
+    exps = [BankProbe(), MixBank(partner="shl"), MixBank(partner="imad")]
+    return {e.name: e for e in exps}
