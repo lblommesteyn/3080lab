@@ -131,7 +131,7 @@ class GGUFQwen(F.FusedQwen):
             if a.startswith("--prefetch-mb="):
                 attn, self.pf_mb = "ATTN4PF", float(a.split("=")[1])
         self.k_attn, self.k_fin = F.Kern(getattr(KS, attn) % {"maxlen": Q.MAX_LEN}), F.Kern(KS.FINISH)
-        self.attn_threads = 512 if attn == "ATTN4" else 128
+        self.attn_threads = 512 if attn in ("ATTN4", "ATTN4PF") else 128
 
 
 _BASE_GEMV = F.FusedQwen.gemv   # captured before main() rebinds F.FusedQwen
