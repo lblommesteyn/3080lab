@@ -82,19 +82,33 @@ extern "C" __global__ void k(const uint4* __restrict__ W, const float* S, const 
                 wexpr = f"W[(size_t)(row0 + {r}) * (K / 32) + j + {u}]"
                 if v.params.get("wc") == "cg":   # weights bypass L1 (no pollution of the reused x lines)
                     wexpr = f"__ldcg(&{wexpr})"
-                L.append(f"  uint4 w{r}_{u} = (j + {u} < K / 32) ? {wexpr} : make_uint4(0x88888888u,0x88888888u,0x88888888u,0x88888888u);")
+                if v.params.get("ablate") == "compute":   # no weight loads: opaque register values
+                    L.append(f"  uint4 w{r}_{u}; asm volatile(\"mov.b32 %0, %1;\" : \"=r\"(w{r}_{u}.x) : \"r\"(j * 2654435761u + {r * 8 + u}));"
+                             f" w{r}_{u}.y = w{r}_{u}.x * 3u; w{r}_{u}.z = w{r}_{u}.x ^ 0x5555u; w{r}_{u}.w = w{r}_{u}.x + 7u;")
+                else:
+                    L.append(f"  uint4 w{r}_{u} = (j + {u} < K / 32) ? {wexpr} : make_uint4(0x88888888u,0x88888888u,0x88888888u,0x88888888u);")
         for u in range(U):
             L.append(f"  const float4* xp{u} = X + (size_t)(j + {u}) * 8;")
             for k in range(4):
-                L.append(f"  float4 xa{u}_{k} = (j + {u} < K / 32) ? xp{u}[{2 * k}] : make_float4(0,0,0,0);"
-                         f" float4 xb{u}_{k} = (j + {u} < K / 32) ? xp{u}[{2 * k + 1}] : make_float4(0,0,0,0);")
+                if v.params.get("ablate") == "compute":   # no x loads: opaque register values
+                    L.append(f"  float xs{u}_{k}; asm volatile(\"mov.b32 %0, %1;\" : \"=f\"(xs{u}_{k}) : \"f\"((float)(j + {k})));"
+                             f" float4 xa{u}_{k} = make_float4(xs{u}_{k}, xs{u}_{k} + 1.f, xs{u}_{k} + 2.f, xs{u}_{k} + 3.f);"
+                             f" float4 xb{u}_{k} = make_float4(xs{u}_{k} + 4.f, xs{u}_{k} + 5.f, xs{u}_{k} + 6.f, xs{u}_{k} + 7.f);")
+                else:
+                    L.append(f"  float4 xa{u}_{k} = (j + {u} < K / 32) ? xp{u}[{2 * k}] : make_float4(0,0,0,0);"
+                             f" float4 xb{u}_{k} = (j + {u} < K / 32) ? xp{u}[{2 * k + 1}] : make_float4(0,0,0,0);")
                 if deq == "half2":
                     L.append(f"  __half2 xh{u}_{k}[4] = {{__floats2half2_rn(xa{u}_{k}.x, xb{u}_{k}.x), __floats2half2_rn(xa{u}_{k}.y, xb{u}_{k}.y),"
                              f" __floats2half2_rn(xa{u}_{k}.z, xb{u}_{k}.z), __floats2half2_rn(xa{u}_{k}.w, xb{u}_{k}.w)}};")
         for u in range(U):
             for r in range(R):
                 L.append("  { float part = 0.f;")
-                L += ["    " + s for s in _deq(deq, f"w{r}_{u}", u)]
+                if v.params.get("ablate") == "loads":   # keep every load, trivial math consuming all of it
+                    xs = " + ".join(f"xa{u}_{k}.x + xa{u}_{k}.y + xa{u}_{k}.z + xa{u}_{k}.w + xb{u}_{k}.x + xb{u}_{k}.y + xb{u}_{k}.z + xb{u}_{k}.w" for k in range(4))
+                    L.append(f"    part = __uint_as_float(((w{r}_{u}.x ^ w{r}_{u}.y ^ w{r}_{u}.z ^ w{r}_{u}.w) & 0x3fffffu) | 0x3f800000u)"
+                             + (f" + ({xs});" if r == 0 else ";"))
+                else:
+                    L += ["    " + s for s in _deq(deq, f"w{r}_{u}", u)]
                 L.append(f"    if (j + {u} < K / 32) acc[{r}] = fmaf(S[(size_t)(row0 + {r}) * (K / 128) + ((j + {u}) >> 2)], part, acc[{r}]); }}")
         L.append("}")
         body = "\n    ".join(L)
@@ -204,6 +218,24 @@ class Gemv3WC(Gemv3):
         return out
 
 
+@dataclass
+class Gemv3Ablate(Gemv3):
+    """Which half owns the U=2 slowdown? Full kernel vs loads-only vs compute-only."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.name = "gemv_ablate"
+        self.description = "int4 GEMV ablation: full / loads only / compute only (R4U1, R4U2, R8U1, R8U2)"
+
+    def variants(self, opts):
+        out = []
+        for R, U in ((4, 1), (4, 2), (8, 1), (8, 2)):
+            for ab in ("none", "loads", "compute"):
+                out.append(Variant(f"gate_up/R{R}U{U}/{ab}", {"N": 18944, "K": 3584, "R": R, "U": U, "T": 128,
+                                                             "deq": "magic", "ablate": ab, "warps": 4, "iters": 1}))
+        return out
+
+
 def registry():
-    exps = [Gemv3(), Gemv3WC()]
+    exps = [Gemv3(), Gemv3WC(), Gemv3Ablate()]
     return {e.name: e for e in exps}
