@@ -167,6 +167,57 @@ min(4, 2/(1-p)) warp-instr/cyc/SM, i.e. only the 16-lane INT pipe limits it.
 **A register renumbering alone makes the 50/50 mix 1.48x faster than ptxas.**
 IMAD does not benefit (it shares the fmaheavy pipe with FFMA; real contention).
 
+### Reuse cache and yield semantics
+
+- `.reuse` only takes effect when the raw yield bit is 1 (warp does not
+  yield); nvdisasm hides `.reuse` otherwise (85/512 IMADs in one test). This
+  fixes the yield polarity the literature disagrees on: raw 1 = stay.
+- Entries are per (bank, operand slot). An instruction that does not read a
+  slot (RZ, immediate, constant) leaves that entry alone, so a value can stay
+  cached across an intervening instruction. A read of the same bank and slot
+  either refreshes the entry (reuse flag) or evicts it.
+- IMAD (half rate) follows the same bank rules: 3 operands in one bank cost 3
+  cycles; 2 in one bank cost nothing extra because the read overlaps the
+  2-cycle pipe. Each bank has its own read port.
+
+### Predictor (Phase 5)
+
+`lab/model.py` simulates one SM from the control bits plus measured tables.
+Out-of-sample on 60 random kernels it never saw: v0 median error 3.4%, 68%
+within 5%. On a second held-out set: v0 5.9%, v1 (fma/alu pipes, per-bank
+register ports, reuse cache) 7.0%. v1 fixes register-bank kernels (7.9% ->
+2.6%) and the HFMA2 mix, but still mis-handles some IMAD+FFMA mixes and
+IMAD/SHF-heavy multi-warp kernels. Cache-capacity edges need a partial-hit model.
+
+### Automatic register re-allocation beats ptxas (`lab/regalloc.py`, `realloc_*`)
+
+Live-range (web) splitting over the CFG, interference from liveness, annealed
+coloring for bank-conflict cost, operand fields discovered empirically per
+instruction form (`lab/operands.py`). Every result is checked three ways:
+disassembly text must match the substitution, reaching definitions of every
+use must be unchanged, and GPU outputs must be bit-identical.
+
+| FFMA:SHF mix | ptxas | re-allocated | speedup |
+|---|---:|---:|---:|
+| 3/8 | 2.43 | 2.97 | 1.22x |
+| 4/8 | 2.64 | 3.52 | 1.33x |
+| 5/8 | 2.87 | 3.75 | 1.31x |
+| 7/8 | 3.52 | 3.91 | 1.11x |
+
+Two soundness bugs found on the way (both now pinned): plain `CS2R Rn` writes
+the pair Rn:Rn+1, and a renamed read of the hidden Rn+1 corrupted the kernel's
+clock while outputs still matched. Lesson: only whitelisted pure-32-bit
+opcodes are renamable, and the runner now cross-checks clock64 against
+globaltimer. The proof is only as good as the operand model, so GPU checks stay.
+
+### int4 GEMV baseline (Phase 9 start, `gemv_int4`)
+
+One-warp-per-row W4 (group-128) GEMV at Qwen2.5-7B layer shapes reaches only
+161-260 GB/s of ~760 GB/s. Batch-1 decode here is instruction/latency bound,
+not DRAM bound: per 32 weights ptxas emits 32 FFMA + 84 integer ALU ops
+(including 32 IADD3 for the "-8") + 32 I2FP. Bank re-allocation does nothing
+for it (no conflicts in the hot loop). This is the target for Phase 9.
+
 ### FP32/INT32 sharing (superseded by the section above)
 
 GA102 has 16 FP32 + 16 FP32/INT32 lanes per partition. If INT ops simply
