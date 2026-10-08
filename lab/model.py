@@ -26,7 +26,8 @@ from .sass import Instr
 BRANCH_TAKEN_PENALTY = 7      # fitted: dependent_ffma loop = sum(stalls) + 7
 STALL0_CYCLES = 32            # stall field 0 behaves like ~32 (stall probes: 32.8/op)
 READ_BARRIER = 2
-REUSE_SCOPE = "partition"          # "warp": each warp keeps its own reuse slots; "partition": any other warp's issue clears them
+RF_MODEL = "shared"         # "per_bank": each bank has its own read port; "shared": one port per partition
+REUSE_SCOPE = "warp"          # "warp": each warp keeps its own reuse slots; "partition": any other warp's issue clears them
 
 MEM_LATENCY = {"L1": 35, "L2": 238, "DRAM": 498, "SMEM": 23}
 SB_LATENCY = {  # issue -> dependent may issue, for scoreboarded producers
@@ -67,19 +68,39 @@ def port_of_v1(op: str):
     return port_of(op)
 
 
-def rf_cycles(ops, reuse_cache: dict, wid: int) -> int:
-    """Register-file read cycles: 2 banks (parity), one read per bank per cycle;
-    operands supplied by the reuse cache (same warp, same slot, same register) are free."""
+def bank_reads(ops, reuse_cache: dict, wid: int) -> list[int]:
+    """Reads needed from [bank0, bank1]. Reuse cache: one entry per (bank, operand slot)
+    holding (warp, reg); a hit costs no read."""
     if ops is None or ops.wide or not ops.complete:
-        return 1
+        return [0, 0]
     banks = [0, 0]
+    for slot, reg in ops.srcs:
+        if reg == 255 or reuse_cache.get((reg & 1, slot)) == (wid, reg):
+            continue
+        banks[reg & 1] += 1
+    return banks
+
+
+def update_reuse(ops, ins, reuse_cache: dict, wid: int):
+    """After an instruction: each slot it READ either keeps the value (reuse flag set and
+    the warp does not yield) or evicts that (bank, slot) entry. Slots it does not read
+    (RZ, immediates, constants) leave the cache alone (Huerta et al.: an entry is
+    invalidated when a read arrives for the same bank and operand position)."""
+    if ops is None or ops.wide or not ops.complete:
+        reuse_cache.clear()
+        return
     for slot, reg in ops.srcs:
         if reg == 255:
             continue
-        if reuse_cache.get(slot) == (wid, reg):
-            continue
-        banks[reg & 1] += 1
-    return max(1, max(banks))
+        key = (reg & 1, slot)
+        if ins.yield_ and ins.reuse >> "abc".index(slot) & 1:
+            reuse_cache[key] = (wid, reg)
+        else:
+            reuse_cache.pop(key, None)
+
+
+def rf_cycles(ops, reuse_cache: dict, wid: int) -> int:
+    return max(1, max(bank_reads(ops, reuse_cache, wid)))
 
 
 def port_of(op: str):
@@ -150,17 +171,19 @@ def simulate(body: list[Instr], warps: int, iters: int, mem_level: str = "L1",
                 if part_port[p].get(port, 0) > t or (smp and sm_port.get(smp, 0) > t):
                     continue
                 if version >= 1:
-                    if part_port[p].get("rf", 0) > t:
+                    if RF_MODEL == "shared" and part_port[p].get("rf", 0) > t:
                         continue
                     rcache = reuse_w[w.wid] if REUSE_SCOPE == "warp" else reuse[p]
-                    rc = rf_cycles(ops_of[w.pc], rcache, w.wid)
-                    part_port[p]["rf"] = t + rc
-                    o = ops_of[w.pc]
-                    rcache.clear()
-                    if o is not None and o.complete and not o.wide:
-                        for slot, reg in o.srcs:
-                            if ins.reuse >> "abc".index(slot) & 1:
-                                rcache[slot] = (w.wid, reg)
+                    if RF_MODEL == "per_bank":
+                        br = bank_reads(ops_of[w.pc], rcache, w.wid)
+                        if any(br[b] and part_port[p].get(f"bank{b}", 0) > t for b in (0, 1)):
+                            continue
+                        for b in (0, 1):
+                            if br[b]:
+                                part_port[p][f"bank{b}"] = t + br[b]
+                    else:
+                        part_port[p]["rf"] = t + rf_cycles(ops_of[w.pc], rcache, w.wid)
+                    update_reuse(ops_of[w.pc], ins, rcache, w.wid)
                 part_port[p][port] = t + cost
                 if smp:
                     sm_port[smp] = t + smc
