@@ -274,6 +274,58 @@ small kernels.
   4.8 us; 37,984 blocks: 27.5 us, ~49 ns/block/SM). With real work per block the
   dispatch overlaps execution: G = 1..8 row-groups per block made no difference.
 
+### Memory system under load (`mem_*`, `smem_banks`, `l1_wavefronts`, `l2_latency_map`, `tlb_reach`)
+
+- **Transfer granularity is the 32 B sector** for L2 and DRAM: useful bandwidth
+  halves per stride doubling up to 32 B. L2 serves ~2.0-2.2 TB/s, DRAM ~710-720
+  GB/s regardless of 4/8/16 B per-lane width. At a 256 B lane stride DRAM drops
+  to ~60% of the sector rate (row/bank locality; 256 B chunks per bank/row).
+- **Little's law**: one SM caps at ~63 GB/s; DRAM saturates at 710 GB/s with
+  >= 4 warps/SM on 68 SMs or >= 16 warps/SM on 17 SMs. Loaded DRAM latency
+  (calibrated through the SM simulator): 570 cycles = 292 ns.
+- **L1 wavefronts**: an L1-hit load costs one SM cycle per distinct 128 B line
+  the warp touches (floor ~3): 1 line 2.8, 4 lines 4.3, 8 -> 8.0, 32 -> 32.0 cycles.
+  ld.global.nc behaves identically. This, not DRAM latency, was why the naive
+  one-row-per-warp GEMV was slow (each fp32 x load touched 32 lines).
+- **Shared memory**: 32 banks x 4 B, but one request per 2 cycles, so 2-way
+  conflicts are free; n-way costs n/2 (4-way 0.25, ..., 32-way 0.031 warp-instr/cycle).
+- **L2 map** (every line of a 2 MB buffer timed from all 68 SMs, trial-to-trial
+  r = 0.997): no A100-style bimodal split. Variance = SM position 69% (45-cycle
+  range; SMs 2k/2k+1 identical = TPC pairs; blocks of 6 = GPC placement), line
+  21%, and a rank-1 SM x line interaction 9%. That interaction is a two-way L2
+  half selected by **XOR of address bits {8, 11, 14, 15, 16, 17, 19}**, which
+  explains 100.0% of 16,384 lines; near/far costs only ~3-12 cycles.
+- **TLB**: cudaMalloc uses 2 MB pages; a 16-entry first level (knee between 32 and
+  48 MB), and only +10-15 cycles beyond it even at 2 GB.
+
+### Whole-GPU predictor for real kernels (`lab/model_gpu.py`, `scripts/eval_gpu_model.py`)
+
+T = max(SM simulation of the real SASS loop, bytes / 710 GB/s) + fixed overhead.
+The SM simulation uses the calibrated DRAM latency, scoreboards, pipes, register
+banks, and an SM-wide L1 port charged per 128 B line. Which pointer each load
+reads is found by **flow-sensitive address provenance** (reaching definitions
+back to kernel parameters); lines per instruction come from each kernel
+family's access pattern, scaled by active lanes. Every constant comes from
+microbenchmarks. On 131 measured GEMV variants: **median error 13.6%, 73% within
+20%** (23.1% without the L1 term). Remaining misses: register-heavy R8U2
+kernels (~2x slower than predicted, unexplained) and epilogue cost on 3-4 us kernels.
+
+### Tensor cores (`tc_*`)
+
+| mma.sync | latency (cyc) | peak / SM / cycle | at 1.95 GHz |
+|---|---:|---:|---:|
+| FP16 or BF16 -> FP32 acc | 32.9 | 512 FLOP | 67.9 TFLOPS |
+| FP16 -> FP16 acc | 24.0 | 1,024 FLOP | 135.5 TFLOPS |
+| TF32 -> FP32 | 32.9 | 256 FLOP | 33.9 TFLOPS |
+| INT8 / INT4 -> INT32 | 24.0 | 2,044 / 4,088 ops | 271 / 542 TOPS |
+| binary AND+POPC | 24.0 | 16,351 ops | 2,168 TOPS |
+
+FP32 accumulation is half rate (GeForce segmentation). One warp per SM
+partition saturates the tensor core: the issue interval (32 cycles FP32-acc, 16
+FP16-acc) is about its latency, so chains within one warp do not overlap.
+Register fragment layouts for m16n8k16 f16 and m16n8k32 s8 verified exactly
+against numpy (`tc_correct`).
+
 ### FP32/INT32 sharing (superseded by the section above)
 
 GA102 has 16 FP32 + 16 FP32/INT32 lanes per partition. If INT ops simply
