@@ -265,7 +265,7 @@ extern "C" __global__ void __launch_bounds__(1024) k(int stride, int iters, unsi
 
 
 def registry():
-    exps = [Coalesce(), Width(), MLP(), SmemBanks(), L1Wavefronts()]
+    exps = [Coalesce(), Width(), MLP(), SmemBanks(), L1Wavefronts(), SplitSector()]
     return {e.name: e for e in exps}
 
 
@@ -336,3 +336,47 @@ extern "C" __global__ void __launch_bounds__(1024) k(const unsigned char* __rest
     def release(self, dev, st):
         for x in ("B", "sink", "cyc"):
             dev.free(st[x])
+
+
+@dataclass
+class SplitSector(Coalesce):
+    """DRAM streaming where each 32 B sector is read by TWO instructions (lane stride 32 B,
+    16 B each: the GEMV U=2 pattern) vs contiguous 16 B per lane (each sector read once)."""
+
+    def __post_init__(self):
+        self.name = "mem_split_sector"
+        self.description = "DRAM bandwidth: split-sector (U=2 GEMV) pattern vs contiguous, via L1 (.nc) or not (.cg)"
+
+    def source(self, v):
+        cop = v.params["cop"]
+        split = v.params["pattern"] == "split"
+        a0 = "(base + lane * 32)" if split else "(base + lane * 16)"
+        a1 = "(base + lane * 32 + 16)" if split else "(base + 512 + lane * 16)"
+        return f"""
+extern "C" __global__ void __launch_bounds__(256) k(const unsigned char* __restrict__ B, unsigned long long mask,
+    int stride, int iters, unsigned* sink, unsigned long long* T)
+{{
+  {TIMED_HEAD}
+  unsigned long long warp = (blockIdx.x * 256ull + threadIdx.x) >> 5, nw = gridDim.x * 8ull;
+  unsigned lane = threadIdx.x & 31, acc = 0;
+  for (int i = 0; i < iters; ++i) {{
+    unsigned long long base = ((warp + i * nw) * 1024ull) & mask;
+    unsigned x0, x1, x2, x3, y0, y1, y2, y3;
+    asm volatile("ld.global.{cop}.v4.u32 {{%0,%1,%2,%3}}, [%4];" : "=r"(x0), "=r"(x1), "=r"(x2), "=r"(x3) : "l"(B + {a0}));
+    asm volatile("ld.global.{cop}.v4.u32 {{%0,%1,%2,%3}}, [%4];" : "=r"(y0), "=r"(y1), "=r"(y2), "=r"(y3) : "l"(B + {a1}));
+    acc ^= x0 ^ x1 ^ x2 ^ x3 ^ y0 ^ y1 ^ y2 ^ y3;
+  }}
+  if (acc == 0x9e3779b9u) sink[0] = acc;
+  {TIMED_TAIL}
+}}
+"""
+
+    def variants(self, opts):
+        return [Variant(f"{pat}/{cop}", {"size": 256 * MB, "stride": 0, "iters": 128, "warps": 8,
+                                         "pattern": pat, "cop": cop})
+                for pat in ("contig", "split") for cop in ("nc", "cg", "ca")]
+
+    def prepare(self, dev, v):
+        st = super().prepare(dev, v)
+        st["useful"] = st["blocks"] * 256 * v.params["iters"] * 32
+        return st

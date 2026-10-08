@@ -58,14 +58,17 @@ LINES = {
 }
 
 
-def l1_map(cubin: bytes, exp: str, active: float = 1.0) -> dict:
-    """active: average fraction of lanes that issue loads (short split-K chunks idle lanes)."""
+def l1_map(cubin: bytes, exp: str, active: float = 1.0, U: int = 1) -> dict:
+    """active: average fraction of lanes that issue loads (short split-K chunks idle lanes).
+    U: uint4 loads per row per lane per trip; lanes are then 16*U bytes apart, so each weight
+    load instruction spans U times more lines (gemv_l1_pollution showed the cost)."""
     prov = model.load_provenance(cubin)
     out = {}
     for off, params in prov.items():
         role = "W" if 0 in params else "X" if 2 in params else "S" if 1 in params else None
         if role:
-            out[off] = max(1, round(LINES[exp][role] * active))
+            lines = min(32, LINES[exp][role] * (U if role == "W" else 1))
+            out[off] = max(1, round(lines * active))
     return out
 
 
@@ -100,8 +103,8 @@ def main():
                 continue
             warps, tpb, trips, per, total = spec
             body = model.body_from_listing(d / f"{s['kernel_artifact']}.sass.json")
-            l1 = (l1_map((d / f"{s['kernel_artifact']}.cubin").read_bytes(), exp, active_fraction(exp, p))
-                  if USE_L1 else None)
+            l1 = (l1_map((d / f"{s['kernel_artifact']}.cubin").read_bytes(), exp, active_fraction(exp, p),
+                         p.get("U", 1)) if USE_L1 else None)
             pr = G.predict_sim(body, total_bytes=total, warps_total=warps, threads_per_block=tpb,
                                regs=s["resources"]["registers"], trips_per_warp=trips, mem=mem, dram_lat=lat,
                                l1_lines=l1)
