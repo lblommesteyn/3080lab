@@ -8,14 +8,14 @@ from __future__ import annotations
 
 from .experiments.gemv4 import _inner
 
-EPILOGUES = ("store", "bias", "resid", "swiglu", "logits")
+EPILOGUES = ("store", "bias", "biasf", "resid", "swiglu", "logits")
 
 
-def gemv_source(S_: int, epi: str) -> str:
+def gemv_source(S_: int, epi: str, quant: str = "g128f32") -> str:
     """Split-K int4 GEMV, block = S warps on one 4-row group, bf16 X.
     epi: store (bf16 Y), bias (bf16 Y = acc + B), resid (fp32 Y += acc),
          swiglu (rows interleaved g,u: bf16 Y[row0/2 + t] = silu(g) * u), logits (fp32 Y)."""
-    body = _inner(4, "kb + lane", "ke", "32", "bf16")
+    body = _inner(4, "kb + lane", "ke", "32", "bf16", quant)
     if epi == "swiglu":
         fin = """
   if (threadIdx.x < 2 && row0 + 2 * threadIdx.x + 1 < rowEnd + 1) {
@@ -28,6 +28,7 @@ def gemv_source(S_: int, epi: str) -> str:
         store = {
             "store": "((__nv_bfloat16*)Y)[r] = __float2bfloat16_rn(a);",
             "bias": "((__nv_bfloat16*)Y)[r] = __float2bfloat16_rn(a + __bfloat162float(((const __nv_bfloat16*)AUX)[r]));",
+            "biasf": "((__nv_bfloat16*)Y)[r] = __float2bfloat16_rn(a + ((const float*)AUX)[r]);",
             "resid": "((float*)Y)[r] += a;",
             "logits": "((float*)Y)[r] = a;",
         }[epi]
@@ -41,6 +42,7 @@ def gemv_source(S_: int, epi: str) -> str:
   }}"""
     return f"""
 #include <cuda_bf16.h>
+#include <cuda_fp16.h>
 #define SPLIT {S_}
 extern "C" __global__ void __launch_bounds__({32 * S_}, 1) k(
     const uint4* __restrict__ W, const float* __restrict__ S, const uint4* __restrict__ X,
@@ -193,3 +195,74 @@ extern "C" __global__ void __launch_bounds__(1024) k(const float* __restrict__ l
   }
 }
 """
+
+
+EMBED_F32 = r"""
+extern "C" __global__ void k(const float* __restrict__ E, const long long* tok, float* __restrict__ h, int H)
+{
+  const float* row = E + (size_t)tok[0] * H;
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < H; i += gridDim.x * blockDim.x) h[i] = row[i];
+}
+"""
+
+
+def gemv_i8_source(S_: int) -> str:
+    """Exact int8 GEMV for Q6_K-derived weights: W int8 [N, K] (16 per uint4), fp32 scale
+    per 16 weights [N, K/16], bf16 X, fp32 logits out. Split-K over S warps, 4 rows/block.
+    int8 -> float exactly via the magic constant: bits 0x4B000000 | (b ^ 0x80) = 2^23 + 128 + q."""
+    rows = []
+    for r in range(4):
+        rows.append(f"""
+      {{ uint4 w = (row0 + {r} < rowEnd) ? W[(size_t)(row0 + {r}) * KW + j] : make_uint4(0x80808080u,0x80808080u,0x80808080u,0x80808080u);
+        unsigned ws[4] = {{w.x, w.y, w.z, w.w}}; float part = 0.f;
+        #pragma unroll
+        for (int u = 0; u < 4; ++u) {{
+          unsigned b = ws[u] ^ 0x80808080u;
+          part = fmaf(__int_as_float(((b      ) & 255) | 0x4B000000) - 8388736.0f, xf[4 * u + 0], part);
+          part = fmaf(__int_as_float(((b >>  8) & 255) | 0x4B000000) - 8388736.0f, xf[4 * u + 1], part);
+          part = fmaf(__int_as_float(((b >> 16) & 255) | 0x4B000000) - 8388736.0f, xf[4 * u + 2], part);
+          part = fmaf(__int_as_float(((b >> 24)      ) | 0x4B000000) - 8388736.0f, xf[4 * u + 3], part);
+        }}
+        if (row0 + {r} < rowEnd) acc[{r}] = fmaf(S[(size_t)(row0 + {r}) * KW + j], part, acc[{r}]); }}""")
+    return f"""
+extern "C" __global__ void __launch_bounds__({32 * S_}, 1) k(
+    const uint4* __restrict__ W, const float* __restrict__ S, const uint4* __restrict__ X,
+    float* Y, const void* AUX, int N, int K)
+{{
+  __shared__ float red[{S_}][4];
+  int ws_ = threadIdx.x >> 5, lane = threadIdx.x & 31;
+  int KW = K / 16;
+  int row0 = blockIdx.x * 4, rowEnd = min(N, row0 + 4);
+  int chunk = (KW + {S_} - 1) / {S_};
+  int kb = ws_ * chunk, ke = min(KW, kb + chunk);
+  float acc[4] = {{0, 0, 0, 0}};
+  for (int j = kb + lane; j < ke; j += 32) {{
+    uint4 xa = X[(size_t)j * 2], xb = X[(size_t)j * 2 + 1];
+    unsigned xw[8] = {{xa.x, xa.y, xa.z, xa.w, xb.x, xb.y, xb.z, xb.w}};
+    float xf[16];
+    #pragma unroll
+    for (int i = 0; i < 8; ++i) {{ xf[2 * i] = __uint_as_float(xw[i] << 16); xf[2 * i + 1] = __uint_as_float(xw[i] & 0xffff0000u); }}
+    {"".join(rows)}
+  }}
+  #pragma unroll
+  for (int r = 0; r < 4; ++r) {{
+    float a = acc[r];
+    for (int o = 16; o; o >>= 1) a += __shfl_xor_sync(0xffffffffu, a, o);
+    if (lane == 0) red[ws_][r] = a;
+  }}
+  __syncthreads();
+  if (threadIdx.x < 4 && row0 + threadIdx.x < rowEnd) {{
+    float a = 0.f;
+    #pragma unroll
+    for (int s = 0; s < {S_}; ++s) a += red[s][threadIdx.x];
+    Y[row0 + threadIdx.x] = a;
+  }}
+}}
+"""
+
+# RMSNorm with fp32 weights (GGUF stores norms as F32, with folded channel scales);
+# fp32 math like llama.cpp, single rounding to bf16 at the end.
+RMSNORM_F32W = RMSNORM.replace("const __nv_bfloat16* __restrict__ w", "const float* __restrict__ w").replace(
+    "out[i] = __float2bfloat16_rn(__bfloat162float(__float2bfloat16_rn(h[i] * r)) * __bfloat162float(w[i]));",
+    "out[i] = __float2bfloat16_rn(h[i] * r * w[i]);")
+assert "w[i]);" in RMSNORM_F32W and "__bfloat162float(w[i])" not in RMSNORM_F32W

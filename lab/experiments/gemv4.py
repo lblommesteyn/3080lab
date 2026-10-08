@@ -28,7 +28,7 @@ SMS = 68
 MAX_WARPS_PER_SM = 48
 
 
-def _inner(R: int, kexpr_start: str, kexpr_end: str, step: str, io: str = "f32") -> str:
+def _inner(R: int, kexpr_start: str, kexpr_end: str, step: str, io: str = "f32", scale: str = "g128f32") -> str:
     """Accumulate rows row0..row0+R-1 over uint4 index range [start, end) with stride step.
     io="bf16": x is packed bf16 (8 per uint4), widened exactly to fp32 by shift/mask."""
     L = [f"for (int j = {kexpr_start}; j < {kexpr_end}; j += {step}) {{"]
@@ -50,7 +50,9 @@ def _inner(R: int, kexpr_start: str, kexpr_end: str, step: str, io: str = "f32")
     for r in range(R):
         L.append("  { float part = 0.f;")
         L += ["    " + s for s in _deq("magic", f"w{r}_0", 0)]
-        L.append(f"    if (row0 + {r} < rowEnd) acc[{r}] = fmaf(S[(size_t)(row0 + {r}) * (K / 128) + (j >> 2)], part, acc[{r}]); }}")
+        sexpr = (f"S[(size_t)(row0 + {r}) * (K / 128) + (j >> 2)]" if scale == "g128f32" else
+                 f"__half2float(reinterpret_cast<const __half*>(S)[(size_t)(row0 + {r}) * (K / 32) + j])")
+        L.append(f"    if (row0 + {r} < rowEnd) acc[{r}] = fmaf({sexpr}, part, acc[{r}]); }}")
     L.append("}")
     return "\n      ".join(L)
 
