@@ -218,6 +218,22 @@ not DRAM bound: per 32 weights ptxas emits 32 FFMA + 84 integer ALU ops
 (including 32 IADD3 for the "-8") + 32 I2FP. Bank re-allocation does nothing
 for it (no conflicts in the hot loop). This is the target for Phase 9.
 
+### int4 GEMV: 2.4-2.5x from memory-level parallelism, then dequant count (`gemv_int4_v2`)
+
+| shape (N x K) | naive R1 | best | speedup | GB/s |
+|---|---:|---:|---:|---:|
+| gate_up 18944 x 3584 | 135.2 us | 56.3 us (R4, magic) | 2.40x | 642 (~84% of peak) |
+| down 3584 x 18944 | 151.6 us | 60.9 us (R4, magic) | 2.49x | 594 |
+| q_o 3584 x 3584 | 31.7 us | 13.3 us (R4, magic) | 2.38x | 515 |
+| qkv_kv 512 x 3584 | 6.1 us | 5.1 us | 1.20x | 194 (launch/tail bound) |
+
+At one row per warp the dequant scheme does not matter (latency bound, too
+few loads in flight). Four rows per warp fixes that, and then the kernel is
+instruction bound, where the exact "magic" fp32 dequant (`0x4B000000|q`,
+one FADD instead of IADD3 + I2F) adds ~14% (561 -> 642 GB/s). The half2
+(Marlin-style) variant currently computes wrong results (harness catches it);
+not yet debugged.
+
 ### FP32/INT32 sharing (superseded by the section above)
 
 GA102 has 16 FP32 + 16 FP32/INT32 lanes per partition. If INT ops simply
