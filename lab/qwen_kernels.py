@@ -32,6 +32,7 @@ def gemv_source(S_: int, epi: str, quant: str = "g128f32", G: int = 1, timed: bo
             "bias": "((__nv_bfloat16*)Y)[r] = __float2bfloat16_rn(a + __bfloat162float(((const __nv_bfloat16*)AUX)[r]));",
             "biasf": "((__nv_bfloat16*)Y)[r] = __float2bfloat16_rn(a + ((const float*)AUX)[r]);",
             "resid": "((float*)Y)[r] += a;",
+            "resid_norm": "((float*)Y)[r] += a;",
             "logits": "((float*)Y)[r] = a;",
         }[epi]
         fin = f"""
@@ -43,11 +44,41 @@ def gemv_source(S_: int, epi: str, quant: str = "g128f32", G: int = 1, timed: bo
     {store}
   }}"""
     tparam = ", unsigned long long* T" if timed else ""
+    if epi == "resid_norm":
+        tparam += ", unsigned* cnt, const float* __restrict__ nw, __nv_bfloat16* __restrict__ xout, float eps"
     tstart = 'unsigned long long g0; asm volatile("mov.u64 %0, %%globaltimer;" : "=l"(g0));' if timed else ""
     tend = ("""
   __syncthreads();
   if (threadIdx.x == 0) { unsigned long long g1; asm volatile("mov.u64 %0, %%globaltimer;" : "=l"(g1));
     T[2 * blockIdx.x] = g0; T[2 * blockIdx.x + 1] = g1; }""" if timed else "")
+    normtail = ""
+    if epi == "resid_norm":
+        # last block to finish computes RMSNorm(h) * nw -> xout for the next GEMV (removes a launch)
+        normtail = """
+  __shared__ unsigned last;
+  __shared__ float part[32];
+  __threadfence();
+  __syncthreads();
+  if (threadIdx.x == 0) last = (atomicAdd(cnt, 1u) == gridDim.x - 1);
+  __syncthreads();
+  if (last) {
+    __threadfence();
+    const float* hf = (const float*)Y;
+    float ss = 0.f;
+    for (int i = threadIdx.x; i < N; i += blockDim.x) { float v = __ldcg(hf + i); ss += v * v; }
+    for (int o = 16; o; o >>= 1) ss += __shfl_xor_sync(0xffffffffu, ss, o);
+    if ((threadIdx.x & 31) == 0) part[threadIdx.x >> 5] = ss;
+    __syncthreads();
+    if (threadIdx.x == 0) {
+      float s = 0.f;
+      for (int w = 0; w < (int)(blockDim.x >> 5); ++w) s += part[w];
+      part[0] = rsqrtf(s / N + eps);
+      *cnt = 0u;
+    }
+    __syncthreads();
+    float rr = part[0];
+    for (int i = threadIdx.x; i < N; i += blockDim.x) xout[i] = __float2bfloat16_rn(__ldcg(hf + i) * rr * nw[i]);
+  }"""
     return f"""
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
@@ -77,7 +108,7 @@ extern "C" __global__ void __launch_bounds__({32 * S_ * G}, 1) k(
   }}
   __syncthreads();
   if (row0 < N) {{{fin}
-  }}{tend}
+  }}{tend}{normtail}
 }}
 """
 

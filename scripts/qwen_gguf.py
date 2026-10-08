@@ -116,8 +116,11 @@ class GGUFQwen(F.FusedQwen):
         self.tok = torch.zeros(1, dtype=torch.long, device=dev)
         self.pos = torch.zeros(1, dtype=torch.long, device=dev)
         F.SPLIT.update(SPLIT)
+        self.fuse_norm = "--no-fuse-norm" not in sys.argv
+        repi = "resid_norm" if self.fuse_norm else "resid"
         self.k = {name: F.Kern(KS.gemv_source(SPLIT[name], epi, "g32f16")) for name, epi in
-                  (("qkv", "biasf"), ("o", "resid"), ("gu", "swiglu"), ("down", "resid"))}
+                  (("qkv", "biasf"), ("o", repi), ("gu", "swiglu"), ("down", repi))}
+        self.cnt = torch.zeros(2 * nL, dtype=torch.int32, device=dev)   # one self-resetting counter per launch site
         self.k["head"] = F.Kern(KS.gemv_q6_source(SPLIT["head"]) if self.head_q6 else KS.gemv_i8_source(SPLIT["head"]))
         self.k_rms, self.k_emb = F.Kern(KS.RMSNORM_F32W), F.Kern(KS.EMBED_F32)
         attn = "ATTN4" if "--attn-v1" not in sys.argv else "ATTN"
@@ -126,6 +129,37 @@ class GGUFQwen(F.FusedQwen):
 
 
 _BASE_GEMV = F.FusedQwen.gemv   # captured before main() rebinds F.FusedQwen
+_BASE_STEP = F.FusedQwen.step
+
+
+def _step(self):
+    """Decode step with RMSNorm folded into the residual GEMVs (o -> ln2, down -> next ln1 / final norm)."""
+    if not self.fuse_norm:
+        return _BASE_STEP(self)
+    c = F.ctypes
+    H, nq = self.H, (self.nh + 2 * self.nkv) * self.hd
+    self.k_emb.launch(4, 512, [self.embed.data_ptr(), self.tok.data_ptr(), self.h.data_ptr(), c.c_int32(H)])
+    self.rms(self.L[0]["ln1"], self.x)
+    scale = c.c_float(1.0 / F.math.sqrt(self.hd))
+    eps = c.c_float(self.eps)
+    nL = len(self.L)
+    for i, L in enumerate(self.L):
+        self.gemv("qkv", L["qkv"], self.x, self.qkv, L["qkv_b"].data_ptr(), nq, H)
+        self.k_attn.launch(self.nh, self.attn_threads, [self.qkv.data_ptr(), self.cos.data_ptr(), self.sin.data_ptr(),
+                                                        self.pos.data_ptr(), self.kc[i].data_ptr(), self.vc[i].data_ptr(),
+                                                        self.att.data_ptr(), c.c_int32(self.nh), c.c_int32(self.nkv), scale])
+        for name, Wt, X, N, K, nw, ci in (("o", L["o"], self.att, H, self.nh * self.hd, L["ln2"], 2 * i),
+                                          ("down", L["down"], None, H, self.inter, None, 2 * i + 1)):
+            if name == "down":
+                self.gemv("gu", L["gu"], self.x, self.xm, 0, 2 * self.inter, H)
+                X = self.xm
+                nw = self.L[i + 1]["ln1"] if i + 1 < nL else self.norm
+            W_, S_ = Wt
+            self.k[name].launch((N + 3) // 4, 32 * F.SPLIT[name],
+                                [W_.data_ptr(), S_.data_ptr(), X.data_ptr(), self.h.data_ptr(), 0, c.c_int32(N), c.c_int32(K),
+                                 c.c_uint64(self.cnt.data_ptr() + 4 * ci), nw.data_ptr(), self.x.data_ptr(), eps])
+    self.gemv("head", self.head, self.x, self.logits, 0, self.V, H)
+    self.k_fin.launch(1, 1024, [self.logits.data_ptr(), c.c_int32(self.V), self.tok.data_ptr(), self.pos.data_ptr()])
 
 
 def _gemv(self, name, wsplit, X, Y, aux, N, K):
@@ -139,6 +173,7 @@ def _gemv(self, name, wsplit, X, Y, aux, N, K):
 
 
 GGUFQwen.gemv = _gemv
+GGUFQwen.step = _step
 
 
 def main():
