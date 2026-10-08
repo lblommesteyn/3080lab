@@ -87,18 +87,26 @@ def main():
     for _ in range(3):
         run(0, 0)                                     # warm clocks
     base = np.median([run(0, 0) for _ in range(5)], axis=0)
-    # references: one line from each of the 40 latency clusters (results/l2_slice_labels.npy)
-    lat_lab = np.load(ROOT / "results" / "l2_slice_labels.npy")
-    rng = np.random.default_rng(0)
-    refs = [int(rng.choice(np.nonzero(lat_lab == c)[0])) for c in range(lat_lab.max() + 1)]
-    D = np.zeros((len(refs), n), np.float32)
-    for r, ref in enumerate(refs):
-        D[r] = np.median([run(ref, 1) for _ in range(3)], axis=0) - base
-        print(f"ref {r:2d} line {ref:5d}: +{D[r, ref]:.0f} at ref; lines > +25: {(D[r] > 25).sum()}, > +200: {(D[r] > 200).sum()}, "
-              f"> +2000: {(D[r] > 2000).sum()}", flush=True)
-    np.save(ROOT / "results" / "l2_contention_D.npy", D)
+    # adaptive references: start from the saved 40, then keep adding a line that no reference slows
+    # strongly (> +2000 cycles) until every line has one (or 120 references)
+    D = list(np.load(ROOT / "results" / "l2_contention_D.npy"))
+    refs = list(np.load(ROOT / "results" / "l2_contention_refs.npy"))
+    rng = np.random.default_rng(1)
+    while len(refs) < 120:
+        strongest = np.max(np.array(D), axis=0)
+        weak = np.nonzero(strongest < 2000)[0]
+        print(f"{len(refs)} refs: lines without a strong unit: {len(weak)}", flush=True)
+        if len(weak) == 0:
+            break
+        ref = int(rng.choice(weak))
+        d = np.median([run(ref, 1) for _ in range(3)], axis=0) - base
+        if d[ref] < 2000:
+            print(f"   ref {ref} did not slow itself (+{d[ref]:.0f}); skipped", flush=True)
+            continue
+        refs.append(ref)
+        D.append(d.astype(np.float32))
+    np.save(ROOT / "results" / "l2_contention_D.npy", np.array(D))
     np.save(ROOT / "results" / "l2_contention_refs.npy", np.array(refs))
-    (ROOT / "results" / "l2_slices.json").write_text(json.dumps({"base": int(base_ptr)}))
 
 
 if __name__ == "__main__":
