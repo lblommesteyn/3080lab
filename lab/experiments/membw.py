@@ -372,11 +372,22 @@ extern "C" __global__ void __launch_bounds__(256) k(const unsigned char* __restr
 """
 
     def variants(self, opts):
-        return [Variant(f"{pat}/{cop}", {"size": 256 * MB, "stride": 0, "iters": 128, "warps": 8,
-                                         "pattern": pat, "cop": cop})
-                for pat in ("contig", "split") for cop in ("nc", "cg", "ca")]
+        out = []
+        for bps in (1, 6):                       # blocks of 8 warps per SM: low vs full occupancy
+            for pat in ("contig", "split"):
+                for cop in ("nc", "cg"):
+                    out.append(Variant(f"bps{bps}/{pat}/{cop}", {"size": 256 * MB, "stride": 0,
+                                                                 "iters": 128 * 6 // bps, "warps": 8,
+                                                                 "pattern": pat, "cop": cop, "bps": bps}))
+        return out
 
     def prepare(self, dev, v):
         st = super().prepare(dev, v)
-        st["useful"] = st["blocks"] * 256 * v.params["iters"] * 32
+        blocks = 68 * v.params["bps"]
+        dev.free(st["T"])
+        st["T"] = dev.alloc(blocks * 16)
+        st["blocks"] = blocks
+        st["launch"]["grid"] = blocks
+        st["launch"]["args"][5] = ctypes.c_uint64(st["T"])
+        st["useful"] = blocks * 256 * v.params["iters"] * 32
         return st
