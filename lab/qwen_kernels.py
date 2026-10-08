@@ -281,3 +281,93 @@ RMSNORM_F32W = RMSNORM.replace("const __nv_bfloat16* __restrict__ w", "const flo
     "out[i] = __float2bfloat16_rn(__bfloat162float(__float2bfloat16_rn(h[i] * r)) * __bfloat162float(w[i]));",
     "out[i] = __float2bfloat16_rn(h[i] * r * w[i]);")
 assert "w[i]);" in RMSNORM_F32W and "__bfloat162float(w[i])" not in RMSNORM_F32W
+
+# Flash-decoding attention in one launch: grid = NH x MAXCH blocks (static for graphs).
+# Block (h, c) handles positions [64c, 64c+64) of head h. Partials (max, sum, out[128])
+# go to scratch; the last block to arrive for head h (atomic counter) combines them,
+# writes the output and resets the counter.
+ATTN2 = r"""
+#include <cuda_bf16.h>
+#define HD 128
+#define MAXLEN %(maxlen)d
+#define CH 64
+#define MAXCH (MAXLEN / CH)
+extern "C" __global__ void __launch_bounds__(128) k(
+    const __nv_bfloat16* __restrict__ qkv, const float* __restrict__ cosT, const float* __restrict__ sinT,
+    const long long* posp, __nv_bfloat16* __restrict__ kc, __nv_bfloat16* __restrict__ vc,
+    __nv_bfloat16* __restrict__ out, int NH, int NKV, float scale,
+    float* __restrict__ part, unsigned* __restrict__ counter)
+{
+  __shared__ float q[HD], kn[HD], vn[HD], sc[CH], red[8];
+  __shared__ int amLast;
+  int h = blockIdx.x / MAXCH, c = blockIdx.x %% MAXCH;
+  int d = threadIdx.x, warp = d >> 5, lane = d & 31;
+  int grp = NH / NKV, kvh = h / grp;
+  int pos = (int)posp[0];
+  int j0 = c * CH, j1 = min(pos + 1, j0 + CH);
+  float* P = part + ((size_t)h * MAXCH + c) * (HD + 2);
+  if (j0 <= pos) {
+    int half = HD / 2, dd = d %% half;
+    float cs = cosT[pos * half + dd], sn = sinT[pos * half + dd];
+    float qa = __bfloat162float(qkv[h * HD + d]);
+    float qb = __bfloat162float(qkv[h * HD + (d < half ? d + half : d - half)]);
+    q[d] = __bfloat162float(__float2bfloat16_rn(d < half ? qa * cs - qb * sn : qa * cs + qb * sn));
+    const __nv_bfloat16* kp = qkv + NH * HD + kvh * HD;
+    float ka = __bfloat162float(kp[d]), kb2 = __bfloat162float(kp[d < half ? d + half : d - half]);
+    kn[d] = __bfloat162float(__float2bfloat16_rn(d < half ? ka * cs - kb2 * sn : ka * cs + kb2 * sn));
+    vn[d] = __bfloat162float(qkv[(NH + NKV) * HD + kvh * HD + d]);
+    __nv_bfloat16* kbase = kc + (size_t)kvh * MAXLEN * HD;
+    __nv_bfloat16* vbase = vc + (size_t)kvh * MAXLEN * HD;
+    if (h %% grp == 0 && c == pos / CH) {  // single writer of the new kv row
+      kbase[(size_t)pos * HD + d] = __float2bfloat16_rn(kn[d]);
+      vbase[(size_t)pos * HD + d] = __float2bfloat16_rn(vn[d]);
+    }
+    __syncthreads();
+    // scores: warp w handles positions j0 + w, j0 + w + 4, ...; lane covers dims 4*lane .. 4*lane+3
+    float q0 = q[4 * lane], q1 = q[4 * lane + 1], q2 = q[4 * lane + 2], q3 = q[4 * lane + 3];
+    for (int j = j0 + warp; j < j1; j += 4) {
+      float s;
+      if (j == pos) {
+        s = q0 * kn[4 * lane] + q1 * kn[4 * lane + 1] + q2 * kn[4 * lane + 2] + q3 * kn[4 * lane + 3];
+      } else {
+        uint2 t = *reinterpret_cast<const uint2*>(kbase + (size_t)j * HD + 4 * lane);
+        s = q0 * __uint_as_float(t.x << 16) + q1 * __uint_as_float(t.x & 0xffff0000u)
+          + q2 * __uint_as_float(t.y << 16) + q3 * __uint_as_float(t.y & 0xffff0000u);
+      }
+      for (int o = 16; o; o >>= 1) s += __shfl_xor_sync(0xffffffffu, s, o);
+      if (lane == 0) sc[j - j0] = s * scale;
+    }
+    __syncthreads();
+    float mx = -1e30f;
+    for (int j = j0; j < j1; ++j) mx = fmaxf(mx, sc[j - j0]);
+    float l = 0.f, o_ = 0.f;
+    for (int j = j0; j < j1; ++j) {
+      float p = __expf(sc[j - j0] - mx);
+      l += p;
+      float vv = (j == pos) ? __bfloat162float(__float2bfloat16_rn(vn[d])) : __bfloat162float(vbase[(size_t)j * HD + d]);
+      o_ += p * vv;
+    }
+    P[d] = o_;
+    if (d == 0) { P[HD] = mx; P[HD + 1] = l; }
+  } else if (d == 0) {
+    P[HD] = -1e30f; P[HD + 1] = 0.f;
+  }
+  __threadfence();
+  __syncthreads();
+  if (d == 0) amLast = (atomicAdd(&counter[h], 1u) == MAXCH - 1);
+  __syncthreads();
+  if (!amLast) return;
+  __threadfence();
+  float M = -1e30f;
+  for (int cc = 0; cc < MAXCH; ++cc) M = fmaxf(M, part[((size_t)h * MAXCH + cc) * (HD + 2) + HD]);
+  float L = 0.f, O = 0.f;
+  for (int cc = 0; cc < MAXCH; ++cc) {
+    const float* Q = part + ((size_t)h * MAXCH + cc) * (HD + 2);
+    float w = __expf(Q[HD] - M);
+    L += w * Q[HD + 1];
+    O += w * (Q[HD + 1] > 0.f ? Q[d] : 0.f);
+  }
+  out[h * HD + d] = __float2bfloat16_rn(O / L);
+  if (d == 0) counter[h] = 0;
+}
+"""

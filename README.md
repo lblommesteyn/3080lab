@@ -261,6 +261,19 @@ tensors must come from the same file. At 2.29 ms/token we are at ~64% of the
 bandwidth bound (1.03 GB/token at 705 GB/s); the rest is launch overhead and
 small kernels.
 
+### Where the remaining 2.29 ms/token goes (GGUF run)
+
+- GEMVs ~1.65 ms: layers 1.235 ms (per layer qkv 4.1 + o 3.1 + gate/up 23.6 +
+  down 13.3 us; 432-657 GB/s) + exact-int8 lm_head ~0.42 ms (292 MB at 697 GB/s).
+  A Q6_K-native head (191 MB) would save ~0.15 ms.
+- Attention ~0.2 ms (v1: 4.4 us at pos 40 -> 11.5 us at 300). A one-launch
+  flash-decoding version (`ATTN2`, last-block combine) is exact but only wins
+  past ~300 positions: the cross-block combine costs what the parallelism saves.
+- Norms, embed, argmax, and ~1 us per kernel inside a graph for ~200 kernels.
+- Kernel cost in a graph: ~1.0 us empty, growing with grid size (4,480 blocks:
+  4.8 us; 37,984 blocks: 27.5 us, ~49 ns/block/SM). With real work per block the
+  dispatch overlaps execution: G = 1..8 row-groups per block made no difference.
+
 ### FP32/INT32 sharing (superseded by the section above)
 
 GA102 has 16 FP32 + 16 FP32/INT32 lanes per partition. If INT ops simply
