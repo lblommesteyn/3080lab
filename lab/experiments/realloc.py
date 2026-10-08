@@ -93,5 +93,6 @@ class Realloc(Experiment):
 def registry():
     exps = [Realloc(base_name="mix_ffma_shl"), Realloc(base_name="mix_ffma_imad"),
             Realloc(base_name="rand_kernels"), Realloc(base_name="rand_kernels_b"),
-            Realloc(base_name="independent_ffma"), Realloc(base_name="mix_ffma_hfma2")]
+            Realloc(base_name="independent_ffma"), Realloc(base_name="mix_ffma_hfma2"),
+            Realloc(base_name="gemv_int4", max_reg=128)]
     return {e.name: e for e in exps}

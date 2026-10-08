@@ -112,6 +112,17 @@
   "opcode": "IMAD",
   "tokens": 4
  },
+ "225": {
+  "example": "IMAD.WIDE.U32 R2, R34, R29, R30",
+  "fields": {
+   "a": 1,
+   "b": 2,
+   "c": 3,
+   "d": 0
+  },
+  "opcode": "IMAD.WIDE.U32",
+  "tokens": 4
+ },
  "229": {
   "example": "DADD R10, RZ, R8",
   "fields": {
@@ -171,6 +182,14 @@
   "opcode": "I2F.F64.U32",
   "tokens": 2
  },
+ "348": {
+  "example": "WARPSYNC R7",
+  "fields": {
+   "b": 0
+  },
+  "opcode": "WARPSYNC",
+  "tokens": 1
+ },
  "388": {
   "example": "STS [R0.X4], R5",
   "fields": {
@@ -179,6 +198,17 @@
   },
   "opcode": "STS",
   "tokens": 2
+ },
+ "389": {
+  "example": "SHFL.BFLY PT, R5, R4, R5, R0",
+  "fields": {
+   "a": 1,
+   "b": 2,
+   "c": 3,
+   "d": 0
+  },
+  "opcode": "SHFL.BFLY",
+  "tokens": 4
  },
  "3c2": {
   "example": "R2UR UR4, R12",
@@ -262,6 +292,16 @@
   "opcode": "IADD3",
   "tokens": 3
  },
+ "811": {
+  "example": "LEA.HI R8, R8, 0xfffffff8, RZ, 0x4",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "LEA.HI",
+  "tokens": 3
+ },
  "812": {
   "example": "LOP3.LUT R11, R11, 0x1f, RZ, 0xc0, !PT",
   "fields": {
@@ -317,6 +357,14 @@
    "d": 0
   },
   "opcode": "S2R",
+  "tokens": 1
+ },
+ "950": {
+  "example": "RET.REL.NODEC R2 `(k)",
+  "fields": {
+   "a": 0
+  },
+  "opcode": "RET.REL.NODEC",
   "tokens": 1
  },
  "980": {
@@ -426,5 +474,14 @@
   },
   "opcode": "IMAD.U32",
   "tokens": 3
+ },
+ "f89": {
+  "example": "SHFL.BFLY PT, R3, R28, 0x10, 0x1f",
+  "fields": {
+   "a": 1,
+   "d": 0
+  },
+  "opcode": "SHFL.BFLY",
+  "tokens": 2
  }
 }
