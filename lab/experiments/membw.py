@@ -169,7 +169,7 @@ extern "C" __global__ void k(const uint4* __restrict__ B, unsigned long long n16
     def variants(self, opts):
         out = []
         for sms in (1, 4, 17, 34, 68):
-            for wps in (1, 2, 4, 8, 16, 32, 48):
+            for wps in (1, 2, 4, 8, 16, 32):   # <= 1024 threads per block
                 out.append(Variant(f"sms{sms}/w{wps}", {"sms": sms, "wps": wps, "warps": wps, "iters": 1}))
         return out
 
@@ -224,12 +224,14 @@ extern "C" __global__ void __launch_bounds__(1024) k(int stride, int iters, unsi
   __syncthreads();
   unsigned lane = threadIdx.x & 31, acc = 0;
   unsigned a = (lane * stride) % (32 * 33 * 4);
+  // shared-window address of sm[0] (sm_80+ reserves 1 KB of system smem, so it is not 0)
+  unsigned smbase = (unsigned)__cvta_generic_to_shared(sm);
   long long t0 = clock64();
   #pragma unroll 1
   for (int i = 0; i < iters; ++i) {{
     // ptxas hoists loop-invariant asm-volatile LDS; use ld.volatile and an iteration-dependent
     // offset that is a multiple of 32 words (same banks every iteration)
-    unsigned b = ((a + (i & 31) * 128) % (32 * 33 * 4)) * 4;
+    unsigned b = smbase + ((a + (i & 31) * 128) % (32 * 33 * 4)) * 4;
     unsigned v0, v1, v2, v3;
     asm volatile("ld.volatile.shared.u32 %0, [%1];" : "=r"(v0) : "r"(b));
     asm volatile("ld.volatile.shared.u32 %0, [%1];" : "=r"(v1) : "r"(b + 128 * 4));
