@@ -265,7 +265,7 @@ extern "C" __global__ void __launch_bounds__(1024) k(int stride, int iters, unsi
 
 
 def registry():
-    exps = [Coalesce(), Width(), MLP(), SmemBanks(), L1Wavefronts(), SplitSector()]
+    exps = [Coalesce(), Width(), MLP(), SmemBanks(), L1Wavefronts(), SplitSector(), SplitGap()]
     return {e.name: e for e in exps}
 
 
@@ -390,4 +390,57 @@ extern "C" __global__ void __launch_bounds__(256) k(const unsigned char* __restr
         st["launch"]["grid"] = blocks
         st["launch"]["args"][5] = ctypes.c_uint64(st["T"])
         st["useful"] = blocks * 256 * v.params["iters"] * 32
+        return st
+
+
+@dataclass
+class SplitGap(Coalesce):
+    """Split-sector loads where the second half of each sector is requested G instructions after
+    the first (GEMV U=2 order: first halves of G rows, then second halves). G=1 is adjacent."""
+
+    def __post_init__(self):
+        self.name = "mem_split_gap"
+        self.description = "DRAM bandwidth when the two halves of each sector are requested G loads apart"
+
+    def source(self, v):
+        G, pat = v.params["G"], v.params["pattern"]
+        first = [f"(base + {g} * 1024 + lane * 32)" if pat == "split" else f"(base + {g} * 1024 + lane * 16)" for g in range(G)]
+        second = [f"(base + {g} * 1024 + lane * 32 + 16)" if pat == "split" else f"(base + {g} * 1024 + 512 + lane * 16)" for g in range(G)]
+        loads = []
+        for idx, a in enumerate(first + second):
+            loads.append(f'asm volatile("ld.global.nc.v4.u32 {{%0,%1,%2,%3}}, [%4];" : "=r"(r{idx}.x), "=r"(r{idx}.y), "=r"(r{idx}.z), "=r"(r{idx}.w) : "l"(B + {a}));')
+        decl = " ".join(f"uint4 r{i};" for i in range(2 * G))
+        fold = " ^ ".join(f"r{i}.x ^ r{i}.y ^ r{i}.z ^ r{i}.w" for i in range(2 * G))
+        return f"""
+extern "C" __global__ void __launch_bounds__(256) k(const unsigned char* __restrict__ B, unsigned long long mask,
+    int stride, int iters, unsigned* sink, unsigned long long* T)
+{{
+  {TIMED_HEAD}
+  unsigned long long warp = (blockIdx.x * 256ull + threadIdx.x) >> 5, nw = gridDim.x * 8ull;
+  unsigned lane = threadIdx.x & 31, acc = 0;
+  for (int i = 0; i < iters; ++i) {{
+    unsigned long long base = ((warp + i * nw) * {1024 * G}ull) & mask;
+    {decl}
+    {chr(10).join("    " + l for l in loads)}
+    acc ^= {fold};
+  }}
+  if (acc == 0x9e3779b9u) sink[0] = acc;
+  {TIMED_TAIL}
+}}
+"""
+
+    def variants(self, opts):
+        return [Variant(f"G{G}/{pat}", {"size": 256 * MB, "stride": 0, "iters": max(8, 256 // G), "warps": 8,
+                                        "pattern": pat, "G": G})
+                for G in (1, 2, 4, 8) for pat in ("contig", "split")]
+
+    def prepare(self, dev, v):
+        blocks = 68 * 2
+        st = super().prepare(dev, v)
+        dev.free(st["T"])
+        st["T"] = dev.alloc(blocks * 16)
+        st["blocks"] = blocks
+        st["launch"]["grid"] = blocks
+        st["launch"]["args"][5] = ctypes.c_uint64(st["T"])
+        st["useful"] = blocks * 256 * v.params["iters"] * 32 * v.params["G"]
         return st
