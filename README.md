@@ -372,6 +372,20 @@ showed iterations not overlapping across shuffle reductions; attention v4
 (4-way ILP in scores and PV) is exact and 17-21% faster. **End to end on
 llama.cpp's Q4_0 weights: 446 -> 463 tok/s, 1.36x llama.cpp (340.5).**
 
+### Qwen decode, round 3 (same bytes as llama.cpp)
+
+| change (GGUF weights, Qwen2.5-1.5B) | tok/s |
+|---|---:|
+| attention v1 | 446 |
+| attention v4 (ILP) | 463 |
+| + Q6_K-exact lm_head (191 MB, llama.cpp's own format and bytes; checked vs float64, 9e-8) | 492 |
+| + gate/up split-K 2, single-pass RMSNorm | **509 (1.50x llama.cpp's 340.5)** |
+
+Refuted: folding RMSNorm into the residual GEMVs with a last-block-done tail
+(396 tok/s): the fenced, serialized tail costs ~8.7 us per site against 2.25 us
+for a separate kernel in the graph. Remaining gap to the bandwidth floor (0.52
+ms/token) is per-kernel fixed cost: attention 32%, RMSNorm 18%, GEMV tails.
+
 ### FP32/INT32 sharing (superseded by the section above)
 
 GA102 has 16 FP32 + 16 FP32/INT32 lanes per partition. If INT ops simply
