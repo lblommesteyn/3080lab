@@ -106,7 +106,7 @@ class L1Capacity(Chase):
 
 
 def registry():
-    exps = [ICache(), L1Capacity(space="global"), GridBarrier()]
+    exps = [ICache(), L1Capacity(space="global"), GridBarrier(), PrefetchCheck()]
     return {e.name: e for e in exps}
 
 
@@ -180,4 +180,74 @@ extern "C" __global__ void k(unsigned* bar, int n, long long* cyc, unsigned long
 
     def release(self, dev, st):
         for x in ("bar", "cyc", "ns", "to"):
+            dev.free(st[x])
+
+
+@dataclass
+class PrefetchCheck(Experiment):
+    """Does prefetch.global.L2 (CCTL.E.PF2) actually fill L2? Flush L2 with a 64 MB stream, prefetch a
+    2 MB region (none / prefetch.global.L2 / ld.global.cg), then chase it with ld.cg from one thread:
+    ~238 cycles = L2 hit, ~500 = DRAM."""
+
+    def __post_init__(self):
+        self.name = "prefetch_check"
+        self.description = "is prefetch.global.L2 honored? chase latency after prefetch"
+
+    def source(self, v):
+        mode = v.params["mode"]
+        pf = {"none": "", "pf": 'asm volatile("prefetch.global.L2 [%0];" :: "l"(R + off));',
+              "ldcg": 'unsigned d; asm volatile("ld.global.cg.u32 %0, [%1];" : "=r"(d) : "l"(R + off)); acc ^= d;'}[mode]
+        return f"""
+extern "C" __global__ void k(const unsigned char* F, unsigned long long fbytes, const unsigned char* R,
+                             unsigned long long rbytes, const unsigned long long* chain, int steps,
+                             long long* cyc, unsigned* sink)
+{{
+  unsigned acc = 0;
+  unsigned long long tid = blockIdx.x * (unsigned long long)blockDim.x + threadIdx.x, nt = gridDim.x * (unsigned long long)blockDim.x;
+  for (unsigned long long off = tid * 128ull; off < fbytes; off += nt * 128ull) {{     // flush L2
+    unsigned d; asm volatile("ld.global.cg.u32 %0, [%1];" : "=r"(d) : "l"(F + off)); acc ^= d;
+  }}
+  __threadfence();
+  for (unsigned long long off = tid * 128ull; off < rbytes; off += nt * 128ull) {{ {pf} }}
+  if (acc == 0x12345u) sink[0] = acc;
+  if (blockIdx.x != 0 || threadIdx.x != 0) return;
+  for (volatile int w = 0; w < 200000; ++w) {{ }}            // let prefetches land
+  unsigned long long p = chain[0];
+  long long t0 = clock64();
+  for (int i = 0; i < steps; ++i) asm volatile("ld.global.cg.u64 %0, [%0];" : "+l"(p));
+  long long t1 = clock64();
+  cyc[0] = t1 - t0; sink[1] = (unsigned)p;
+}}
+"""
+
+    def expected(self, v):
+        return {}
+
+    def variants(self, opts):
+        return [Variant(m, {"mode": m, "warps": 8, "iters": 1}) for m in ("none", "pf", "ldcg")]
+
+    def prepare(self, dev, v):
+        from .mem import sattolo
+        fb, rb = 64 << 20, 2 << 20
+        st = {"F": dev.alloc(fb), "R": dev.alloc(rb), "cyc": dev.alloc(8), "sink": dev.alloc(8)}
+        n = rb // 128
+        nxt = sattolo(n, np.random.default_rng(3))
+        host = np.zeros(rb // 8, np.uint64)
+        host[np.arange(n) * 16] = np.uint64(st["R"]) + nxt.astype(np.uint64) * np.uint64(128)
+        dev.htod(st["R"], host)
+        st["chain"] = dev.alloc(8)
+        dev.htod(st["chain"], np.array([st["R"]], np.uint64))
+        st["steps"] = 2000
+        st["launch"] = dict(grid=68 * 4, block=256, args=[
+            ctypes.c_uint64(st["F"]), ctypes.c_uint64(fb), ctypes.c_uint64(st["R"]), ctypes.c_uint64(rb),
+            ctypes.c_uint64(st["chain"]), ctypes.c_int32(st["steps"]), ctypes.c_uint64(st["cyc"]), ctypes.c_uint64(st["sink"])])
+        return st
+
+    def collect(self, dev, v, st):
+        cyc = int(dev.dtoh(np.zeros(1, np.int64), st["cyc"])[0])
+        return {"cycles": cyc, "ops_per_thread": st["steps"], "cycles_per_op": cyc / st["steps"],
+                "warp_ops_per_cycle": 0.0, "sm_mhz_inkernel": 0.0}
+
+    def release(self, dev, st):
+        for x in ("F", "R", "cyc", "sink", "chain"):
             dev.free(st[x])
