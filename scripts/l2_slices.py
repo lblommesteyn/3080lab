@@ -28,6 +28,7 @@ extern "C" __global__ void k(const unsigned char* __restrict__ B, int nlines, in
     if (threadIdx.x != 0) return;
     unsigned acc = 0;
     for (int i = 0; i < nlines; ++i) { unsigned v; asm volatile("ld.global.cg.u32 %0, [%1];" : "=r"(v) : "l"(B + (size_t)i * 128)); acc += v; }
+    done[1] = 1u;                                                   // go: start hammering
     for (volatile int w = 0; w < 20000; ++w) { }                  // let the hammer ramp up
     for (int i = 0; i < nlines; ++i) {
       long long t0, t1 = 0;
@@ -44,7 +45,8 @@ extern "C" __global__ void k(const unsigned char* __restrict__ B, int nlines, in
   if (!hammer) return;
   const unsigned char* a = B + (size_t)ref * 128 + (threadIdx.x & 31) * 4;
   unsigned acc = 0;
-  for (unsigned long long it = 0; it < 4000000ull && *done == 0u; ++it) {     // hard cap
+  for (unsigned long long it = 0; it < 2000000000ull && done[1] == 0u; ++it) { }   // wait for go (capped)
+  for (unsigned long long it = 0; it < 2000000000ull && done[0] == 0u; ++it) {     // hammer until done (capped)
     unsigned v; asm volatile("ld.global.cg.u32 %0, [%1];" : "=r"(v) : "l"(a)); acc += v;
   }
   if (acc == 0x12345u) lat[0] = 1;
@@ -59,12 +61,12 @@ def main():
     n = size // 128
     B = dev.alloc(size)
     dev.memset(B, size)
-    done = dev.alloc(4)
+    done = dev.alloc(8)
     lat = dev.alloc(n * 2)
     base_ptr = B
 
     def run(ref, hammer):
-        dev.memset(done, 4)
+        dev.memset(done, 8)
         args = [ctypes.c_uint64(B), ctypes.c_int32(n), ctypes.c_int32(ref), ctypes.c_int32(hammer),
                 ctypes.c_uint64(done), ctypes.c_uint64(lat)]
         k.launch(1 + 67 * 4, 256, args)
@@ -83,7 +85,11 @@ def main():
             break
         ref = int(rng.choice(free))
         d = np.median([run(ref, 1) for _ in range(3)], axis=0) - base
-        thr = max(20.0, 0.5 * np.percentile(d, 99.5))
+        mad = np.median(np.abs(d - np.median(d)))
+        thr = max(25.0, np.median(d) + 6 * 1.4826 * mad)
+        if d[ref] < thr:                    # hammer must slow its own line, or the run is invalid
+            print(f"iter {it:2d} ref {ref}: reference not slowed (+{d[ref]:.0f}), skipping", flush=True)
+            continue
         members = np.nonzero(d > thr)[0]
         members = members[label[members] < 0]
         label[members] = it
