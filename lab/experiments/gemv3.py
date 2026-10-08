@@ -82,7 +82,7 @@ extern "C" __global__ void k(const uint4* __restrict__ W, const float* S, const 
                 wexpr = f"W[(size_t)(row0 + {r}) * (K / 32) + j + {u}]"
                 if v.params.get("wc") == "cg":   # weights bypass L1 (no pollution of the reused x lines)
                     wexpr = f"__ldcg(&{wexpr})"
-                if v.params.get("ablate") == "compute":   # no weight loads: opaque register values
+                if v.params.get("ablate") in ("compute", "xonly"):   # no weight loads: opaque register values
                     L.append(f"  uint4 w{r}_{u}; asm volatile(\"mov.b32 %0, %1;\" : \"=r\"(w{r}_{u}.x) : \"r\"(j * 2654435761u + {r * 8 + u}));"
                              f" w{r}_{u}.y = w{r}_{u}.x * 3u; w{r}_{u}.z = w{r}_{u}.x ^ 0x5555u; w{r}_{u}.w = w{r}_{u}.x + 7u;")
                 else:
@@ -90,7 +90,7 @@ extern "C" __global__ void k(const uint4* __restrict__ W, const float* S, const 
         for u in range(U):
             L.append(f"  const float4* xp{u} = X + (size_t)(j + {u}) * 8;")
             for k in range(4):
-                if v.params.get("ablate") == "compute":   # no x loads: opaque register values
+                if v.params.get("ablate") in ("compute", "wonly"):   # no x loads: opaque register values
                     L.append(f"  float xs{u}_{k}; asm volatile(\"mov.b32 %0, %1;\" : \"=f\"(xs{u}_{k}) : \"f\"((float)(j + {k})));"
                              f" float4 xa{u}_{k} = make_float4(xs{u}_{k}, xs{u}_{k} + 1.f, xs{u}_{k} + 2.f, xs{u}_{k} + 3.f);"
                              f" float4 xb{u}_{k} = make_float4(xs{u}_{k} + 4.f, xs{u}_{k} + 5.f, xs{u}_{k} + 6.f, xs{u}_{k} + 7.f);")
@@ -103,7 +103,7 @@ extern "C" __global__ void k(const uint4* __restrict__ W, const float* S, const 
         for u in range(U):
             for r in range(R):
                 L.append("  { float part = 0.f;")
-                if v.params.get("ablate") == "loads":   # keep every load, trivial math consuming all of it
+                if v.params.get("ablate") in ("loads", "wonly", "xonly"):   # trivial math consuming every load
                     xs = " + ".join(f"xa{u}_{k}.x + xa{u}_{k}.y + xa{u}_{k}.z + xa{u}_{k}.w + xb{u}_{k}.x + xb{u}_{k}.y + xb{u}_{k}.z + xb{u}_{k}.w" for k in range(4))
                     L.append(f"    part = __uint_as_float(((w{r}_{u}.x ^ w{r}_{u}.y ^ w{r}_{u}.z ^ w{r}_{u}.w) & 0x3fffffu) | 0x3f800000u)"
                              + (f" + ({xs});" if r == 0 else ";"))
@@ -230,7 +230,7 @@ class Gemv3Ablate(Gemv3):
     def variants(self, opts):
         out = []
         for R, U in ((4, 1), (4, 2), (8, 1), (8, 2)):
-            for ab in ("none", "loads", "compute"):
+            for ab in ("none", "loads", "compute", "wonly", "xonly"):
                 out.append(Variant(f"gate_up/R{R}U{U}/{ab}", {"N": 18944, "K": 3584, "R": R, "U": U, "T": 128,
                                                              "deq": "magic", "ablate": ab, "warps": 4, "iters": 1}))
         return out
