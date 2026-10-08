@@ -1,9 +1,597 @@
 Warning: using the shared project folder; file isolation is disabled.
-Submitted job 1309 (exclusive GPU, gres=gpu:1).
-Log: C:\Users\LukeB\.pcslurm\logs\3080lab-mixbank_ffma_shl-1-1309.log
-queued job 1309; waiting ...
-mixbank_ffma_shl: pop from empty list
+Submitted job 1310 (exclusive GPU, gres=gpu:1).
+Log: C:\Users\LukeB\.pcslurm\logs\3080lab-mixbank_ffma_shl-1-1310.log
+queued job 1310; waiting ...
+experiment:      mixbank_ffma_shl  (FFMA:SHF.L.U32 mix with FFMA chain registers moved to opposite/same bank)
+device:          NVIDIA GeForce RTX 3080 (sm_86, 68 SMs), driver 591.86
+clocks:          unlocked (not requested)
+ptxas flags:     (default -O3)
+trials:          10 per variant, shuffled (seed 1999723955), 24 warmup launches
+
+[ffma=1/8/orig]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       26  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       113.798  [p05 113.263, p95 116.580, CV 1.26%]
+  throughput:      2.250 warp-instr/cycle/SM  = 72.0 thread-ops/cycle/SM
+  runtime:         29.051 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       SHF.L.U32x224, FFMAx32, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=1/8/opp]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       113.797  [p05 113.263, p95 115.320, CV 0.75%]
+  throughput:      2.250 warp-instr/cycle/SM  = 72.0 thread-ops/cycle/SM
+  runtime:         29.028 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       SHF.L.U32x224, FFMAx32, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=1/8/same]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       119.359  [p05 118.468, p95 121.416, CV 1.00%]
+  throughput:      2.145 warp-instr/cycle/SM  = 68.6 thread-ops/cycle/SM
+  runtime:         30.439 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       SHF.L.U32x224, FFMAx32, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=2/8/orig]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       24  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       98.992  [p05 97.265, p95 100.808, CV 1.45%]
+  throughput:      2.586 warp-instr/cycle/SM  = 82.8 thread-ops/cycle/SM
+  runtime:         25.284 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       SHF.L.U32x192, FFMAx64, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=2/8/opp]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       97.265  [p05 97.265, p95 99.437, CV 0.94%]
+  throughput:      2.632 warp-instr/cycle/SM  = 84.2 thread-ops/cycle/SM
+  runtime:         24.861 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       SHF.L.U32x192, FFMAx64, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=2/8/same]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       114.098  [p05 113.014, p95 115.233, CV 0.90%]
+  throughput:      2.244 warp-instr/cycle/SM  = 71.8 thread-ops/cycle/SM
+  runtime:         29.084 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       SHF.L.U32x192, FFMAx64, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=3/8/orig]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       26  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       104.505  [p05 104.504, p95 107.767, CV 1.40%]
+  throughput:      2.450 warp-instr/cycle/SM  = 78.4 thread-ops/cycle/SM
+  runtime:         26.686 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       SHF.L.U32x160, FFMAx96, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=3/8/opp]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       81.255  [p05 81.255, p95 83.806, CV 1.31%]
+  throughput:      3.151 warp-instr/cycle/SM  = 100.8 thread-ops/cycle/SM
+  runtime:         20.746 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       SHF.L.U32x160, FFMAx96, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=3/8/same]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       105.005  [p05 105.004, p95 107.206, CV 0.99%]
+  throughput:      2.438 warp-instr/cycle/SM  = 78.0 thread-ops/cycle/SM
+  runtime:         26.797 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       SHF.L.U32x160, FFMAx96, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=4/8/orig]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       28  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       96.456  [p05 96.456, p95 98.435, CV 0.86%]
+  throughput:      2.654 warp-instr/cycle/SM  = 84.9 thread-ops/cycle/SM
+  runtime:         24.596 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       SHF.L.U32x128, FFMAx128, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=4/8/opp]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       65.478  [p05 65.478, p95 67.690, CV 1.60%]
+  throughput:      3.910 warp-instr/cycle/SM  = 125.1 thread-ops/cycle/SM
+  runtime:         16.753 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       SHF.L.U32x128, FFMAx128, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=4/8/same]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       96.549  [p05 96.549, p95 98.608, CV 0.98%]
+  throughput:      2.652 warp-instr/cycle/SM  = 84.8 thread-ops/cycle/SM
+  runtime:         24.715 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       SHF.L.U32x128, FFMAx128, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=5/8/orig]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       28  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       88.756  [p05 88.755, p95 90.820, CV 1.11%]
+  throughput:      2.884 warp-instr/cycle/SM  = 92.3 thread-ops/cycle/SM
+  runtime:         22.636 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx160, SHF.L.U32x96, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=5/8/opp]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       65.015  [p05 65.009, p95 65.734, CV 0.63%]
+  throughput:      3.938 warp-instr/cycle/SM  = 126.0 thread-ops/cycle/SM
+  runtime:         16.605 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx160, SHF.L.U32x96, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=5/8/same]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       90.865  [p05 88.757, p95 91.500, CV 1.27%]
+  throughput:      2.817 warp-instr/cycle/SM  = 90.2 thread-ops/cycle/SM
+  runtime:         23.179 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx160, SHF.L.U32x96, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=6/8/orig]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       28  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       80.760  [p05 80.759, p95 82.860, CV 1.19%]
+  throughput:      3.170 warp-instr/cycle/SM  = 101.4 thread-ops/cycle/SM
+  runtime:         20.626 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx192, SHF.L.U32x64, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=6/8/opp]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       65.266  [p05 65.264, p95 67.692, CV 1.66%]
+  throughput:      3.922 warp-instr/cycle/SM  = 125.5 thread-ops/cycle/SM
+  runtime:         16.671 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx192, SHF.L.U32x64, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=6/8/same]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       80.762  [p05 80.762, p95 82.875, CV 1.32%]
+  throughput:      3.170 warp-instr/cycle/SM  = 101.4 thread-ops/cycle/SM
+  runtime:         20.765 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx192, SHF.L.U32x64, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=7/8/orig]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       25  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       72.767  [p05 72.762, p95 74.807, CV 1.18%]
+  throughput:      3.518 warp-instr/cycle/SM  = 112.6 thread-ops/cycle/SM
+  runtime:         18.570 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx224, SHF.L.U32x32, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=7/8/opp]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       65.550  [p05 65.010, p95 66.792, CV 1.21%]
+  throughput:      3.906 warp-instr/cycle/SM  = 125.0 thread-ops/cycle/SM
+  runtime:         16.741 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx224, SHF.L.U32x32, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=7/8/same]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       72.768  [p05 72.767, p95 73.940, CV 0.92%]
+  throughput:      3.518 warp-instr/cycle/SM  = 112.6 thread-ops/cycle/SM
+  runtime:         18.572 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx224, SHF.L.U32x32, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=8/8/orig]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       25  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       65.374  [p05 65.012, p95 67.127, CV 1.53%]
+  throughput:      3.916 warp-instr/cycle/SM  = 125.3 thread-ops/cycle/SM
+  runtime:         16.709 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx256, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=8/8/opp]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       65.388  [p05 65.014, p95 67.161, CV 1.41%]
+  throughput:      3.915 warp-instr/cycle/SM  = 125.3 thread-ops/cycle/SM
+  runtime:         16.756 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx256, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=8/8/same]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       65.016  [p05 65.013, p95 66.960, CV 1.25%]
+  throughput:      3.937 warp-instr/cycle/SM  = 126.0 thread-ops/cycle/SM
+  runtime:         16.600 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx256, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+SASS (timed loop body, control: Stall Yield Wbar Rbar wait-mask reuse):
+  /*0230*/  FFMA R10, R7, R10, R8.reuse                  S01 Y W- R- wait:-      reuse:4  100fe200000000080000000a070a7223
+  /*0260*/  FFMA R10, R7, R10, R8.reuse                  S01 Y W- R- wait:-      reuse:4  100fe200000000080000000a070a7223
+  /*0290*/  FFMA R10, R7, R10, R8                        S01 Y W- R- wait:-      reuse:0  000fe200000000080000000a070a7223
+  /*02c0*/  FFMA R10, R7, R10, R8.reuse                  S01 Y W- R- wait:-      reuse:4  100fe200000000080000000a070a7223
+  /*02f0*/  FFMA R10, R7, R10, R8.reuse                  S01 Y W- R- wait:-      reuse:4  100fe200000000080000000a070a7223
+  /*0320*/  FFMA R10, R7, R10, R8                        S01 Y W- R- wait:-      reuse:0  000fe200000000080000000a070a7223
+  /*0350*/  FFMA R10, R7, R10, R8.reuse                  S01 Y W- R- wait:-      reuse:4  100fe200000000080000000a070a7223
+  /*0380*/  FFMA R10, R7, R10, R8.reuse                  S01 Y W- R- wait:-      reuse:4  100fe200000000080000000a070a7223
+  ... (32 FFMA total)
+
+counters:        unavailable: Nsight Compute (ncu) not installed
+warnings:        none
+artifacts:       C:\Users\LukeB\dev\3080lab\results\20261007-211019_mixbank_ffma_shl
 ====================================================================================================
-mixbank_ffma_imad: pop from empty list
+experiment:      mixbank_ffma_imad  (FFMA:IMAD mix with FFMA chain registers moved to opposite/same bank)
+device:          NVIDIA GeForce RTX 3080 (sm_86, 68 SMs), driver 591.86
+clocks:          unlocked (not requested)
+ptxas flags:     (default -O3)
+trials:          10 per variant, shuffled (seed 1384875860), 24 warmup launches
+
+[ffma=1/8/orig]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       26  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       125.420  [p05 120.754, p95 134.527, CV 4.33%]
+  throughput:      2.041 warp-instr/cycle/SM  = 65.3 thread-ops/cycle/SM
+  runtime:         31.974 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       IMADx224, FFMAx32, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=1/8/opp]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       134.367  [p05 127.720, p95 140.187, CV 3.60%]
+  throughput:      1.905 warp-instr/cycle/SM  = 61.0 thread-ops/cycle/SM
+  runtime:         34.270 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       IMADx224, FFMAx32, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=1/8/same]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       128.443  [p05 120.754, p95 131.783, CV 3.48%]
+  throughput:      1.993 warp-instr/cycle/SM  = 63.8 thread-ops/cycle/SM
+  runtime:         32.769 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       IMADx224, FFMAx32, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=2/8/orig]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 47 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       24  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       123.191  [p05 116.927, p95 127.650, CV 3.42%]
+  throughput:      2.078 warp-instr/cycle/SM  = 66.5 thread-ops/cycle/SM
+  runtime:         31.396 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       IMADx192, FFMAx64, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=2/8/opp]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       129.694  [p05 125.965, p95 142.321, CV 4.85%]
+  throughput:      1.974 warp-instr/cycle/SM  = 63.2 thread-ops/cycle/SM
+  runtime:         33.059 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       IMADx192, FFMAx64, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=2/8/same]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       119.437  [p05 115.013, p95 128.855, CV 5.18%]
+  throughput:      2.145 warp-instr/cycle/SM  = 68.6 thread-ops/cycle/SM
+  runtime:         30.456 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       IMADx192, FFMAx64, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=3/8/orig]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       23  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       116.442  [p05 114.466, p95 125.080, CV 3.86%]
+  throughput:      2.199 warp-instr/cycle/SM  = 70.4 thread-ops/cycle/SM
+  runtime:         29.706 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       IMADx160, FFMAx96, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=3/8/opp]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       121.774  [p05 118.257, p95 130.398, CV 3.87%]
+  throughput:      2.103 warp-instr/cycle/SM  = 67.3 thread-ops/cycle/SM
+  runtime:         31.073 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       IMADx160, FFMAx96, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=3/8/same]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       118.620  [p05 114.008, p95 124.552, CV 3.30%]
+  throughput:      2.158 warp-instr/cycle/SM  = 69.1 thread-ops/cycle/SM
+  runtime:         30.234 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       IMADx160, FFMAx96, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=4/8/orig]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       22  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       106.561  [p05 104.505, p95 110.777, CV 2.10%]
+  throughput:      2.402 warp-instr/cycle/SM  = 76.9 thread-ops/cycle/SM
+  runtime:         27.174 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       IMADx128, FFMAx128, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=4/8/opp]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       124.525  [p05 120.753, p95 134.088, CV 4.08%]
+  throughput:      2.056 warp-instr/cycle/SM  = 65.8 thread-ops/cycle/SM
+  runtime:         31.763 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       IMADx128, FFMAx128, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=4/8/same]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       105.821  [p05 104.255, p95 109.736, CV 1.89%]
+  throughput:      2.419 warp-instr/cycle/SM  = 77.4 thread-ops/cycle/SM
+  runtime:         26.989 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       IMADx128, FFMAx128, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=5/8/orig]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       24  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       90.783  [p05 88.513, p95 98.274, CV 3.91%]
+  throughput:      2.820 warp-instr/cycle/SM  = 90.2 thread-ops/cycle/SM
+  runtime:         23.153 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx160, IMADx96, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=5/8/opp]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 47 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       117.735  [p05 113.245, p95 123.041, CV 3.27%]
+  throughput:      2.175 warp-instr/cycle/SM  = 69.6 thread-ops/cycle/SM
+  runtime:         30.075 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx160, IMADx96, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=5/8/same]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       89.302  [p05 88.259, p95 95.503, CV 3.23%]
+  throughput:      2.867 warp-instr/cycle/SM  = 91.7 thread-ops/cycle/SM
+  runtime:         22.817 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx160, IMADx96, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=6/8/orig]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       23  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       83.066  [p05 81.338, p95 85.237, CV 1.70%]
+  throughput:      3.082 warp-instr/cycle/SM  = 98.6 thread-ops/cycle/SM
+  runtime:         21.197 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx192, IMADx64, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=6/8/opp]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       98.676  [p05 96.766, p95 105.711, CV 3.63%]
+  throughput:      2.594 warp-instr/cycle/SM  = 83.0 thread-ops/cycle/SM
+  runtime:         25.170 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx192, IMADx64, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=6/8/same]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       83.297  [p05 80.275, p95 89.086, CV 3.88%]
+  throughput:      3.074 warp-instr/cycle/SM  = 98.4 thread-ops/cycle/SM
+  runtime:         21.225 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx192, IMADx64, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=7/8/orig]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       27  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       83.391  [p05 80.960, p95 87.250, CV 2.81%]
+  throughput:      3.070 warp-instr/cycle/SM  = 98.2 thread-ops/cycle/SM
+  runtime:         21.286 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx224, IMADx32, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=7/8/opp]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       72.771  [p05 72.770, p95 80.090, CV 4.29%]
+  throughput:      3.518 warp-instr/cycle/SM  = 112.6 thread-ops/cycle/SM
+  runtime:         18.604 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx224, IMADx32, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=7/8/same]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       82.326  [p05 80.265, p95 89.253, CV 4.33%]
+  throughput:      3.110 warp-instr/cycle/SM  = 99.5 thread-ops/cycle/SM
+  runtime:         21.009 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx224, IMADx32, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=8/8/orig]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       25  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       65.961  [p05 65.012, p95 70.797, CV 3.43%]
+  throughput:      3.881 warp-instr/cycle/SM  = 124.2 thread-ops/cycle/SM
+  runtime:         16.835 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx256, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=8/8/opp]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       66.441  [p05 65.013, p95 70.378, CV 3.31%]
+  throughput:      3.853 warp-instr/cycle/SM  = 123.3 thread-ops/cycle/SM
+  runtime:         16.988 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx256, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[ffma=8/8/same]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 48 C)
+  iterations:      4,000,000 ops/thread
+  warps:           32
+  registers:       64  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       65.754  [p05 65.013, p95 69.392, CV 2.95%]
+  throughput:      3.894 warp-instr/cycle/SM  = 124.6 thread-ops/cycle/SM
+  runtime:         16.781 ms (event-timed)
+  instructions:    ~4,062,500 per warp (static loop body 260 x trips)
+  loop body:       FFMAx256, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+SASS (timed loop body, control: Stall Yield Wbar Rbar wait-mask reuse):
+  /*0240*/  FFMA R12, R0, R12, R7                        S01 Y W- R- wait:-      reuse:0  000fe200000000070000000c000c7223
+  /*0280*/  FFMA R12, R0, R12, R7                        S01 Y W- R- wait:-      reuse:0  000fe200000000070000000c000c7223
+  /*02c0*/  FFMA R12, R0, R12, R7                        S01 Y W- R- wait:-      reuse:0  000fe200000000070000000c000c7223
+  /*02f0*/  FFMA R12, R0, R12, R7                        S01 Y W- R- wait:-      reuse:0  000fe200000000070000000c000c7223
+  /*0320*/  FFMA R12, R0, R12, R7                        S01 Y W- R- wait:-      reuse:0  000fe200000000070000000c000c7223
+  /*0350*/  FFMA R12, R0, R12, R7                        S01 Y W- R- wait:-      reuse:0  000fe200000000070000000c000c7223
+  /*0380*/  FFMA R12, R0, R12, R7                        S01 Y W- R- wait:-      reuse:0  000fe200000000070000000c000c7223
+  /*03b0*/  FFMA R12, R0, R12, R7                        S01 Y W- R- wait:-      reuse:0  000fe200000000070000000c000c7223
+  ... (32 FFMA total)
+
+counters:        unavailable: Nsight Compute (ncu) not installed
+WARNINGS:
+  ! [ffma=1/8/orig] cycle-count CV 4.3% > 2%
+  ! [ffma=1/8/opp] cycle-count CV 3.6% > 2%
+  ! [ffma=1/8/same] cycle-count CV 3.5% > 2%
+  ! [ffma=2/8/orig] cycle-count CV 3.4% > 2%
+  ! [ffma=2/8/opp] cycle-count CV 4.9% > 2%
+  ! [ffma=2/8/same] cycle-count CV 5.2% > 2%
+  ! [ffma=3/8/orig] cycle-count CV 3.9% > 2%
+  ! [ffma=3/8/opp] cycle-count CV 3.9% > 2%
+  ! [ffma=3/8/same] cycle-count CV 3.3% > 2%
+  ! [ffma=4/8/orig] cycle-count CV 2.1% > 2%
+  ! [ffma=4/8/opp] cycle-count CV 4.1% > 2%
+  ! [ffma=5/8/orig] cycle-count CV 3.9% > 2%
+  ! [ffma=5/8/opp] cycle-count CV 3.3% > 2%
+  ! [ffma=5/8/same] cycle-count CV 3.2% > 2%
+  ! [ffma=6/8/opp] cycle-count CV 3.6% > 2%
+  ! [ffma=6/8/same] cycle-count CV 3.9% > 2%
+  ! [ffma=7/8/orig] cycle-count CV 2.8% > 2%
+  ! [ffma=7/8/opp] cycle-count CV 4.3% > 2%
+  ! [ffma=7/8/same] cycle-count CV 4.3% > 2%
+  ! [ffma=8/8/orig] cycle-count CV 3.4% > 2%
+  ! [ffma=8/8/opp] cycle-count CV 3.3% > 2%
+  ! [ffma=8/8/same] cycle-count CV 3.0% > 2%
+artifacts:       C:\Users\LukeB\dev\3080lab\results\20261007-211043_mixbank_ffma_imad
 ====================================================================================================
 

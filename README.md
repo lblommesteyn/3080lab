@@ -131,7 +131,43 @@ first, and untouched lines die oldest-first (survival 25% oldest vs 79%
 newest when streaming 384 new lines). Not strict LRU; some old lines
 survive, which fits pseudo-LRU with uneven set load.
 
-### FP32/INT32 sharing (tentative)
+### Register file: 2 banks, 1 read each, and the reuse cache is mandatory (`regbank_ffma`)
+
+Every FFMA in an 8-chain loop rewritten in the cubin to `FFMA S, A, S, C`
+with chosen register parity (operand fields patched directly; register count
+raised by patching both `sh_info` and EIATTR_REGCOUNT):
+
+| operand banks | no reuse flags | reuse on A and C |
+|---|---:|---:|
+| all three in one bank | 0.32 issue/cyc/partition (3 cycles) | 0.94 |
+| two in one bank | 0.49 (2 cycles) | 0.94 |
+
+Two banks (register parity), one read per bank per cycle. A 3-source FFMA
+always has two operands in one bank, so **without the reuse cache FFMA can
+never exceed 1 issue per 2 cycles**; full FP32 rate depends on reuse.
+(Consistent with Huerta et al. MICRO'25; the costs here are measured.)
+Also: with a register count of 64, R62 and R63 fault with
+CUDA_ERROR_ILLEGAL_INSTRUCTION; only R0-R61 are usable.
+
+### The FP32/INT32 "no overlap" ceiling was a ptxas register-allocation artifact (`mixbank_*`)
+
+In the FFMA:SHF mixes, the interleaved SHF evicts one FFMA operand from the
+reuse cache, and ptxas had put the two remaining FFMA register reads in the
+same bank. Moving each FFMA's chain register to the opposite bank (operand
+patch only, same instructions, same schedule):
+
+| FFMA fraction | ptxas | opposite bank | same bank |
+|---|---:|---:|---:|
+| 3/8 | 2.45 | 3.15 | 2.44 |
+| 4/8 | 2.65 | **3.91** | 2.65 |
+| 6/8 | 3.17 | 3.92 | 3.17 |
+
+FP32 and INT32 do run concurrently: the fixed kernel tracks
+min(4, 2/(1-p)) warp-instr/cyc/SM, i.e. only the 16-lane INT pipe limits it.
+**A register renumbering alone makes the 50/50 mix 1.48x faster than ptxas.**
+IMAD does not benefit (it shares the fmaheavy pipe with FFMA; real contention).
+
+### FP32/INT32 sharing (superseded by the section above)
 
 GA102 has 16 FP32 + 16 FP32/INT32 lanes per partition. If INT ops simply
 borrowed the shared half, a 50/50 FFMA:SHF mix would reach 4 warp-instr/cyc/SM.
