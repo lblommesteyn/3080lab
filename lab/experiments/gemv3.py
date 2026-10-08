@@ -76,7 +76,12 @@ extern "C" __global__ void k(const uint4* __restrict__ W, const float* S, const 
         R, U, Tn, deq = (v.params[x] for x in ("R", "U", "T", "deq"))
         wpb = Tn // 32
         L = []
-        L.append("for (int j = lane * %d; j < K / 32; j += 32 * %d) {" % (U, U))
+        lc = v.params.get("worder") == "lane_contig"
+        step = 32 if lc else 1            # distance (in uint4) between a lane's u-th loads
+        if lc:
+            L.append("for (int j = lane; j < K / 32; j += 32 * %d) {" % U)
+        else:
+            L.append("for (int j = lane * %d; j < K / 32; j += 32 * %d) {" % (U, U))
         # load order: "u_major" (default; all rows' first halves, then second halves) or
         # "r_major" (each row's halves adjacent; avoids the delayed split-sector penalty, mem_split_gap)
         order = [(u, r) for u in range(U) for r in range(R)]
@@ -84,24 +89,24 @@ extern "C" __global__ void k(const uint4* __restrict__ W, const float* S, const 
             order = [(u, r) for r in range(R) for u in range(U)]
         for u, r in order:
             if True:
-                wexpr = f"W[(size_t)(row0 + {r}) * (K / 32) + j + {u}]"
+                wexpr = f"W[(size_t)(row0 + {r}) * (K / 32) + j + {u * step}]"
                 if v.params.get("wc") == "cg":   # weights bypass L1 (no pollution of the reused x lines)
                     wexpr = f"__ldcg(&{wexpr})"
                 if v.params.get("ablate") in ("compute", "xonly"):   # no weight loads: opaque register values
                     L.append(f"  uint4 w{r}_{u}; asm volatile(\"mov.b32 %0, %1;\" : \"=r\"(w{r}_{u}.x) : \"r\"(j * 2654435761u + {r * 8 + u}));"
                              f" w{r}_{u}.y = w{r}_{u}.x * 3u; w{r}_{u}.z = w{r}_{u}.x ^ 0x5555u; w{r}_{u}.w = w{r}_{u}.x + 7u;")
                 else:
-                    L.append(f"  uint4 w{r}_{u} = (j + {u} < K / 32) ? {wexpr} : make_uint4(0x88888888u,0x88888888u,0x88888888u,0x88888888u);")
+                    L.append(f"  uint4 w{r}_{u} = (j + {u * step} < K / 32) ? {wexpr} : make_uint4(0x88888888u,0x88888888u,0x88888888u,0x88888888u);")
         for u in range(U):
-            L.append(f"  const float4* xp{u} = X + (size_t)(j + {u}) * 8;")
+            L.append(f"  const float4* xp{u} = X + (size_t)(j + {u * step}) * 8;")
             for k in range(4):
                 if v.params.get("ablate") in ("compute", "wonly"):   # no x loads: opaque register values
                     L.append(f"  float xs{u}_{k}; asm volatile(\"mov.b32 %0, %1;\" : \"=f\"(xs{u}_{k}) : \"f\"((float)(j + {k})));"
                              f" float4 xa{u}_{k} = make_float4(xs{u}_{k}, xs{u}_{k} + 1.f, xs{u}_{k} + 2.f, xs{u}_{k} + 3.f);"
                              f" float4 xb{u}_{k} = make_float4(xs{u}_{k} + 4.f, xs{u}_{k} + 5.f, xs{u}_{k} + 6.f, xs{u}_{k} + 7.f);")
                 else:
-                    L.append(f"  float4 xa{u}_{k} = (j + {u} < K / 32) ? xp{u}[{2 * k}] : make_float4(0,0,0,0);"
-                             f" float4 xb{u}_{k} = (j + {u} < K / 32) ? xp{u}[{2 * k + 1}] : make_float4(0,0,0,0);")
+                    L.append(f"  float4 xa{u}_{k} = (j + {u * step} < K / 32) ? xp{u}[{2 * k}] : make_float4(0,0,0,0);"
+                             f" float4 xb{u}_{k} = (j + {u * step} < K / 32) ? xp{u}[{2 * k + 1}] : make_float4(0,0,0,0);")
                 if deq == "half2":
                     L.append(f"  __half2 xh{u}_{k}[4] = {{__floats2half2_rn(xa{u}_{k}.x, xb{u}_{k}.x), __floats2half2_rn(xa{u}_{k}.y, xb{u}_{k}.y),"
                              f" __floats2half2_rn(xa{u}_{k}.z, xb{u}_{k}.z), __floats2half2_rn(xa{u}_{k}.w, xb{u}_{k}.w)}};")
@@ -114,7 +119,7 @@ extern "C" __global__ void k(const uint4* __restrict__ W, const float* S, const 
                              + (f" + ({xs});" if r == 0 else ";"))
                 else:
                     L += ["    " + s for s in _deq(deq, f"w{r}_{u}", u)]
-                L.append(f"    if (j + {u} < K / 32) acc[{r}] = fmaf(S[(size_t)(row0 + {r}) * (K / 128) + ((j + {u}) >> 2)], part, acc[{r}]); }}")
+                L.append(f"    if (j + {u * step} < K / 32) acc[{r}] = fmaf(S[(size_t)(row0 + {r}) * (K / 128) + ((j + {u * step}) >> 2)], part, acc[{r}]); }}")
         L.append("}")
         body = "\n    ".join(L)
         red = "\n    ".join(
@@ -259,7 +264,7 @@ class Gemv3Order(Gemv3):
             if name not in ("gate_up", "down", "q_o"):
                 continue
             for R, U in ((4, 1), (4, 2), (8, 2)):
-                for wo in (("u_major", "r_major") if U == 2 else ("u_major",)):
+                for wo in (("u_major", "r_major", "lane_contig") if U == 2 else ("u_major",)):
                     out.append(Variant(f"{name}/R{R}U{U}/{wo}", {"N": n, "K": k, "R": R, "U": U, "T": 128,
                                                                 "deq": "magic", "worder": wo, "warps": 4, "iters": 1}))
         return out
