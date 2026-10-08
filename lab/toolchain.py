@@ -49,7 +49,8 @@ def _check(res):
 
 def cuda_to_ptx(source: str, name: str = "kernel.cu", opts: list[str] | None = None) -> str:
     prog = _check(nvrtc.nvrtcCreateProgram(source.encode(), name.encode(), 0, [], []))
-    args = [f"--gpu-architecture=compute_{ARCH[3:]}", "-default-device", "-std=c++17"]
+    args = [f"--gpu-architecture=compute_{ARCH[3:]}", "-default-device", "-std=c++17",
+            f"-I{Path(_cu13.__path__[0]) / 'include'}"]
     args += opts or []
     err, = nvrtc.nvrtcCompileProgram(prog, len(args), [a.encode() for a in args])
     size = _check(nvrtc.nvrtcGetProgramLogSize(prog))

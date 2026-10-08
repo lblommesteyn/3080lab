@@ -1,8 +1,8 @@
-from . import alu, cache, gemv, mem, randk, realloc, regfile
+from . import alu, cache, gemv, gemv2, mem, randk, realloc, regfile
 
 
 def registry():
     reg = {}
-    for mod in (alu, mem, cache, regfile, randk, realloc, gemv):
+    for mod in (alu, mem, cache, regfile, randk, realloc, gemv, gemv2):
         reg.update(mod.registry())
     return reg
