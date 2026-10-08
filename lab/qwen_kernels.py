@@ -638,3 +638,30 @@ extern "C" __global__ void __launch_bounds__({32 * S_}, 1) k(
   }}
 }}
 """
+
+
+# Single-pass RMSNorm (fp32 weights): each of 512 threads keeps its <= 4 values in registers,
+# so h is read once (the two-pass version re-reads it after the reduction).
+RMSNORM_F32W_1P = r"""
+#include <cuda_bf16.h>
+extern "C" __global__ void __launch_bounds__(512) k(const float* __restrict__ h, const float* __restrict__ w,
+                                               __nv_bfloat16* __restrict__ out, int H, float eps)
+{
+  __shared__ float part[16];
+  float v[4]; float ss = 0.f;
+  #pragma unroll
+  for (int u = 0; u < 4; ++u) { int i = threadIdx.x + 512 * u; v[u] = i < H ? h[i] : 0.f; ss += v[u] * v[u]; }
+  for (int o = 16; o; o >>= 1) ss += __shfl_xor_sync(0xffffffffu, ss, o);
+  if ((threadIdx.x & 31) == 0) part[threadIdx.x >> 5] = ss;
+  __syncthreads();
+  if (threadIdx.x < 32) {
+    float t = threadIdx.x < 16 ? part[threadIdx.x] : 0.f;
+    for (int o = 16; o; o >>= 1) t += __shfl_xor_sync(0xffffffffu, t, o);
+    if (threadIdx.x == 0) part[0] = rsqrtf(t / H + eps);
+  }
+  __syncthreads();
+  float r = part[0];
+  #pragma unroll
+  for (int u = 0; u < 4; ++u) { int i = threadIdx.x + 512 * u; if (i < H) out[i] = __float2bfloat16_rn(v[u] * r * w[i]); }
+}
+"""

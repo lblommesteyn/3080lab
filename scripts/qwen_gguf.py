@@ -34,7 +34,7 @@ from lab.gguf import GGUF, q4_0_blocks, q6_k_blocks, q6_k_parts  # noqa: E402
 GGUF_PATH = Path.home() / (".cache/huggingface/hub/models--Qwen--Qwen2.5-1.5B-Instruct-GGUF/snapshots/"
                            "91cad51170dc346986eccefdc2dd33a9da36ead9/qwen2.5-1.5b-instruct-q4_0.gguf")
 LLAMA = Q.ROOT / "vendor" / "llamacpp"
-SPLIT = {"qkv": 2, "o": 2, "gu": 1, "down": 2, "head": 1}
+SPLIT = {"qkv": 2, "o": 2, "gu": 2 if "--gu-s1" not in sys.argv else 1, "down": 2, "head": 1}
 
 
 def q4_rows(g: GGUF, name: str):
@@ -116,13 +116,15 @@ class GGUFQwen(F.FusedQwen):
         self.tok = torch.zeros(1, dtype=torch.long, device=dev)
         self.pos = torch.zeros(1, dtype=torch.long, device=dev)
         F.SPLIT.update(SPLIT)
-        self.fuse_norm = "--no-fuse-norm" not in sys.argv
+        # last-block-done norm fold measured SLOWER (+8.7 us per site vs 2.25 us separate kernel): opt-in only
+        self.fuse_norm = "--fuse-norm" in sys.argv
         repi = "resid_norm" if self.fuse_norm else "resid"
         self.k = {name: F.Kern(KS.gemv_source(SPLIT[name], epi, "g32f16")) for name, epi in
                   (("qkv", "biasf"), ("o", repi), ("gu", "swiglu"), ("down", repi))}
         self.cnt = torch.zeros(2 * nL, dtype=torch.int32, device=dev)   # one self-resetting counter per launch site
         self.k["head"] = F.Kern(KS.gemv_q6_source(SPLIT["head"]) if self.head_q6 else KS.gemv_i8_source(SPLIT["head"]))
-        self.k_rms, self.k_emb = F.Kern(KS.RMSNORM_F32W), F.Kern(KS.EMBED_F32)
+        self.k_rms = F.Kern(KS.RMSNORM_F32W_1P if "--rms-2pass" not in sys.argv else KS.RMSNORM_F32W)
+        self.k_emb = F.Kern(KS.EMBED_F32)
         attn = "ATTN4" if "--attn-v1" not in sys.argv else "ATTN"
         self.k_attn, self.k_fin = F.Kern(getattr(KS, attn) % {"maxlen": Q.MAX_LEN}), F.Kern(KS.FINISH)
         self.attn_threads = 512 if attn == "ATTN4" else 128
