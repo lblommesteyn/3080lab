@@ -57,8 +57,11 @@ def main(srcs):
             with torch.cuda.graph(g):
                 for _ in range(50):
                     f()
-            g.replay()
-            torch.cuda.synchronize()
+            import time as _t
+            t_end = _t.perf_counter() + 0.3
+            while _t.perf_counter() < t_end:
+                g.replay()
+                torch.cuda.synchronize()
             s, e = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
             s.record()
             for _ in range(10):
@@ -76,4 +79,4 @@ def main(srcs):
 
 if __name__ == "__main__":
     main({"attn_v1": (KS.ATTN % {"maxlen": MAXLEN}, NH, 128),
-          "attn_v2": (KS.ATTN2 % {"maxlen": MAXLEN}, NH * (MAXLEN // 64), 128)})
+          "attn_v3": (KS.ATTN3 % {"maxlen": MAXLEN}, NH, 512)})

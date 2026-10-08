@@ -371,3 +371,76 @@ extern "C" __global__ void __launch_bounds__(128) k(
   if (d == 0) counter[h] = 0;
 }
 """
+
+# Attention v3: one block (512 threads) per query head. 16 warps score positions with
+# lanes splitting the head dim (coalesced K rows); 4 position-groups of 128 threads
+# accumulate P*V in parallel (4x shorter serial L2-latency chain than v1), combined in smem.
+ATTN3 = r"""
+#include <cuda_bf16.h>
+#define HD 128
+#define MAXLEN %(maxlen)d
+extern "C" __global__ void __launch_bounds__(512) k(
+    const __nv_bfloat16* __restrict__ qkv, const float* __restrict__ cosT, const float* __restrict__ sinT,
+    const long long* posp, __nv_bfloat16* __restrict__ kc, __nv_bfloat16* __restrict__ vc,
+    __nv_bfloat16* __restrict__ out, int NH, int NKV, float scale)
+{
+  __shared__ float q[HD], kn[HD], vn[HD], sc[MAXLEN], red[16], acc4[4][HD];
+  int h = blockIdx.x, t = threadIdx.x, warp = t >> 5, lane = t & 31;
+  int grp = NH / NKV, kvh = h / grp;
+  int pos = (int)posp[0];
+  __nv_bfloat16* kbase = kc + (size_t)kvh * MAXLEN * HD;
+  __nv_bfloat16* vbase = vc + (size_t)kvh * MAXLEN * HD;
+  if (t < HD) {
+    int d = t, half = HD / 2, dd = d %% half;
+    float cs = cosT[pos * half + dd], sn = sinT[pos * half + dd];
+    float qa = __bfloat162float(qkv[h * HD + d]);
+    float qb = __bfloat162float(qkv[h * HD + (d < half ? d + half : d - half)]);
+    q[d] = __bfloat162float(__float2bfloat16_rn(d < half ? qa * cs - qb * sn : qa * cs + qb * sn));
+    const __nv_bfloat16* kp = qkv + NH * HD + kvh * HD;
+    float ka = __bfloat162float(kp[d]), kb = __bfloat162float(kp[d < half ? d + half : d - half]);
+    kn[d] = __bfloat162float(__float2bfloat16_rn(d < half ? ka * cs - kb * sn : ka * cs + kb * sn));
+    vn[d] = __bfloat162float(__float2bfloat16_rn(__bfloat162float(qkv[(NH + NKV) * HD + kvh * HD + d])));
+    if (h %% grp == 0) {
+      kbase[(size_t)pos * HD + d] = __float2bfloat16_rn(kn[d]);
+      vbase[(size_t)pos * HD + d] = __float2bfloat16_rn(vn[d]);
+    }
+  }
+  __syncthreads();
+  float q0 = q[4 * lane], q1 = q[4 * lane + 1], q2 = q[4 * lane + 2], q3 = q[4 * lane + 3];
+  for (int j = warp; j <= pos; j += 16) {
+    float s;
+    if (j == pos) {
+      s = q0 * kn[4 * lane] + q1 * kn[4 * lane + 1] + q2 * kn[4 * lane + 2] + q3 * kn[4 * lane + 3];
+    } else {
+      uint2 w = *reinterpret_cast<const uint2*>(kbase + (size_t)j * HD + 4 * lane);
+      s = q0 * __uint_as_float(w.x << 16) + q1 * __uint_as_float(w.x & 0xffff0000u)
+        + q2 * __uint_as_float(w.y << 16) + q3 * __uint_as_float(w.y & 0xffff0000u);
+    }
+    for (int o = 16; o; o >>= 1) s += __shfl_xor_sync(0xffffffffu, s, o);
+    if (lane == 0) sc[j] = s * scale;
+  }
+  __syncthreads();
+  float mx = -1e30f;
+  for (int j = t; j <= pos; j += 512) mx = fmaxf(mx, sc[j]);
+  for (int o = 16; o; o >>= 1) mx = fmaxf(mx, __shfl_xor_sync(0xffffffffu, mx, o));
+  if (lane == 0) red[warp] = mx;
+  __syncthreads();
+  mx = red[0];
+  for (int i = 1; i < 16; ++i) mx = fmaxf(mx, red[i]);
+  __syncthreads();
+  float sum = 0.f;
+  for (int j = t; j <= pos; j += 512) { float e = __expf(sc[j] - mx); sc[j] = e; sum += e; }
+  for (int o = 16; o; o >>= 1) sum += __shfl_xor_sync(0xffffffffu, sum, o);
+  if (lane == 0) red[warp] = sum;
+  __syncthreads();
+  sum = 0.f;
+  for (int i = 0; i < 16; ++i) sum += red[i];
+  int pg = t >> 7, d = t & 127;
+  float o_ = 0.f;
+  for (int j = pg; j < pos; j += 4) o_ += sc[j] * __bfloat162float(vbase[(size_t)j * HD + d]);
+  if (pos %% 4 == pg) o_ += sc[pos] * vn[d];
+  acc4[pg][d] = o_;
+  __syncthreads();
+  if (t < HD) out[h * HD + t] = __float2bfloat16_rn((acc4[0][t] + acc4[1][t] + acc4[2][t] + acc4[3][t]) / sum);
+}
+"""
