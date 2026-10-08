@@ -229,10 +229,13 @@ class Gemv3Ablate(Gemv3):
 
     def variants(self, opts):
         out = []
-        for R, U in ((4, 1), (4, 2), (8, 1), (8, 2)):
-            for ab in ("none", "loads", "compute", "wonly", "xonly"):
-                out.append(Variant(f"gate_up/R{R}U{U}/{ab}", {"N": 18944, "K": 3584, "R": R, "U": U, "T": 128,
-                                                             "deq": "magic", "ablate": ab, "warps": 4, "iters": 1}))
+        for K in (3584, 4096, 3072, 2048):
+            for R, U in ((4, 1), (4, 2), (8, 1), (8, 2)):
+                abl = ("none", "loads", "compute", "wonly", "xonly") if K == 3584 else ("wonly",)
+                for ab in abl:
+                    tag = "gate_up" if K == 3584 else f"K{K}"
+                    out.append(Variant(f"{tag}/R{R}U{U}/{ab}", {"N": 18944, "K": K, "R": R, "U": U, "T": 128,
+                                                               "deq": "magic", "ablate": ab, "warps": 4, "iters": 1}))
         return out
 
 
