@@ -106,5 +106,65 @@ class L1Capacity(Chase):
 
 
 def registry():
-    exps = [ICache(), L1Capacity(space="global")]
+    exps = [ICache(), L1Capacity(space="global"), GridBarrier()]
     return {e.name: e for e in exps}
+
+
+@dataclass
+class GridBarrier(Experiment):
+    """Cost of a software grid-wide barrier (atomic arrive + spin on a generation counter) with
+    every block co-resident, vs. a kernel boundary in a CUDA graph (~1 us + ramp, graph_overhead).
+    Decides whether a persistent per-token megakernel can beat ~200 launches."""
+
+    def __post_init__(self):
+        self.name = "grid_barrier"
+        self.description = "software grid barrier cost vs blocks (all co-resident)"
+
+    def source(self, v):
+        return r"""
+extern "C" __global__ void k(unsigned* bar, int n, long long* cyc, unsigned long long* ns)
+{
+  // bar[0] = arrive count, bar[1] = generation
+  long long t0 = clock64(); unsigned long long g0; asm volatile("mov.u64 %0, %%globaltimer;" : "=l"(g0));
+  for (int it = 0; it < n; ++it) {
+    __syncthreads();
+    if (threadIdx.x == 0) {
+      volatile unsigned* gen = bar + 1;
+      unsigned g = *gen;
+      __threadfence();
+      if (atomicAdd(bar, 1u) == gridDim.x - 1) { bar[0] = 0; __threadfence(); atomicAdd(bar + 1, 1u); }
+      else { while (*gen == g) { } }
+      __threadfence();
+    }
+    __syncthreads();
+  }
+  long long t1 = clock64(); unsigned long long g1; asm volatile("mov.u64 %0, %%globaltimer;" : "=l"(g1));
+  if (blockIdx.x == 0 && threadIdx.x == 0) { cyc[0] = t1 - t0; ns[0] = g1 - g0; }
+}
+"""
+
+    def expected(self, v):
+        return {}
+
+    def variants(self, opts):
+        return [Variant(f"blocks{b}/t{t}", {"blocks": b, "threads": t, "n": 2000, "warps": t // 32, "iters": 1})
+                for b in (68, 136, 272, 544) for t in (128, 256)]
+
+    def prepare(self, dev, v):
+        st = {"bar": dev.alloc(8), "cyc": dev.alloc(8), "ns": dev.alloc(8)}
+        dev.memset(st["bar"], 8)
+        st["launch"] = dict(grid=v.params["blocks"], block=v.params["threads"],
+                            args=[ctypes.c_uint64(st["bar"]), ctypes.c_int32(v.params["n"]),
+                                  ctypes.c_uint64(st["cyc"]), ctypes.c_uint64(st["ns"])])
+        return st
+
+    def collect(self, dev, v, st):
+        cyc = int(dev.dtoh(np.zeros(1, np.int64), st["cyc"])[0])
+        ns = int(dev.dtoh(np.zeros(1, np.uint64), st["ns"])[0])
+        n = v.params["n"]
+        return {"cycles": cyc, "ns": ns, "ops_per_thread": n, "cycles_per_op": cyc / n, "warp_ops_per_cycle": 0.0,
+                "sm_mhz_inkernel": cyc / max(ns, 1) * 1e3, "us_per_barrier": ns / n / 1e3}
+
+    def release(self, dev, st):
+        for x in ("bar", "cyc", "ns"):
+            dev.free(st[x])
