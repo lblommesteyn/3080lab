@@ -64,9 +64,14 @@ def build(cubin: bytes, kernel: str = "k") -> dict:
             mapped = t in f2t.values() and w is not None
             is_def = (t == dest_tok)
             if w is None or not info["fields"]:
-                # unknown instruction: treat every register as both used and defined, pinned
-                lst.append(Occ(k, t, r, False, 2, False))
-                lst.append(Occ(k, t, r, True, 2, False))
+                # Unknown/unsafe instruction: it may touch the whole aligned pair or quad
+                # implicitly (plain CS2R Rn writes Rn:Rn+1; a renamed read of the hidden
+                # Rn+1 once corrupted a clock). Pin every register it could touch as both
+                # used and defined.
+                span = 4 if "128" in i.text else 2
+                for rr in range(r & ~(span - 1), (r & ~(span - 1)) + span):
+                    lst.append(Occ(k, t, rr, False, span, False))
+                    lst.append(Occ(k, t, rr, True, span, False))
                 continue
             regs = range(r, r + w) if w > 1 else [r]
             for rr in regs:
@@ -313,7 +318,7 @@ def apply(cubin: bytes, res: dict, kernel: str = "k") -> bytes:
         kw = {}
         for o in g["occs"][k]:
             w = W["occ_web"][id(o)]
-            if w in W["pinned"] or color[w] == o.reg:
+            if w in W["pinned"] or color[w] == o.reg or not o.mapped:
                 continue
             fld = t2f[o.tok]
             kw[{"d": "rd", "a": "ra", "b": "rb", "c": "rc"}[fld]] = color[w]
