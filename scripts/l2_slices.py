@@ -87,33 +87,18 @@ def main():
     for _ in range(3):
         run(0, 0)                                     # warm clocks
     base = np.median([run(0, 0) for _ in range(5)], axis=0)
-    label = -np.ones(n, int)
-    refs = []
+    # references: one line from each of the 40 latency clusters (results/l2_slice_labels.npy)
+    lat_lab = np.load(ROOT / "results" / "l2_slice_labels.npy")
     rng = np.random.default_rng(0)
-    for it in range(80):
-        free = np.nonzero(label < 0)[0]
-        if len(free) == 0:
-            break
-        ref = int(rng.choice(free))
-        d = np.median([run(ref, 1) for _ in range(3)], axis=0) - base
-        mad = np.median(np.abs(d - np.median(d)))
-        thr = max(25.0, np.median(d) + 6 * 1.4826 * mad)
-        if d[ref] < thr:                    # hammer must slow its own line, or the run is invalid
-            print(f"iter {it:2d} ref {ref}: reference not slowed (+{d[ref]:.0f}), skipping", flush=True)
-            continue
-        members = np.nonzero(d > thr)[0]
-        members = members[label[members] < 0]
-        label[members] = it
-        label[ref] = it
-        refs.append({"ref": ref, "members": int(len(members)), "thr": float(thr),
-                     "d_ref": float(d[ref]), "d_median": float(np.median(d))})
-        print(f"iter {it:2d} ref line {ref:5d}: +{d[ref]:.0f} cyc at ref, {len(members)} lines over {thr:.0f}, "
-              f"unassigned left {int((label < 0).sum())}", flush=True)
-    np.save(ROOT / "results" / "l2_slice_labels_contention.npy", label)
-    (ROOT / "results" / "l2_slices.json").write_text(json.dumps({"base": int(base_ptr), "refs": refs}, indent=1))
-    sizes = np.bincount(label[label >= 0])
-    print(f"slices found: {len(sizes)}; sizes min/median/max {sizes.min()}/{int(np.median(sizes))}/{sizes.max()}; "
-          f"unassigned {int((label < 0).sum())}")
+    refs = [int(rng.choice(np.nonzero(lat_lab == c)[0])) for c in range(lat_lab.max() + 1)]
+    D = np.zeros((len(refs), n), np.float32)
+    for r, ref in enumerate(refs):
+        D[r] = np.median([run(ref, 1) for _ in range(3)], axis=0) - base
+        print(f"ref {r:2d} line {ref:5d}: +{D[r, ref]:.0f} at ref; lines > +25: {(D[r] > 25).sum()}, > +200: {(D[r] > 200).sum()}, "
+              f"> +2000: {(D[r] > 2000).sum()}", flush=True)
+    np.save(ROOT / "results" / "l2_contention_D.npy", D)
+    np.save(ROOT / "results" / "l2_contention_refs.npy", np.array(refs))
+    (ROOT / "results" / "l2_slices.json").write_text(json.dumps({"base": int(base_ptr)}))
 
 
 if __name__ == "__main__":
