@@ -595,9 +595,24 @@ batched Q4_0 GEMVs read each weight once for B input vectors:
 | gate_up 17920 x 1536 | 30.3 | 34.7 | 46.8 | 80.4 | 146 | 25.4 |
 | down 1536 x 8960 | 32.3 | 37.0 | 38.8 | 52.7 | 92 | 14.5 |
 
-`down` (long K, only 96 row tiles of 16) lacks parallelism at small B. Next: end-to-end batched
-decode (batched attention over separate KV caches, norms, embedding, the Q6_K head) against the
-llama.cpp numbers above.
+`down` (long K, only 96 row tiles of 16) lacks parallelism at small B.
+
+**End to end** (`scripts/qwen_batched_decode.py`). Tensor-core GEMVs; embedding, RMSNorm, attention
+(separate KV cache per sequence) and argmax are the single-sequence kernels, with a batch index from
+`blockIdx.y`; the Q6_K head is dequantized once to fp16 for a cuBLAS matmul. The whole step is a
+CUDA graph. B copies of one prompt give identical, coherent sequences. They match the validated
+single-sequence decode for 73 of 128 tokens and then diverge, presumably at a near-tie flipped by
+the fp16 weight rounding of the tensor-core path.
+
+| decode tok/s (128 generated per sequence) | B = 1 | 4 | 8 | 16 | 32 |
+|---|---|---|---|---|---|
+| ours | 342 | 1258 | **2133** | 2989 | 3556 |
+| llama.cpp b11485 | 336 | 964 | 1420 | 2424 | 3566 |
+| ratio | 1.02 | 1.30 | **1.50** | 1.23 | 1.00 |
+
+At B = 1 the single-vector path (509 tok/s) is the better choice. At B = 32 the GEMVs dominate the
+9.0 ms step and run far below tensor-core peak: per n-tile they convert bf16 inputs to fp16 and
+decode weights, rather than doing MMAs.
 
 ### Phase 8: our own block scheduler (`lab/resched.py`, `lab/verify.py`, `pair_latency`, `mufu_latency`, `resched_rand`)
 
