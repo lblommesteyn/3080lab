@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import re
 import struct
+from collections import defaultdict
 from dataclasses import dataclass
 
 from . import operands as opnd
@@ -300,7 +301,7 @@ def _try_move(cubin: bytes, kernel: str, a: int, b: int, rename_regs: bool, fres
 
 
 def fix_split_sectors(cubin: bytes, kernel: str = "k", min_gap: int = 3, max_moves: int = 128,
-                      rename_regs: bool = True, finder=None) -> tuple[bytes, list]:
+                      rename_regs: bool = True, finder=None, max_regs: int | None = None) -> tuple[bytes, list]:
     """Repeatedly hoist the second half of the widest-gap split-sector pair next to its first half.
     Pairs are re-found after every move (moves shift offsets); refused pairs are not retried."""
     log, refused = [], set()
@@ -312,7 +313,10 @@ def fix_split_sectors(cubin: bytes, kernel: str = "k", min_gap: int = 3, max_mov
             break
         a, b, g = max(cand, key=lambda t: t[2])
         top = max(int(r) for x in ins.values() for r in _REG.findall(x.text))
-        c2, why, _ = _try_move(cubin, kernel, a, b, rename_regs, (top + 4) & ~3)
+        fresh = (top + 4) & ~3
+        # register budget (occupancy cliff): a move that would need registers past it is not renamed
+        allow = rename_regs and (max_regs is None or fresh + 4 + 3 <= max_regs)
+        c2, why, _ = _try_move(cubin, kernel, a, b, allow, fresh)
         log.append((g, ins[b].text, why))
         if why.startswith("ok"):
             cubin = c2
@@ -365,7 +369,7 @@ def _pred_defs(text: str) -> set:
 
 
 def fix_split_sectors_guarded(cubin: bytes, kernel: str = "k", min_gap: int = 3, finder=None,
-                              rename_regs: bool = True) -> tuple[bytes, list]:
+                              rename_regs: bool = True, max_regs: int | None = None) -> tuple[bytes, list]:
     """Like fix_split_sectors, but first hoists the ISETP that guards the late loads, retargeted to a
     free predicate register, so the guarded loads can move up next to their sector partners."""
     log = []
@@ -416,7 +420,7 @@ def fix_split_sectors_guarded(cubin: bytes, kernel: str = "k", min_gap: int = 3,
         if why != "ok":
             continue
         cubin = c2
-    c3, log2 = fix_split_sectors(cubin, kernel, min_gap, finder=finder, rename_regs=rename_regs)
+    c3, log2 = fix_split_sectors(cubin, kernel, min_gap, finder=finder, rename_regs=rename_regs, max_regs=max_regs)
     return c3, log + log2
 
 
@@ -640,3 +644,74 @@ def dedicate_barrier(cubin: bytes, kernel: str = "k", original: bytes | None = N
     if fix:
         out = patch.set_control(out, kernel, fix)
     return out, f"{len(long_idx)} long loads -> W{B}, {len(others)} other producers moved"
+
+
+def compact_renames(cubin: bytes, kernel: str = "k", original: bytes | None = None) -> tuple[bytes, str]:
+    """Pack renamed load destinations back into registers that are dead over their live ranges.
+
+    rename_dest gives every hoisted load a fresh aligned quad above all allocated registers and never
+    reuses them: R8U4 GEMVs went 96 -> 195 registers (20 -> 8 resident warps/SM) and ran at 0.81x.
+    Here each renamed destination (registers above the original kernel's) is moved, as a whole
+    aligned quad, to the lowest base whose registers hold no interfering value (web interference
+    from lab/regalloc.py); then the register count is lowered. regalloc.prove checks the result."""
+    from . import regalloc
+    top0 = rename._regcount(original, kernel) - 3 if original else None
+    c = cubin
+    moved = 0
+    for _ in range(64):
+        g = regalloc.build(c, kernel)
+        W = regalloc.webs(g)
+        E = regalloc.interference(g, W)
+        ins = g["ins"]
+        hi = []
+        for k, x in enumerate(ins):
+            if not x.opcode.startswith("LDG"):
+                continue
+            defs = [o for o in g["occs"][k] if o.is_def]
+            if defs and top0 is not None and min(o.reg for o in defs) > top0:
+                hi.append((min(o.reg for o in defs), k, defs))
+        if not hi:
+            break
+        hi.sort(reverse=True)                          # highest first: frees the top of the file
+        progressed = False
+        for r0, k, defs in hi:
+            width = max(o.reg for o in defs) - r0 + 1
+            align = 4 if width > 2 else width
+            q = {W["occ_web"][id(o)]: o.reg - r0 for o in defs}
+            # current register of every web = the register its occurrences use
+            reg_of = {}
+            for w, occs in W["members"].items():
+                reg_of[w] = occs[0].reg
+            busy_regs = defaultdict(set)
+            for w, delta in q.items():
+                for x in E[w]:
+                    if x not in q:
+                        busy_regs[delta].add(reg_of[x])
+            base = None
+            for b in range(0, r0, align):
+                if b + width - 1 >= r0:
+                    break
+                if b <= 1 and b + width > 1:             # R1 is the stack pointer
+                    continue
+                if all((b + d) not in busy_regs[d] for d in range(width)):
+                    base = b
+                    break
+            if base is None:
+                continue
+            c2, why = rename_dest(c, kernel, ins[k].offset, base)
+            if why != "ok":
+                continue
+            try:
+                regalloc.prove(c, c2, kernel)
+            except Exception:
+                continue
+            c, moved, progressed = c2, moved + 1, True
+            break                                      # rebuild the analysis after every move
+        if not progressed:
+            break
+    # lower the register count to what is used (+2: the top two registers fault)
+    used = [int(r) for x in sass.parse(toolchain.disassemble(c)) for r in _REG.findall(x.text)]
+    need = max(used) + 3 if used else 3
+    if need < rename._regcount(c, kernel):
+        c = patch.set_regcount(c, kernel, need)
+    return c, f"{moved} destinations packed, regcount {rename._regcount(c, kernel)}"

@@ -435,7 +435,7 @@ extern "C" __global__ void __launch_bounds__(256) k(const unsigned char* __restr
                 for G in (1, 2, 4, 8) for pat in ("contig", "split")]
 
     def prepare(self, dev, v):
-        blocks = 68 * 2
+        blocks = v.params.get("blocks", 68 * 2)
         st = super().prepare(dev, v)
         dev.free(st["T"])
         st["T"] = dev.alloc(blocks * 16)
@@ -500,16 +500,18 @@ extern "C" __global__ void __launch_bounds__(256) k(const unsigned char* __restr
 }}
 """
 
+    # 64 MB buffers (12x the L2): the runner keeps every variant's buffer alive, and ~70 x 256 MB
+    # overflowed the 10 GB card, so WDDM paged buffers to host memory (25 GB/s "DRAM" readings)
     def variants(self, opts):
         out = []
         for cache in ("nc", "cg"):
             for G in (1, 2, 4, 8, 16, 32):
                 for pat in ("contig", "split"):
-                    out.append(Variant(f"{cache}/G{G}/{pat}", {"size": 256 * MB, "stride": 0, "iters": max(8, 256 // G),
+                    out.append(Variant(f"{cache}/G{G}/{pat}", {"size": 64 * MB, "stride": 0, "iters": max(8, 256 // G),
                                                               "warps": 8, "pattern": pat, "G": G, "fill": 0,
                                                               "wait": False, "cache": cache}))
             for fill in ((100, 400, 1600) if cache == "cg" else ()):   # ptxas hoists .nc loads across it
-                out.append(Variant(f"{cache}/G1/split/fill{fill}", {"size": 256 * MB, "stride": 0, "iters": 256,
+                out.append(Variant(f"{cache}/G1/split/fill{fill}", {"size": 64 * MB, "stride": 0, "iters": 256,
                                                                      "warps": 8, "pattern": "split", "G": 1,
                                                                      "fill": fill, "wait": False, "cache": cache}))
             if cache == "nc":
@@ -517,15 +519,24 @@ extern "C" __global__ void __launch_bounds__(256) k(const unsigned char* __restr
                 # few trips per warp, one wave, G=16 (reuse distance far beyond L2)
                 for it in (1, 2, 4, 32):
                     for pat in ("contig", "split"):
-                        out.append(Variant(f"nc/G16/{pat}/it{it}", {"size": 256 * MB, "stride": 0, "iters": it,
+                        out.append(Variant(f"nc/G16/{pat}/it{it}", {"size": 64 * MB, "stride": 0, "iters": it,
                                                                    "warps": 8, "pattern": pat, "G": 16, "fill": 0,
                                                                    "wait": False, "cache": "nc"}))
+            if cache == "nc":
+                # is m a function of D = bytes-between x warps only? (optimize benchmark: sub-wave
+                # GEMVs are over-predicted). Vary G and the concurrent warps independently.
+                for blocks in (17, 34, 68):                    # 136, 272, 544 warps (1088 above)
+                    for G in (2, 4, 8, 16, 32):
+                        for pat in ("contig", "split"):
+                            out.append(Variant(f"nc/G{G}/{pat}/b{blocks}", {"size": 64 * MB, "stride": 0,
+                                               "iters": max(8, 256 // G), "warps": 8, "pattern": pat, "G": G,
+                                               "fill": 0, "wait": False, "cache": "nc", "blocks": blocks}))
             for G in (8, 32):
-                out.append(Variant(f"{cache}/G{G}/split/wait", {"size": 256 * MB, "stride": 0,
+                out.append(Variant(f"{cache}/G{G}/split/wait", {"size": 64 * MB, "stride": 0,
                                                                  "iters": max(8, 256 // G), "warps": 8,
                                                                  "pattern": "split", "G": G, "fill": 0,
                                                                  "wait": True, "cache": cache}))
-                out.append(Variant(f"{cache}/G{G}/contig/wait", {"size": 256 * MB, "stride": 0,
+                out.append(Variant(f"{cache}/G{G}/contig/wait", {"size": 64 * MB, "stride": 0,
                                                                   "iters": max(8, 256 // G), "warps": 8,
                                                                   "pattern": "contig", "G": G, "fill": 0,
                                                                   "wait": True, "cache": cache}))
