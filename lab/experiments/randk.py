@@ -128,7 +128,10 @@ extern "C" __global__ void k(float* out, long long* cyc, unsigned long long* ns,
         cmax = int(cyc.max())
         p = self._program(v.params["seed"])
         ops = v.params["iters"] * p["k"] * p["length"]
-        return {"cycles": cmax, "ns": int(ns.max()), "ops_per_thread": ops,
+        import hashlib
+        y = dev.dtoh(np.zeros(32 * w, np.float32), st["out"])
+        return {"y_hash": hashlib.sha1(y.tobytes()).hexdigest()[:12],
+                "cycles": cmax, "ns": int(ns.max()), "ops_per_thread": ops,
                 "cycles_per_op": cmax / ops, "warp_ops_per_cycle": w * ops / cmax,
                 "sm_mhz_inkernel": cmax / max(int(ns.max()), 1) * 1e3}
 
@@ -137,8 +140,37 @@ extern "C" __global__ void k(float* out, long long* cyc, unsigned long long* ns,
             dev.free(st[x])
 
 
+@dataclass
+class ReschedRandom(RandomKernels):
+    """Phase 8 scheduler on random kernels: ptxas vs our critical-path schedule vs a random legal
+    order (a correctness stress test). Outputs must match bitwise (y_hash)."""
+    n_kernels: int = 40
+
+    def __post_init__(self):
+        self.name = "resched_rand"
+        self.description = "lab/resched.py block scheduler vs ptxas on seeded random kernels"
+
+    def variants(self, opts: dict) -> list[Variant]:
+        out = []
+        for v in super().variants(opts):
+            for pol in ("ptxas", "crit", "random", "identity"):
+                out.append(Variant(f"{v.label}/{pol}", dict(v.params, policy=pol)))
+        return out
+
+    def build_key(self, v: Variant):
+        return v.params["policy"]
+
+    def transform(self, cubin: bytes, v: Variant) -> bytes:
+        if v.params["policy"] == "ptxas":
+            return cubin
+        from lab import resched
+        out, _ = resched.reschedule(cubin, "k", policy=v.params["policy"], seed=v.params["seed"])
+        return out
+
+
 def registry():
     a = RandomKernels()
     b = RandomKernels(seed0=2000)  # held-out set for model versions tuned on set A
     b.name = "rand_kernels_b"
-    return {a.name: a, b.name: b}
+    c = ReschedRandom()
+    return {a.name: a, b.name: b, c.name: c}

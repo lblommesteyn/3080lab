@@ -417,6 +417,89 @@ ms/token) is per-kernel fixed cost: attention 32%, RMSNorm 18%, GEMV tails.
   The 5-way selector is not a simple modulo of address bits below 2^21 (best
   0.36 vs 0.24 chance); it likely uses higher physical bits or a table.
 
+### Phase 7: automatic SASS pass beats ptxas on R8U2 (`lab/schedule.py`, `gemv_load_order` sassfix*)
+
+ptxas splits each 32 B weight sector into two 16 B loads and, under register pressure, defers the second half
+by ~1000 instructions; L1 only merges halves issued within ~2 loads, so every sector goes to L2 twice. The pass
+re-joins the halves directly in the cubin, with no source change:
+
+1. Find split-sector pairs (same base register, offsets 16 B apart in one 32 B sector).
+2. The late halves are guarded (`@!P0`) by an `ISETP` placed just before them, and P0 is reused as a carry flag
+   elsewhere. Retarget that ISETP to a free predicate (P4: dest field hi[17:20]), retarget the 87 guards that
+   consume it (guard field lo[12:15]), then hoist the ISETP up to the first half.
+3. Hoist each late half up to its partner. Legality checks: no barriers, memory ops or control flow in range;
+   no register RAW/WAR/WAW; predicates conflict only when one side defines them; a fixed-latency producer
+   is at least 6 cycles away; a scoreboard producer's barrier is added to the wait mask.
+4. Repairs when a move is blocked:
+   - rename the load's destination web to fresh registers (regcount raised);
+   - carry along the constant default ptxas writes before a guarded load (the not-taken value);
+   - land after the guard def;
+   - slide the landing point down past a too-close address producer.
+
+| R8U2 shape | ptxas u_major | sassfix (gap>=64) | sassfix (gap>=3) | source fix (lane_contig) |
+|---|---|---|---|---|
+| gate_up 17920x1536 | 94.2 us | **62.5 us (1.51x)** | 63.5 us | 54.3 us |
+| down 1536x8960 | 66.6 us | 63.5 us | 65.5 us | 59.4 us |
+| q_o 1536x1536 | 15.4 us | 14.3 us | 15.4 us | 13.3 us |
+
+The outputs are bitwise identical to the unpatched ptxas kernel (SHA-1 of y) for every shape and variant.
+Fixing all pairs (gap>=3) renames more and raises regcount further (103 -> 151 on gate_up), so it is no better
+than fixing only the long gaps. About 15% remains to the source-level fix. lane_contig also changes which
+lines each warp touches (fewer L1 lines per request), and a load-only reorder cannot do that.
+Gotcha: the runner caches builds by source + `build_key()`, so a transform-only variant must override
+`build_key`. The first run silently measured the unpatched cubin.
+
+### Phase 8: our own block scheduler (`lab/resched.py`, `lab/verify.py`, `pair_latency`, `mufu_latency`, `resched_rand`)
+
+Every basic block is list-scheduled from a dependence DAG on top of ptxas's register allocation,
+and every control word is regenerated: stalls, wait masks, write barriers and reuse flags.
+
+**Correctness.** Tested on 40 seeded random kernels (FFMA, IMAD, SHF, MUFU, SHFL; 1 to 32 warps).
+Each kernel was run with three schedules:
+- ptxas order with my control words (identity);
+- my critical-path order (crit);
+- a random legal order, as a stress test.
+
+All 120 rescheduled kernels are bitwise identical to ptxas, stable over 5 full-length launches
+each. The independent hazard checker (`lab/verify.py`) walks the code in execution order with
+the loop unrolled 3x and finds no hazard that ptxas's own code does not also have. Getting
+there required these hardware rules, each found from a wrong answer on the GPU:
+
+| rule | evidence |
+|---|---|
+| forwarding latency 4 cycles within a pipe, 5 across the FMA/ALU pipes, 4 into SHFL, 4 FFMA/FADD -> MUFU | `pair_latency`, `mufu_latency` (stall patched below the minimum gives wrong values) |
+| FMA pipe = FFMA, FADD, FMUL, IMAD, IMAD.IADD; ALU pipe = IADD3, LOP3, SHF, FMNMX | same |
+| a scoreboard arms one cycle after issue: an instruction waiting on the previous instruction's barrier needs stall >= 2, including across a block boundary | races in random orders |
+| waits are sticky: ptxas protects a value from an earlier block by any earlier wait in the block, so moved code must wait at block entry | race in a pre-loop block |
+| a wait on an op's read barrier resolves its operand reads, not its result | loop-carried SHFL race |
+| an op with only a read barrier has a stall-timed result | MUFU with R set, W unset |
+| a variable-latency op with no barriers (e.g. a dead MUFU) is protected only by distance: keep ptxas's distance to the next write of its register | deterministic wrong answer at 32 warps |
+| encoding: with the yield bit set the stall must be 1..11; 12..15 need yield clear | nvdisasm rejects the opex value |
+
+Ptxas itself sometimes gives MUFU no scoreboard at all and relies on a 9 to 25 cycle stall. Ptxas
+also turns some `add.s32` into `IMAD.IADD` (FMA pipe), apparently to balance pipes.
+
+**Speed vs ptxas** (median cycles, 40 kernels; geomean of ptxas/ours):
+
+| schedule | geomean | worst | best |
+|---|---|---|---|
+| identity order, my control words | 0.964 | 0.846 | 1.023 |
+| critical-path order | 0.932 | 0.642 | 1.040 |
+| random legal order | 0.846 | 0.483 | 1.023 |
+
+Critical-path order picks instructions by EXPECTED completion (MUFU 17, SHFL 26, LDG 498
+cycles). The encoded stalls come from a replay that uses only the hard requirements, so the
+waits do the blocking. Before this split the critical-path order was 0.85x, because it put
+consumers right behind MUFU/SHFL producers and the single warp sat at the wait. Write barriers
+are reallocated in the new order, except producers still in flight at ptxas's block exit.
+
+Remaining gap to ptxas:
+- reuse flags: I set them only between neighbours, while the cache keeps an entry until another
+  read hits the same bank and slot (seed1014: ptxas 84 flags vs mine 52);
+- a conservative 5-cycle latency for unmeasured ops;
+- ptxas's register allocation was made for ptxas's order, so WAR edges limit how far I can
+  move anything.
+
 ### FP32/INT32 sharing (superseded by the section above)
 
 GA102 has 16 FP32 + 16 FP32/INT32 lanes per partition. If INT ops simply

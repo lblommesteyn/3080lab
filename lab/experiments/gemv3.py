@@ -199,6 +199,8 @@ extern "C" __global__ void __launch_bounds__({Tn}) k(
             y = dev.dtoh(np.zeros(v.params["N"], np.float32), st["Y"])
             err = float(np.max(np.abs(y - st["ref"])) / np.max(np.abs(st["ref"])))
             r["norm_err"] = err
+            import hashlib
+            r["y_hash"] = hashlib.sha1(y.tobytes()).hexdigest()[:12]
             r["correct"] = err < TOL[v.params["deq"]]
         return r
 
@@ -267,7 +269,30 @@ class Gemv3Order(Gemv3):
                 for wo in (("u_major", "r_major", "lane_contig") if U == 2 else ("u_major",)):
                     out.append(Variant(f"{name}/R{R}U{U}/{wo}", {"N": n, "K": k, "R": R, "U": U, "T": 128,
                                                                 "deq": "magic", "worder": wo, "warps": 4, "iters": 1}))
+                if (R, U) == (8, 2):
+                    # u_major source, split-sector pairs re-joined by the automatic SASS pass (lab/schedule.py)
+                    base = {"N": n, "K": k, "R": R, "U": U, "T": 128, "deq": "magic", "warps": 4, "iters": 1}
+                    for gap in (3, 64):
+                        out.append(Variant(f"{name}/R{R}U{U}/sassfix{gap}",
+                                           dict(base, worder="u_major", fix_gap=gap)))
+                    # Phase 8 block scheduler (lab/resched.py), alone and after the split-sector pass
+                    out.append(Variant(f"{name}/R{R}U{U}/resched", dict(base, worder="u_major", resched=True)))
+                    out.append(Variant(f"{name}/R{R}U{U}/sassfix64+resched",
+                                       dict(base, worder="u_major", fix_gap=64, resched=True)))
+                    out.append(Variant(f"{name}/R{R}U{U}/lane_contig+resched",
+                                       dict(base, worder="lane_contig", resched=True)))
         return out
+
+    def build_key(self, v: Variant):
+        return (v.params.get("fix_gap"), v.params.get("resched"))
+
+    def transform(self, cubin: bytes, v: Variant) -> bytes:
+        from lab import resched, schedule
+        if "fix_gap" in v.params:
+            cubin, _ = schedule.fix_split_sectors_guarded(cubin, "k", min_gap=v.params["fix_gap"])
+        if v.params.get("resched"):
+            cubin, _ = resched.reschedule(cubin, "k", policy="crit")
+        return cubin
 
 
 def registry():
