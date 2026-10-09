@@ -67,15 +67,19 @@ def timeit(fn, reps=20):
 
 VARIANT = {}
 MMA = False
+BIG = False
 
 
 def main():
     global VARIANT
     S_ = int(sys.argv[1]) if len(sys.argv) > 1 else 2
-    global MMA
+    global MMA, BIG
     for a in sys.argv[2:]:
         if a == "mma":
             MMA = True
+            continue
+        if a == "big":
+            BIG = True
             continue
         k, v = a.split("=")
         VARIANT[k] = int(v)
@@ -93,7 +97,7 @@ def main():
         nout = N // 2 if epi == "swiglu" else N
         ytype = torch.float32 if epi == "resid" else torch.bfloat16
         row = [f"{name:5s} N={N:5d} K={K:5d}"]
-        for B in ((1, 2, 4, 8, 16, 32) if MMA else (1, 2, 4, 8)):
+        for B in (((1, 2, 4, 8, 16, 32) if not BIG else (8, 16, 32)) if MMA else (1, 2, 4, 8)):
             X = torch.randn(B, K, device=dev).to(torch.bfloat16).contiguous()
             # reference: the single-vector kernel on each vector
             Yref = torch.zeros(B, nout, dtype=ytype, device=dev)
@@ -102,7 +106,7 @@ def main():
                                                        Yref[b].data_ptr(), aux.data_ptr(), ctypes.c_int32(N),
                                                        ctypes.c_int32(K)])
             batched = Kern(QB.gemv_mma_source(S_, B, epi, **VARIANT) if MMA else QB.gemv_batched_source(S_, B, epi, **VARIANT))
-            grid_b = (N + 15) // 16 if MMA else (N + 3) // 4
+            grid_b = (N + 16 * VARIANT.get("MT", 1) - 1) // (16 * VARIANT.get("MT", 1)) if MMA else (N + 3) // 4
             Y = torch.zeros(B, nout, dtype=ytype, device=dev)
             batched.launch(grid_b, 32 * S_, [W.data_ptr(), Sc.data_ptr(), X.data_ptr(), Y.data_ptr(),
                                              aux.data_ptr(), ctypes.c_int32(N), ctypes.c_int32(K)])

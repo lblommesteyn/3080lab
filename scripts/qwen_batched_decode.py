@@ -33,6 +33,11 @@ from lab.gguf import GGUF, q6_k_blocks  # noqa: E402
 dev = "cuda"
 cu, check = F.cu, F.check
 GEN = 128
+CONFIG = {
+    8: {"qkv": (8, 2, 2), "o": (8, 4, 2), "gu": (8, 2, 2), "down": (16, 2, 2)},
+    16: {"qkv": (8, 4, 2), "o": (8, 4, 2), "gu": (8, 2, 2), "down": (16, 2, 2)},
+    32: {"qkv": (8, 4, 2), "o": (8, 4, 2), "gu": (4, 2, 4), "down": (8, 4, 2)},
+}
 
 
 class Kern:
@@ -81,9 +86,11 @@ class Batched:
         self.pos = torch.zeros(B, dtype=torch.long, device=dev)
         self.kc = torch.zeros(nL, B, nkv, Q.MAX_LEN, hd, dtype=torch.bfloat16, device=dev)
         self.vc = torch.zeros_like(self.kc)
-        S, U = 8, 4
-        self.S = S
-        self.g = {name: Kern(QB.gemv_mma_source(S, B, epi, U)) for name, epi in
+        # (S warps, U blocks in flight, MT m-tiles) per shape and batch bucket, from batched_gemv_bench sweeps
+        bucket = 8 if B <= 8 else 16 if B <= 16 else 32
+        cfg = CONFIG[bucket]
+        self.cfg = cfg
+        self.g = {name: Kern(QB.gemv_mma_source(cfg[name][0], B, epi, cfg[name][1], cfg[name][2])) for name, epi in
                   (("qkv", "biasf"), ("o", "resid"), ("gu", "swiglu"), ("down", "resid"))}
         self.k_emb = Kern(batchify(KS.EMBED_F32, "tok += b_; h += (size_t)b_ * H;"))
         self.k_rms = Kern(batchify(KS.RMSNORM_F32W_1P, "h += (size_t)b_ * H; out += (size_t)b_ * H;"))
@@ -95,8 +102,9 @@ class Batched:
 
     def gemv(self, name, wsplit, X, Y, aux, N, K):
         W, S = wsplit
-        self.g[name].launch((N + 15) // 16, 32 * self.S, [W.data_ptr(), S.data_ptr(), X.data_ptr(), Y.data_ptr(), aux,
-                                                         ctypes.c_int32(N), ctypes.c_int32(K)])
+        S_, _, MT = self.cfg[name]
+        self.g[name].launch((N + 16 * MT - 1) // (16 * MT), 32 * S_, [W.data_ptr(), S.data_ptr(), X.data_ptr(), Y.data_ptr(),
+                                                                       aux, ctypes.c_int32(N), ctypes.c_int32(K)])
 
     def rms(self, w):
         self.k_rms.launch((1, self.B), 512, [self.h.data_ptr(), w.data_ptr(), self.x.data_ptr(),

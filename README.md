@@ -597,22 +597,40 @@ batched Q4_0 GEMVs read each weight once for B input vectors:
 
 `down` (long K, only 96 row tiles of 16) lacks parallelism at small B.
 
+At large B the B fragments (inputs) are the expensive part: each is converted bf16 -> fp16 and
+loaded once per 16-row tile. Giving each warp MT m-tiles (16·MT rows) reuses every B fragment MT
+times. Split-K partials go through one shared [16·MT][B] buffer, accumulated warp by warp in a
+fixed order (deterministic, and under the 48 KB static shared-memory limit). Best per shape:
+
+| us per launch, tuned (S, U, MT) | B = 8 | 16 | 32 |
+|---|---|---|---|
+| qkv | 7.2 (8,2,2) | 11.0 | 16.7 (8,2,2) |
+| o | 7.5 | 10.9 (8,4,2) | 16.6 (8,4,2) |
+| gate_up | 37.3 (8,2,2) | 59.7 (8,2,2) | 90.8 (4,2,4) |
+| down | 29.5 (16,2,2) | 42.5 (16,2,2) | 59.5 (16,2,2) |
+
+At B = 32 the four GEMVs drop from 277 to about 184 us per layer.
+
 **End to end** (`scripts/qwen_batched_decode.py`). Tensor-core GEMVs; embedding, RMSNorm, attention
 (separate KV cache per sequence) and argmax are the single-sequence kernels, with a batch index from
 `blockIdx.y`; the Q6_K head is dequantized once to fp16 for a cuBLAS matmul. The whole step is a
-CUDA graph. B copies of one prompt give identical, coherent sequences. They match the validated
-single-sequence decode for 73 of 128 tokens and then diverge, presumably at a near-tie flipped by
-the fp16 weight rounding of the tensor-core path.
+CUDA graph. B copies of one prompt give identical, coherent sequences. With the tuned (S, U, MT)
+per shape (`CONFIG` in the script, bucketed by B), they match the validated single-sequence decode
+for 84 of 128 tokens and then diverge, presumably at a near-tie flipped by the fp16 weight rounding
+of the tensor-core path. The B = 32 config (gate_up with S = 4, MT = 4) changes the split-K
+summation order and diverges earlier, at token 25, still into coherent text; with the B = 16
+config at B = 32 it matches for 84 tokens again, at 4607 tok/s.
 
 | decode tok/s (128 generated per sequence) | B = 1 | 4 | 8 | 16 | 32 |
 |---|---|---|---|---|---|
-| ours | 342 | 1258 | **2133** | 2989 | 3556 |
+| ours, S = 8, U = 4, MT = 1 | 342 | 1258 | 2133 | 2989 | 3556 |
+| ours, tuned per shape | | 1278 | **2501** | **3618** | **5002** |
 | llama.cpp b11485 | 336 | 964 | 1420 | 2424 | 3566 |
-| ratio | 1.02 | 1.30 | **1.50** | 1.23 | 1.00 |
+| ratio, tuned | | 1.33 | **1.76** | **1.49** | **1.40** |
 
-At B = 1 the single-vector path (509 tok/s) is the better choice. At B = 32 the GEMVs dominate the
-9.0 ms step and run far below tensor-core peak: per n-tile they convert bf16 inputs to fp16 and
-decode weights, rather than doing MMAs.
+At B = 1 the single-vector path (509 tok/s) is the better choice. At B = 32 the step is 6.4 ms,
+of which the GEMVs are about 5.2 ms (28 layers x 184 us); they still run far below tensor-core
+peak, since per n-tile they convert bf16 inputs to fp16 and decode weights.
 
 ### Phase 8: our own block scheduler (`lab/resched.py`, `lab/verify.py`, `pair_latency`, `mufu_latency`, `resched_rand`)
 

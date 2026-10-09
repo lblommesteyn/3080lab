@@ -126,23 +126,26 @@ extern "C" __global__ void __launch_bounds__({32 * S_}, {minb}) k(
 """
 
 
-def gemv_mma_source(S_: int, B: int, epi: str = "store", U: int = 1) -> str:
+def gemv_mma_source(S_: int, B: int, epi: str = "store", U: int = 1, MT: int = 1) -> str:
     """Tensor-core Q4_0 x [B, K] for batched decode (mma.sync m16n8k16, fp16 in, fp32 accumulate).
 
-    A block = S warps on one 16-row tile, splitting K. Per 16-wide k-step each lane needs, for rows
-    g and g+8 (g = lane / 4) and t = lane % 4, the weight pairs k = 2t, 2t+1 and 2t+8, 2t+9: nibbles
-    2t, 2t+1 of words 2s and 2s+1 of the packed row. They become half2 via the 0x6400 exponent trick
-    ((1024 + q) - 1032 = q - 8), times the block's fp16 scale. B operand: x[col = g][k], bf16 -> fp16,
-    zero for columns >= B. NT = ceil(B / 8) n-tiles reuse each A fragment."""
+    A block = S warps on one tile of 16*MT rows, splitting K. Per 16-wide k-step each lane needs, for
+    rows g and g+8 of every m-tile (g = lane / 4, t = lane % 4), the weight pairs k = 2t, 2t+1 and
+    2t+8, 2t+9: nibbles 2t, 2t+1 of words 2s and 2s+1 of the packed row. They become half2 via the
+    0x6400 exponent trick ((1024 + q) - 1032 = q - 8), times the block's fp16 scale. B operand:
+    x[col = g][k], bf16 -> fp16, zero for columns >= B. NT = ceil(B / 8) n-tiles reuse each A
+    fragment; MT m-tiles reuse each B fragment (x traffic per weight byte / MT: at B = 32 a warp
+    otherwise reads 2 KB of x per 256 B of weights). U Q4_0 blocks of weights are loaded ahead."""
     NT = (B + 7) // 8
+    R = 16 * MT
     return f"""
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 #define SPLIT {S_}
 #define B_ {B}
 #define NT {NT}
+#define MT {MT}
 __device__ __forceinline__ unsigned h2pair(unsigned w, int t, unsigned d2) {{
-  // nibbles 2t, 2t+1 of w -> half2 (q0 - 8, q1 - 8) * d
   unsigned lo = (w >> (8 * t)) & 0xFu, hi = (w >> (8 * t + 4)) & 0xFu;
   unsigned h = lo | (hi << 16) | 0x64006400u;
   __half2 v = __hsub2(*reinterpret_cast<__half2*>(&h), __float2half2_rn(1032.f));
@@ -157,32 +160,38 @@ extern "C" __global__ void __launch_bounds__({32 * S_}) k(
     const unsigned* __restrict__ W, const __half* __restrict__ S, const __nv_bfloat16* __restrict__ X,
     void* Y, const void* AUX, int N, int K)
 {{
-  __shared__ float red[SPLIT][16][NT * 8];
+  __shared__ float red[{R}][NT * 8];             // split-K partials, accumulated warp by warp (deterministic)
   int warp = threadIdx.x >> 5, lane = threadIdx.x & 31, g = lane >> 2, t = lane & 3;
-  int row0 = blockIdx.x * 16;
-  int KW = K / 8;                                  // packed words per row
-  int KB = K / 32;                                 // Q4_0 blocks per row
+  int row0 = blockIdx.x * {R};
+  int KW = K / 8, KB = K / 32;
   int chunk = (KB + SPLIT - 1) / SPLIT;
   int bb = warp * chunk, be = min(KB, bb + chunk);
-  float c[NT][4];
+  float c[MT][NT][4];
   #pragma unroll
-  for (int n = 0; n < NT; ++n) c[n][0] = c[n][1] = c[n][2] = c[n][3] = 0.f;
-  int ra = min(row0 + g, N - 1), rb = min(row0 + g + 8, N - 1);
-  const unsigned* wa = W + (size_t)ra * KW;
-  const unsigned* wb = W + (size_t)rb * KW;
-  // U Q4_0 blocks per iteration: their weight loads are all in flight before the first mma
+  for (int m = 0; m < MT; ++m)
+    #pragma unroll
+    for (int n = 0; n < NT; ++n) c[m][n][0] = c[m][n][1] = c[m][n][2] = c[m][n][3] = 0.f;
+  const unsigned* wa[MT]; const unsigned* wb[MT]; int ra[MT], rb[MT];
+  #pragma unroll
+  for (int m = 0; m < MT; ++m) {{
+    ra[m] = min(row0 + 16 * m + g, N - 1); rb[m] = min(row0 + 16 * m + g + 8, N - 1);
+    wa[m] = W + (size_t)ra[m] * KW; wb[m] = W + (size_t)rb[m] * KW;
+  }}
   #pragma unroll 1
   for (int blk0 = bb; blk0 < be; blk0 += {U}) {{
-    uint4 A0[{U}], A1[{U}];
-    unsigned dA[{U}], dB[{U}];
+    uint4 A0[{U}][MT], A1[{U}][MT];
+    unsigned dA[{U}][MT], dB[{U}][MT];
     #pragma unroll
     for (int u = 0; u < {U}; ++u) {{
       int blk = min(blk0 + u, be - 1);
-      A0[u] = *reinterpret_cast<const uint4*>(wa + blk * 4);
-      A1[u] = *reinterpret_cast<const uint4*>(wb + blk * 4);
-      __half da = S[(size_t)ra * KB + blk], db = S[(size_t)rb * KB + blk];
-      __half2 da2 = __halves2half2(da, da), db2 = __halves2half2(db, db);
-      dA[u] = *reinterpret_cast<unsigned*>(&da2); dB[u] = *reinterpret_cast<unsigned*>(&db2);
+      #pragma unroll
+      for (int m = 0; m < MT; ++m) {{
+        A0[u][m] = *reinterpret_cast<const uint4*>(wa[m] + blk * 4);
+        A1[u][m] = *reinterpret_cast<const uint4*>(wb[m] + blk * 4);
+        __half da = S[(size_t)ra[m] * KB + blk], db = S[(size_t)rb[m] * KB + blk];
+        __half2 da2 = __halves2half2(da, da), db2 = __halves2half2(db, db);
+        dA[u][m] = *reinterpret_cast<unsigned*>(&da2); dB[u][m] = *reinterpret_cast<unsigned*>(&db2);
+      }}
     }}
     #pragma unroll
     for (int u = 0; u < {U}; ++u) {{
@@ -190,10 +199,14 @@ extern "C" __global__ void __launch_bounds__({32 * S_}) k(
       int blk = blk0 + u;
       #pragma unroll
       for (int s = 0; s < 2; ++s) {{                // two 16-wide k-steps per Q4_0 block
-        unsigned w0a = s ? A0[u].z : A0[u].x, w1a = s ? A0[u].w : A0[u].y;
-        unsigned w0b = s ? A1[u].z : A1[u].x, w1b = s ? A1[u].w : A1[u].y;
-        unsigned a0 = h2pair(w0a, t, dA[u]), a1 = h2pair(w0b, t, dB[u]);
-        unsigned a2 = h2pair(w1a, t, dA[u]), a3 = h2pair(w1b, t, dB[u]);
+        unsigned a[MT][4];
+        #pragma unroll
+        for (int m = 0; m < MT; ++m) {{
+          unsigned w0a = s ? A0[u][m].z : A0[u][m].x, w1a = s ? A0[u][m].w : A0[u][m].y;
+          unsigned w0b = s ? A1[u][m].z : A1[u][m].x, w1b = s ? A1[u][m].w : A1[u][m].y;
+          a[m][0] = h2pair(w0a, t, dA[u][m]); a[m][1] = h2pair(w0b, t, dB[u][m]);
+          a[m][2] = h2pair(w1a, t, dA[u][m]); a[m][3] = h2pair(w1b, t, dB[u][m]);
+        }}
         int kk = blk * 32 + s * 16 + 2 * t;
         #pragma unroll
         for (int n = 0; n < NT; ++n) {{
@@ -203,24 +216,32 @@ extern "C" __global__ void __launch_bounds__({32 * S_}) k(
             const __nv_bfloat16* xr = X + (size_t)col * K + kk;
             b0 = xpair(xr); b1 = xpair(xr + 8);
           }}
-          asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 {{%0,%1,%2,%3}}, {{%4,%5,%6,%7}}, {{%8,%9}}, {{%0,%1,%2,%3}};"
-                       : "+f"(c[n][0]), "+f"(c[n][1]), "+f"(c[n][2]), "+f"(c[n][3])
-                       : "r"(a0), "r"(a1), "r"(a2), "r"(a3), "r"(b0), "r"(b1));
+          #pragma unroll
+          for (int m = 0; m < MT; ++m)
+            asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 {{%0,%1,%2,%3}}, {{%4,%5,%6,%7}}, {{%8,%9}}, {{%0,%1,%2,%3}};"
+                         : "+f"(c[m][n][0]), "+f"(c[m][n][1]), "+f"(c[m][n][2]), "+f"(c[m][n][3])
+                         : "r"(a[m][0]), "r"(a[m][1]), "r"(a[m][2]), "r"(a[m][3]), "r"(b0), "r"(b1));
         }}
       }}
     }}
   }}
-  #pragma unroll
-  for (int n = 0; n < NT; ++n) {{
-    red[warp][g][n * 8 + 2 * t] = c[n][0];      red[warp][g][n * 8 + 2 * t + 1] = c[n][1];
-    red[warp][g + 8][n * 8 + 2 * t] = c[n][2];  red[warp][g + 8][n * 8 + 2 * t + 1] = c[n][3];
+  for (int s = 0; s < SPLIT; ++s) {{
+    if (warp == s) {{
+      #pragma unroll
+      for (int m = 0; m < MT; ++m)
+        #pragma unroll
+        for (int n = 0; n < NT; ++n) {{
+          float* r0 = &red[16 * m + g][n * 8 + 2 * t];
+          float* r8 = &red[16 * m + g + 8][n * 8 + 2 * t];
+          if (s == 0) {{ r0[0] = c[m][n][0]; r0[1] = c[m][n][1]; r8[0] = c[m][n][2]; r8[1] = c[m][n][3]; }}
+          else {{ r0[0] += c[m][n][0]; r0[1] += c[m][n][1]; r8[0] += c[m][n][2]; r8[1] += c[m][n][3]; }}
+        }}
+    }}
+    __syncthreads();
   }}
-  __syncthreads();
-  for (int i = threadIdx.x; i < 16 * B_; i += blockDim.x) {{
-    int rr = i % 16, b = i / 16, r = row0 + rr;
-    float a = 0.f;
-    #pragma unroll
-    for (int s = 0; s < SPLIT; ++s) a += red[s][rr][b];
+  for (int i = threadIdx.x; i < {R} * B_; i += blockDim.x) {{
+    int rr = i % {R}, b = i / {R}, r = row0 + rr;
+    float a = red[rr][b];
     {_mma_epi(epi)}
   }}
 }}
@@ -230,9 +251,7 @@ extern "C" __global__ void __launch_bounds__({32 * S_}) k(
 def _mma_epi(epi: str) -> str:
     if epi == "swiglu":     # rows interleaved g, u: even rr = gate, odd = up; one output per pair
         return """if ((rr & 1) == 0 && r + 1 < N + 1 && r < N) {
-      float u = 0.f;
-      #pragma unroll
-      for (int s = 0; s < SPLIT; ++s) u += red[s][rr + 1][b];
+      float u = red[rr + 1][b];
       ((__nv_bfloat16*)Y)[(size_t)b * (N / 2) + r / 2] = __float2bfloat16_rn(a / (1.f + __expf(-a)) * u);
     }"""
     store = {
