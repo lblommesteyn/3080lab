@@ -500,6 +500,19 @@ Remaining gap to ptxas:
 - ptxas's register allocation was made for ptxas's order, so WAR edges limit how far I can
   move anything.
 
+**On the int4 GEMV (R8U2, memory-bound) the scheduler loses.** Outputs are bitwise identical
+throughout:
+
+| shape | ptxas | resched | Phase 7 sassfix | sassfix + resched | lane_contig + resched |
+|---|---|---|---|---|---|
+| gate_up | 94.2 us | 99.3 | **62.5** | 74.8 | 61.4 (55.3 without) |
+| down | 66.6 | 94.2 | 63.5 | 82.9 | 92.2 (59.4 without) |
+| q_o | 15.4 | 20.5 | 15.4 | 19.5 | 20.5 (13.3 without) |
+
+The targeted Phase 7 pass is still the right tool for these kernels. Why the general scheduler
+loses on memory-bound code is open; suspects are the entry-wait placement and its single-warp
+model of load latency.
+
 ### FP32/INT32 sharing (superseded by the section above)
 
 GA102 has 16 FP32 + 16 FP32/INT32 lanes per partition. If INT ops simply
