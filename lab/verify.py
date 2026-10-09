@@ -32,7 +32,7 @@ def _path(ins: list[sass.Instr]) -> list[int]:
     return list(range(0, s)) + list(range(s, e + 1)) * 3 + tail
 
 
-def check(cubin: bytes, kernel: str = "k", reference: bytes | None = None) -> list[str]:
+def check(cubin: bytes, kernel: str = "k", reference: bytes | None = None, structured: bool = False) -> list:
     """reference: the original ptxas cubin, whose stall distances calibrate unmeasured opcodes (the
     same table the scheduler used)."""
     cache = opnd.discover(cubin, kernel)
@@ -43,7 +43,7 @@ def check(cubin: bytes, kernel: str = "k", reference: bytes | None = None) -> li
     last = {}                 # resource -> (step, t, instr index, barrier or None, resolved?)
     readers = {}              # resource -> [(step, t, idx, rbar)] pending scoreboarded reads
     armed = {b: [] for b in range(6)}   # barrier -> [(t, resource keys)]
-    out = []
+    out, recs = [], []
     t = 0
     for step, k in enumerate(_path(ins)):
         x = ins[k]
@@ -77,17 +77,21 @@ def check(cubin: bytes, kernel: str = "k", reference: bytes | None = None) -> li
                 if pb is None:
                     need = latency(ins[pk], table, x)
                     if t - pt < need:
+                        recs.append(("RAW", ins[pk].offset, x.offset, t - pt, need))
                         out.append(f"RAW {u}: {ins[pk].text!r} @{ins[pk].offset:#x} -> {x.text!r} @{x.offset:#x} "
                                    f"after {t - pt} < {need} cycles")
                 elif not ok:
+                    recs.append(("RAW-SB", ins[pk].offset, x.offset, None, None))
                     out.append(f"RAW {u}: scoreboarded {ins[pk].text!r} @{ins[pk].offset:#x} not waited on "
                                f"(bar {pb}) before {x.text!r} @{x.offset:#x}")
         for d in defs:
             if d in last and last[d][3] is not None and not last[d][4] and d not in uses:
                 ps, pt, pk, pb, ok = last[d]
+                recs.append(("WAW", ins[pk].offset, x.offset, None, None))
                 out.append(f"WAW {d}: in-flight {ins[pk].text!r} @{ins[pk].offset:#x} overwritten by "
                            f"{x.text!r} @{x.offset:#x}")
             for rr in readers.get(d, []):
+                recs.append(("WAR", ins[rr[2]].offset, x.offset, None, None))
                 out.append(f"WAR {d}: pending read by {ins[rr[2]].text!r} @{ins[rr[2]].offset:#x} clobbered by "
                            f"{x.text!r} @{x.offset:#x}")
         var = x.wbar != 7
@@ -102,6 +106,8 @@ def check(cubin: bytes, kernel: str = "k", reference: bytes | None = None) -> li
         if not var and not _fixed_producer(x, r):
             pass
         t += x.stall or 32
+    if structured:
+        return sorted(set(recs), key=str)
     # de-duplicate (the loop is unrolled three times)
     seen, uniq = set(), []
     for m in out:
@@ -109,3 +115,43 @@ def check(cubin: bytes, kernel: str = "k", reference: bytes | None = None) -> li
             seen.add(m)
             uniq.append(m)
     return uniq
+
+
+_LO_MASK = ~((0xF << 12) | (0xFFFFFF << 16)) & (2**64 - 1)     # guard predicate, Rd, Ra, Rb
+_HI_MASK = ~(0xFF | (0x7 << 17) | (0x1FFFFF << 41)) & (2**64 - 1)  # Rc, setp dest, control word
+
+
+def match(orig: list, new: list) -> dict:
+    """new offset -> original offset, matching encodings with register/predicate fields and control
+    bits masked (a rewrite only moves words and patches those fields). Duplicates match in order."""
+    from collections import defaultdict, deque
+    q = defaultdict(deque)
+    for x in orig:
+        q[(x.lo & _LO_MASK, x.hi & _HI_MASK, x.opcode)].append(x.offset)
+    out = {}
+    for x in new:
+        k = (x.lo & _LO_MASK, x.hi & _HI_MASK, x.opcode)
+        if q[k]:
+            out[x.offset] = q[k].popleft()
+    return out
+
+
+def new_hazards(new_cubin: bytes, orig_cubin: bytes, kernel: str = "k") -> list:
+    """Hazards in the rewrite that the original does not already have for the same instruction
+    pair (instructions matched by encoding, so register renames and guard retargets do not break the
+    comparison). A pre-existing fixed-latency hazard counts as new only if its distance shrank."""
+    oi = sass.parse(toolchain.disassemble(orig_cubin))
+    ni = sass.parse(toolchain.disassemble(new_cubin))
+    mp = match(oi, ni)
+    old = {}
+    for kind, p, c, dist, need in check(orig_cubin, kernel, reference=orig_cubin, structured=True):
+        old[(kind, p, c)] = min(dist if dist is not None else -1, old.get((kind, p, c), 10**9))
+    bad = []
+    for kind, p, c, dist, need in check(new_cubin, kernel, reference=orig_cubin, structured=True):
+        key = (kind, mp.get(p), mp.get(c))
+        if None not in key[1:] and key in old and (dist is None or dist >= old[key]):
+            continue
+        by = {x.offset: x for x in ni}
+        bad.append(f"{kind}: {by[p].text!r} @{p:#x} -> {by[c].text!r} @{c:#x}"
+                   + (f" after {dist} < {need} cycles" if dist is not None else ""))
+    return bad

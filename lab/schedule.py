@@ -41,7 +41,33 @@ class RegUse:
     ok: bool          # all register operands understood
 
 
+_WIDTH = {".64": 2, ".128": 4}
+
+
+def _local_mem_use(i: sass.Instr):
+    """LDL/STL (spill refill/store): parsed directly, operand discovery does not cover them."""
+    t = re.sub(r"^@!?P\d\s+", "", i.text.strip()).replace(".reuse", "")
+    m = re.match(r"^(LDL|STL)(\.\w+)*\s+(.*)$", t)
+    if not m:
+        return None
+    w = next((n for k, n in _WIDTH.items() if k in i.opcode), 1)
+    ops = m.group(3)
+    addr = re.search(r"\[(R\d+)?", ops)
+    a = {int(addr.group(1)[1:])} if addr and addr.group(1) else set()
+    regs = [int(x) for x in re.findall(r"(?<![\[\w])R(\d+)(?![\.\w])", ops.split("[")[0] if m.group(1) == "LDL" else ops.split("]")[-1])]
+    if m.group(1) == "LDL":
+        d = set(range(regs[0], regs[0] + w)) if regs else set()
+        u = set(a)
+        if re.match(r"^@!?P", i.text.strip()):
+            u |= d
+        return RegUse(d, u, True)
+    return RegUse(set(), a | (set(range(regs[0], regs[0] + w)) if regs else set()), True)
+
+
 def reg_use(i: sass.Instr, cache: dict) -> RegUse:
+    lm = _local_mem_use(i) if i.opcode.startswith(("LDL", "STL")) else None
+    if lm is not None:
+        return lm
     m = re.match(r"^CS2R\s+R(\d+),\s*SRZ\s*$", i.text.strip())
     if m:                                          # zeroing idiom: writes a register pair, reads nothing
         r = int(m.group(1))
@@ -84,7 +110,13 @@ def hoist(cubin: bytes, kernel: str, src_off: int, dst_after_off: int) -> tuple[
     m_preds, m_urs = set(_PRED.findall(m.text)), set(_UREG.findall(m.text))
     skipped = ins[d + 1:s]
     for x in skipped:
-        if x.opcode.startswith(BARRIERS) and not (x.opcode == "CS2R" and x.text.rstrip().endswith("SRZ")):
+        # Memory ordering: local memory (spill LDL/STL) never aliases global memory, and a
+        # .CONSTANT (ld.global.nc) load reads data that is read-only for the whole kernel, so it
+        # commutes with every store. Register dependencies are still checked below.
+        local = x.opcode.startswith(("LDL", "STL"))
+        nc_over_store = m.opcode.startswith("LDG") and ".CONSTANT" in m.opcode and x.opcode.startswith(("ST", "LD"))             and not x.opcode.startswith(("STS", "LDS")) or False
+        memory_ok = m.opcode.startswith("LDG") and (local or nc_over_store)
+        if x.opcode.startswith(BARRIERS) and not (x.opcode == "CS2R" and x.text.rstrip().endswith("SRZ"))                 and not memory_ok:
             return cubin, f"barrier/memory/control instruction in range: {x.text}"
         xu = reg_use(x, cache)
         if not xu.ok:
@@ -98,7 +130,12 @@ def hoist(cubin: bytes, kernel: str, src_off: int, dst_after_off: int) -> tuple[
         # predicates: only a def on either side orders the pair (read-read sharing is free)
         if shared and ((_pred_defs(m.text) & shared) or (_pred_defs(x.text) & shared))                 or m_urs & set(_UREG.findall(x.text)):
             return cubin, f"predicate/uniform register shared with: {x.text}"
-    # producers of the moved instruction's sources that sit before the new position
+    # producers of the moved instruction's sources that sit before the new position. Distances
+    # use the measured pair latencies (lab/resched.latency: 4 same pipe, 5 across, ptxas's own
+    # distance for unmeasured ops), and include the guard/operand PREDICATES, not just registers.
+    from .resched import fixed_latency_table, latency
+    table = fixed_latency_table(ins, cache)
+    m_pred_uses = {p for p in _PRED.findall(m.text) if p not in _pred_defs(m.text)}
     extra_wait = 0
     cyc = 0
     for k in range(d, -1, -1):
@@ -111,10 +148,10 @@ def hoist(cubin: bytes, kernel: str, src_off: int, dst_after_off: int) -> tuple[
                 return cubin, "source from special-register read"
             if set(_REG.findall(x.text)) & {str(r) for r in mu.uses}:
                 return cubin, f"source may come from unmodeled instruction: {x.text}"
-        if xu.defs & mu.uses:
+        if (xu.defs & mu.uses) or (_pred_defs(x.text) & m_pred_uses):
             if x.wbar != 7:
                 extra_wait |= 1 << x.wbar
-            elif _is_fixed_latency(x) and cyc < MIN_FIXED_GAP:
+            elif _is_fixed_latency(x) and cyc < max(MIN_FIXED_GAP, latency(x, table, m)):
                 return cubin, f"fixed-latency producer too close ({cyc} cycles): {x.text}"
             if cyc >= 64 and x.wbar == 7:
                 break
@@ -141,6 +178,8 @@ def hoist(cubin: bytes, kernel: str, src_off: int, dst_after_off: int) -> tuple[
     if st > 15:
         return cubin, "stall overflow when absorbing the moved instruction's stall"
     edits[prev_old] = {"stall": st, "reuse": 0}
+    if st > 11:                                     # encoding: yield set allows stalls 1..11 only
+        edits[prev_old]["yield"] = 0
     edits[ins[d].offset] = {**edits.get(ins[d].offset, {}), "reuse": 0}
     edits[m_new].update(reuse=0)
     c = patch.set_control(c, kernel, edits)
@@ -215,7 +254,7 @@ def _find(cubin: bytes, lo: int, hi: int, text: str):
 def _try_move(cubin: bytes, kernel: str, a: int, b: int, rename_regs: bool, fresh_base: int):
     """Move the load at b up next to a, repairing what blocks it. Returns (cubin, reason, regs_used)."""
     notes, anchor, renamed = [], a, False
-    for _ in range(16):
+    for _ in range(48):                               # slides of up to 32 slots need room
         c2, why = hoist(cubin, kernel, b, anchor)
         if why == "ok":
             return c2, "ok" + (f" ({', '.join(notes)})" if notes else ""), renamed
@@ -227,7 +266,8 @@ def _try_move(cubin: bytes, kernel: str, a: int, b: int, rename_regs: bool, fres
         if why.startswith("fixed-latency producer too close"):
             # leave room after the address producer: slide the landing point down
             nxt = [y.offset for y in sass.parse(toolchain.disassemble(cubin)) if anchor < y.offset < b]
-            if len(nxt) < 2 or anchor - a >= 8 * 16:
+            slides = sum(1 for n_ in notes if n_ == "slid")
+            if len(nxt) < 2 or slides >= 32:                 # up to 32 slots: covers a 13-cycle predicate
                 break
             anchor = nxt[0]
             notes.append("slid")
@@ -260,13 +300,13 @@ def _try_move(cubin: bytes, kernel: str, a: int, b: int, rename_regs: bool, fres
 
 
 def fix_split_sectors(cubin: bytes, kernel: str = "k", min_gap: int = 3, max_moves: int = 128,
-                      rename_regs: bool = True) -> tuple[bytes, list]:
+                      rename_regs: bool = True, finder=None) -> tuple[bytes, list]:
     """Repeatedly hoist the second half of the widest-gap split-sector pair next to its first half.
     Pairs are re-found after every move (moves shift offsets); refused pairs are not retried."""
     log, refused = [], set()
     for _ in range(max_moves):
         ins = {x.offset: x for x in sass.parse(toolchain.disassemble(cubin))}
-        cand = [(a, b, g) for a, b, g in split_sector_pairs(cubin, kernel)
+        cand = [(a, b, g) for a, b, g in (finder or split_sector_pairs)(cubin, kernel)
                 if g >= min_gap and (ins[a].text, ins[b].text) not in refused]
         if not cand:
             break
@@ -324,14 +364,15 @@ def _pred_defs(text: str) -> set:
     return out
 
 
-def fix_split_sectors_guarded(cubin: bytes, kernel: str = "k", min_gap: int = 3) -> tuple[bytes, list]:
+def fix_split_sectors_guarded(cubin: bytes, kernel: str = "k", min_gap: int = 3, finder=None,
+                              rename_regs: bool = True) -> tuple[bytes, list]:
     """Like fix_split_sectors, but first hoists the ISETP that guards the late loads, retargeted to a
     free predicate register, so the guarded loads can move up next to their sector partners."""
     log = []
     ins = sass.parse(toolchain.disassemble(cubin))
     used = set(re.findall(r"\bP([0-6])\b", " ".join(x.text for x in ins)))
     free = [p for p in (6, 5, 4) if str(p) not in used]
-    pairs = [p for p in split_sector_pairs(cubin, kernel) if p[2] >= min_gap]
+    pairs = [p for p in (finder or split_sector_pairs)(cubin, kernel) if p[2] >= min_gap]
     pos = {x.offset: k for k, x in enumerate(ins)}
     by_guard = {}
     for a, b, g in pairs:
@@ -375,5 +416,227 @@ def fix_split_sectors_guarded(cubin: bytes, kernel: str = "k", min_gap: int = 3)
         if why != "ok":
             continue
         cubin = c2
-    c3, log2 = fix_split_sectors(cubin, kernel, min_gap)
+    c3, log2 = fix_split_sectors(cubin, kernel, min_gap, finder=finder, rename_regs=rename_regs)
     return c3, log + log2
+
+
+def untangle_barriers(cubin: bytes, kernel: str = "k") -> tuple[bytes, list]:
+    """Remove false scoreboard dependences created by hoisting (optimize benchmark, qo7 vs gu7: the
+    same rewritten binary wins 1.5x on a large grid and loses on a small one).
+
+    A hoisted load keeps its original write barrier. If an instruction between the load and its
+    first consumer waits on that barrier for some OTHER load, it now also waits for the hoisted
+    load: harmless when bandwidth-bound, a full memory latency per trip when latency-bound.
+    Each such load is moved to a barrier no instruction in the loop uses, and that barrier is added
+    to the wait mask of every instruction that consumes (or overwrites) its destination."""
+    from . import patch
+    cache = opnd.discover(cubin, kernel)
+    ins = sass.parse(toolchain.disassemble(cubin))
+    body = sass.loop_body(ins)
+    if not body:
+        return cubin, []
+    used = set()
+    for x in body:
+        used |= {x.wbar, x.rbar} - {7}
+        used |= {b for b in range(6) if x.wait >> b & 1}
+    free = [b for b in range(6) if b not in used]
+    log, edits = [], {}
+    n = len(body)
+    for k, ld in enumerate(body):
+        if not ld.opcode.startswith("LDG") or ld.wbar == 7:
+            continue
+        u = reg_use(ld, cache)
+        if not u.ok or not u.defs:
+            continue
+        # first instruction (in the iteration) that reads or rewrites the loaded registers
+        first = next((j for j in range(k + 1, n) if (lambda r: r.ok and (r.uses | r.defs) & u.defs)(reg_use(body[j], cache))), None)
+        if first is None:
+            continue
+        def waited_between(bar):
+            return any(body[j].wait >> bar & 1 for j in range(k + 1, first)) or                 any((edits.get(body[j].offset, {}).get("wait", 0) >> bar) & 1 for j in range(k + 1, first))
+        if not waited_between(ld.wbar):
+            continue
+        # any barrier nobody waits on before this load's first consumer will do: later waits on it run
+        # after that consumer, i.e. after the load completed, so they cannot be delayed by it
+        cands = [bb for bb in range(6) if bb != ld.rbar and not waited_between(bb)]
+        cands.sort(key=lambda bb: bb not in free)       # prefer barriers the loop does not use at all
+        if not cands:
+            log.append((ld.offset, "every barrier is waited on before the first consumer"))
+            continue
+        b = cands[0]
+        edits.setdefault(ld.offset, {})["wbar"] = b
+        # every later reader/writer of the destination, until it is redefined, waits on b too
+        live = set(u.defs)
+        for j in range(k + 1, n):
+            r = reg_use(body[j], cache)
+            if not r.ok:
+                edits.setdefault(body[j].offset, {})["wait"] = (body[j].wait | edits.get(body[j].offset, {}).get("wait", 0) | 1 << b)
+                continue
+            if (r.uses | r.defs) & live:
+                w = edits.get(body[j].offset, {}).get("wait", body[j].wait)
+                edits.setdefault(body[j].offset, {})["wait"] = w | (1 << b)
+            live -= r.defs - r.uses
+            if not live:
+                break
+        # the loop back edge: if still live at the end, the branch waits too
+        if live:
+            br = body[-1]
+            w = edits.get(br.offset, {}).get("wait", br.wait)
+            edits.setdefault(br.offset, {})["wait"] = w | (1 << b)
+        log.append((ld.offset, f"W{ld.wbar} -> W{b}"))
+    if not edits:
+        return cubin, log
+    out = patch.set_control(cubin, kernel, edits)
+    # a barrier arms a cycle late: the instruction right after a retargeted load must not wait on it
+    ins2 = sass.parse(toolchain.disassemble(out))
+    fix = {}
+    for a_, b_ in zip(ins2, ins2[1:]):
+        if a_.wbar != 7 and b_.wait >> a_.wbar & 1 and a_.stall < 2:
+            fix[a_.offset] = {"stall": 2}
+    if fix:
+        out = patch.set_control(out, kernel, fix)
+    return out, log
+
+
+def dedicate_barrier(cubin: bytes, kernel: str = "k", original: bytes | None = None) -> tuple[bytes, str]:
+    """Give the long-lived (hoisted) loads one scoreboard barrier of their own.
+
+    `untangle_barriers` cannot help when every barrier is waited on inside a hoisted load's window
+    (issue -> first consumer), as in the rewritten GEMVs. Here: long loads = loads whose barrier is
+    waited on before their first consumer. All of them move to one barrier B*; every other producer
+    on B* moves to another barrier; inside the long loads' windows, waits on B* are replaced by waits
+    on the barriers those other producers now use; elsewhere B* is kept and those barriers are added
+    (a superset, never fewer waits). Long loads' consumers also wait on B*. The result must pass the
+    hazard verifier against `cubin`, or the caller keeps `cubin`."""
+    from . import patch
+    cache = opnd.discover(cubin, kernel)
+    ins = sass.parse(toolchain.disassemble(cubin))
+    body = sass.loop_body(ins)
+    if not body:
+        return cubin, "no loop"
+    n = len(body)
+    uses = [reg_use(x, cache) for x in body]
+
+    def first_consumer(k):
+        d = uses[k].defs
+        return next((j for j in range(k + 1, n) if uses[j].ok and (uses[j].uses | uses[j].defs) & d), None)
+
+    prods = []
+    for k, x in enumerate(body):
+        if x.wbar != 7 and uses[k].ok and uses[k].defs:
+            prods.append((k, first_consumer(k)))
+    moved = None
+    if original is not None:
+        # the loads the rewrite moved: their position relative to the other loads changed
+        from .verify import match
+        oi = sass.parse(toolchain.disassemble(original))
+        mp = match(oi, ins)
+        lds = [x for x in body if x.opcode.startswith("LDG") and x.offset in mp]
+        # loads that kept their relative order = longest increasing subsequence of original positions;
+        # the rest were moved by the rewrite
+        seq = [mp[x.offset] for x in lds]
+        import bisect
+        tails, tail_idx, prev = [], [], [-1] * len(seq)
+        for i, v in enumerate(seq):
+            p_ = bisect.bisect_left(tails, v)
+            if p_ == len(tails):
+                tails.append(v)
+                tail_idx.append(i)
+            else:
+                tails[p_] = v
+                tail_idx[p_] = i
+            prev[i] = tail_idx[p_ - 1] if p_ > 0 else -1
+        keep, i = set(), tail_idx[-1] if tail_idx else -1
+        while i >= 0:
+            keep.add(i)
+            i = prev[i]
+        moved = {x.offset for i, x in enumerate(lds) if i not in keep}
+    long_ = [(k, fc) for k, fc in prods if body[k].opcode.startswith("LDG") and fc is not None
+             and (moved is None or body[k].offset in moved)
+             and any(body[j].wait >> body[k].wbar & 1 for j in range(k + 1, fc))]
+    if not long_:
+        return cubin, "no false dependence"
+    long_idx = {k for k, _ in long_}
+    windows = [(k, fc) for k, fc in long_]
+    best = None
+    rbars = {x.rbar for x in body} - {7}
+    body_offs = {x.offset for x in body}
+    outside = set()
+    for x in ins:                                      # barriers armed outside the loop: external producers
+        if x.offset not in body_offs:
+            outside |= {x.wbar, x.rbar} - {7}
+    for B in range(6):
+        if B in rbars or B in outside:                 # waits on B must be fully accounted for by the loop
+            continue
+        others = [k for k, _ in prods if k not in long_idx and body[k].wbar == B]
+        # cost: other producers that must move off B (each may add some over-waiting)
+        if best is None or len(others) < best[1]:
+            best = (B, len(others), others)
+    if best is None:
+        return cubin, "every barrier is a read barrier somewhere in the loop"
+    B, _, others = best
+    # move the others to the barrier least used by the remaining producers (never B)
+    load = {b: 0 for b in range(6)}
+    for k, _ in prods:
+        if k not in long_idx and k not in others:
+            load[body[k].wbar] += 1
+    newbar = {}
+    for k in others:
+        b2 = min((b for b in range(6) if b != B and b != body[k].rbar), key=lambda b: load[b])
+        newbar[k] = b2
+        load[b2] += 1
+    moved_bits = 0
+    for b2 in newbar.values():
+        moved_bits |= 1 << b2
+    edits = {}
+    for k in long_idx:
+        edits[body[k].offset] = {"wbar": B}
+    for k, b2 in newbar.items():
+        edits[body[k].offset] = {"wbar": b2}
+    in_window = [any(a < j < fc for a, fc in windows) for j in range(n)]
+    # write-after-read: overwrites of a long load's address registers may have been protected by a
+    # wait on its WRITE barrier (completion implies the read), even when it has a read barrier;
+    # those writers must now wait on B as well
+    war = set()
+    for k in long_idx:
+        srcs = set(uses[k].uses) - set(uses[k].defs)
+        for j in range(k + 1, n):
+            if uses[j].ok and uses[j].defs & srcs:
+                war.add(j)
+                srcs -= uses[j].defs
+            if not srcs:
+                break
+    # A wait on B covered exactly the producers armed on B since the previous wait on B (scoreboard
+    # waits are sticky). Replace it by those producers' NEW barriers; scan twice for loop-carried ones.
+    repl = {}
+    armed = []
+    for pass_ in range(2):
+        for j, x in enumerate(body):
+            if x.wait >> B & 1:
+                bits = 0
+                for k in armed:
+                    bits |= 1 << newbar[k]
+                if pass_ == 1 or j not in repl:
+                    repl[j] = repl.get(j, 0) | bits
+                armed = []
+            if j in newbar:
+                armed.append(j)
+    for j, x in enumerate(body):
+        w = x.wait
+        if w >> B & 1:
+            w = (w & ~(1 << B)) | repl.get(j, 0)
+            if not in_window[j]:
+                w |= 1 << B                            # outside the windows B is harmless: keep it
+        if any(fc == j for k, fc in long_ if fc is not None) or j in war:
+            w |= 1 << B
+        if w != x.wait:
+            edits.setdefault(x.offset, {})["wait"] = w
+    out = patch.set_control(cubin, kernel, edits)
+    ins2 = sass.parse(toolchain.disassemble(out))
+    fix = {}
+    for a_, b_ in zip(ins2, ins2[1:]):                     # a barrier arms one cycle after issue
+        if a_.wbar != 7 and b_.wait >> a_.wbar & 1 and a_.stall < 2:
+            fix[a_.offset] = {"stall": 2}
+    if fix:
+        out = patch.set_control(out, kernel, fix)
+    return out, f"{len(long_idx)} long loads -> W{B}, {len(others)} other producers moved"

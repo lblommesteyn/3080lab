@@ -43,12 +43,20 @@ def reg_tokens(text: str) -> list[str]:
 
 
 def _load_cache() -> dict:
-    return json.loads(CACHE.read_text()) if CACHE.exists() else {}
+    try:
+        return json.loads(CACHE.read_text()) if CACHE.exists() else {}
+    except ValueError:                       # a concurrent writer: rediscover rather than fail
+        return {}
 
 
 def _save_cache(c: dict):
+    """Atomic, and merged with what other processes wrote meanwhile (parallel optimize runs)."""
+    import os
     CACHE.parent.mkdir(exist_ok=True)
-    CACHE.write_text(json.dumps(c, indent=1, sort_keys=True))
+    merged = {**_load_cache(), **c}
+    tmp = CACHE.with_suffix(f".{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(merged, indent=1, sort_keys=True))
+    os.replace(tmp, CACHE)
 
 
 def _set_byte(elf: bytearray, sec, off: int, fld: str, val: int):

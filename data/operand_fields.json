@@ -238,6 +238,15 @@
   "opcode": "WARPSYNC",
   "tokens": 1
  },
+ "387": {
+  "example": "STL.64 [R1+0x8], R2                                           (*\"SpillRefill\"*)",
+  "fields": {
+   "a": 0,
+   "b": 1
+  },
+  "opcode": "STL.64",
+  "tokens": 2
+ },
  "388": {
   "example": "STS [R0.X4], R5",
   "fields": {
@@ -496,6 +505,15 @@
   "opcode": "LDG.E",
   "tokens": 2
  },
+ "983": {
+  "example": "LDL.LU R53, [R1]                                              (*\"SpillRefill\"*)",
+  "fields": {
+   "a": 1,
+   "d": 0
+  },
+  "opcode": "LDL.LU",
+  "tokens": 2
+ },
  "984": {
   "example": "LDS R13, [R13]",
   "fields": {
@@ -549,6 +567,16 @@
   "opcode": "LEA",
   "tokens": 2
  },
+ "a12": {
+  "example": "LOP3.LUT R34, R2, c[0x0][0x168], RZ, 0xc0, !PT",
+  "fields": {
+   "a": 1,
+   "c": 2,
+   "d": 0
+  },
+  "opcode": "LOP3.LUT",
+  "tokens": 3
+ },
  "a17": {
   "example": "IMNMX R0, R0, c[0x0][0x188], PT",
   "fields": {
@@ -567,6 +595,14 @@
   },
   "opcode": "IMAD",
   "tokens": 3
+ },
+ "a45": {
+  "example": "I2FP.F32.S32 R30, c[0x0][0x170]",
+  "fields": {
+   "d": 0
+  },
+  "opcode": "I2FP.F32.S32",
+  "tokens": 1
  },
  "b82": {
   "example": "LDC.64 R2, c[0x0][R2+0x160]",

@@ -449,6 +449,118 @@ lines each warp touches (fewer L1 lines per request), and a load-only reorder ca
 Gotcha: the runner caches builds by source + `build_key()`, so a transform-only variant must override
 `build_key`. The first run silently measured the unpatched cubin.
 
+### `3080lab optimize`: a general split-sector optimizer (Phase 7 generalized)
+
+```
+3080lab optimize k.cubin --block 128 --grid 560 --trips 2 --report rep.json   # guided (default)
+3080lab optimize k.cubin --mode blind                                        # rewrite whenever valid
+python scripts/opt_bench.py build A 3 && pcslurm submit -- python scripts/opt_bench.py run A
+python scripts/opt_bench.py report                                           # docs/optimize_benchmark.md
+```
+
+Pipeline for one kernel:
+1. **Analyze** (`lab/sectors.py`). An affine abstract interpretation of the SASS gives every LDG
+   address as `root + const + coef * lane`. It follows `S2R`, constant banks, `IADD3`, `IMAD(.WIDE)`,
+   `LEA`, `SHF`, lane masks, spill slots (`STL`/`LDL`) and the loop back edge. A pair is two loads
+   whose sectors overlap, given each address's lane stride, base, offsets and width; this is exact
+   for any base alignment. A load "streams" if its address depends on the warp or block id.
+   Nothing is R8U2-specific.
+2. **Predict** (`lab/costmodel.py`). Per loop trip:
+   `max(T_sm, unique / BW(in flight), (unique + refetched) / peak)`.
+   - Re-fetched bytes = overlap x bytes x m(D).
+   - D = streaming bytes requested between the halves x concurrent warps.
+   - m(D) is read off the `mem_split_mech` microbenchmark.
+   - Whole kernel = fixed overhead + trips x per trip.
+3. **Rewrite** (`lab/schedule.py`). Hoist each later half next to its partner. Guard predicates are
+   retargeted, destination webs renamed, default defs carried, and loads slide past producers
+   that are too close. Global loads may cross local spills, and `.CONSTANT` loads may cross any
+   store.
+4. **Validate**. nvdisasm must decode the result. The hazard verifier must find no hazard the
+   original lacks, matching instructions by encoding so register renames do not hide anything.
+   Registers must stay at 255 or fewer.
+5. **Decide**. Guided mode keeps the rewrite only if the predicted gain is at least 1.02x.
+
+**What the hardware does (microbenchmarks, not the evaluation kernels):**
+
+| test | result |
+|---|---|
+| `mem_split_mech`, halves G loads apart | full speed at G <= 2; 0.83 / 0.61 / 0.50 of peak at G = 4 / 8 / >= 16 |
+| second half issued only after the first half's data arrived | no help: not a pending-miss merge problem |
+| `.nc` (L1) vs `.cg` (L1 bypass) | the same: L1 does not rescue it |
+| 1, 2, 4, 32 trips per warp | m = 0.96 to 0.99: not a steady-state effect (hypothesis refuted) |
+| `mem_split_phase`: pairing done by the optimizer itself | 1.3x to 1.9x at 0.25 to 4 waves, 2 or 8 trips |
+
+The cause is **L2 reuse distance**. Once the bytes requested GPU-wide between the two halves
+exceed the 5 MB L2, the second half is fetched from DRAM again.
+
+**Benchmark** (`docs/optimize_benchmark.md`). 100 int4 GEMV kernels:
+- 16 shapes (Qwen2.5-1.5B/3B/7B, Llama-3-8B and Llama-7B-like projections, small squares);
+- 5 load layouts;
+- `-O1` and 64-register-cap variants, where the cap makes ptxas spill.
+
+Suite B was never used while building or revising anything. Each kernel ran on two random input
+seeds with 60 interleaved timed launches per arm.
+
+- **Correctness: 0 failures.** Every rewritten kernel's output is bitwise equal to ptxas's. Every
+  arm matches a float64 reference.
+- **Timing method.** The 20%-trimmed mean of the in-kernel span. The plain mean was skewed by rare
+  preempted launches, and the median cannot resolve the 1.02 us globaltimer tick. Byte-identical
+  binaries measure the noise floor: 5-6% below 8 us, 2-3% at 8-20 us, 1.2% above 20 us.
+
+| held-out geomean speedup vs ptxas | suite A (56) | suite B (43) |
+|---|---|---|
+| source fix (lane-contiguous, where a layout has one) | 1.108 | 1.165 |
+| blind rewrite | 1.033 | 1.074 |
+| guided v1 | 1.034 | 1.074 |
+| guided v3 | 1.034 | 1.067 |
+
+- **Phase 7 recovered automatically:** 7B gate_up R8U2 goes 94.7 -> 62.7 us (1.51x).
+- **Unseen kernels improved:**
+  - Llama-3-8B gate_up: 1.62x (R8U2), 1.58x (R4U2);
+  - Llama-7B up: 1.57x;
+  - Qwen2.5-3B gate_up: 1.47x / 1.43x;
+  - Llama-3-8B down: 1.16x;
+  - spilling 64-register builds: 1.24x to 1.37x.
+- **Decision accuracy** (v3), counting kernels where the rewrite measurably helps or hurts:
+  15/19 on A and 12/13 on B.
+- **Speedup prediction error** (median): 4.0% on A and 4.9% on B for v3, against 12-15% for v1.
+
+**Prediction-guided vs blind: not better.** I measured regret against a per-kernel oracle (the
+better of ptxas and the rewrite, with differences inside the noise band counted as ties):
+
+| policy | regret, A | regret, B |
+|---|---|---|
+| never rewrite | 3.61% | 7.39% |
+| blind rewrite | 0.36% | 0.00% |
+| guided v1 | 0.29% | -0.02% |
+| guided v3 | 0.31% | 0.47% |
+
+The hoist almost never hurts on this kernel family, so blind is already near the oracle. Guided
+v3's extra regret on B is one missed win: Llama-3-8B down, R4U2 at 64 registers, 1.22x, where v3
+predicted 0.96x. The predictor's value here is the explanation and its 4-5% error, not speed.
+
+**When and why it beats ptxas.** Under register pressure ptxas issues the second 16 B halves of a
+lane's 32 B sector 20 to 30 loads after the first (u_major order). The rewrite pays off whenever
+the reuse distance of those halves exceeds the L2:
+- multi-wave grids: 1.3x to 1.6x;
+- long-K sub-wave grids: about 1.2x.
+
+Short sub-wave launches are neutral. The 3 to 8% losses on the qo7 shapes (3584x3584, about 2 trips
+per warp) are real; 300-launch re-measurements confirmed them.
+
+**Failed hypotheses and fixes found along the way** (all kept in the code or this record):
+
+| item | outcome |
+|---|---|
+| v2: re-fetches only cost time at the bandwidth roof (latency regime) | made zero difference: the kernels v1 got wrong never sat in that regime |
+| v3 fix: m(D) curve in useful bytes vs D in sector bytes (a 2x unit mismatch) | fixed; prediction error 11.7% -> 4.0% |
+| v3 fix: SM simulator's predicted latency-hiding gain from moved loads | not real on the GPU; v3 keeps the original's issue time |
+| cold start (first trip immune) | refuted: m = 0.96 at 1 trip |
+| static stall overhead of the rewrite | +0.1% to +0.5%, too small to explain anything |
+| false scoreboard dependence | confirmed: hoisted loads keep ptxas's barrier, so earlier waits on that barrier also wait for them. Giving them their own barrier (`schedule.dedicate_barrier`, opt-in) won 1.08x on qo7 R8U2 and 1.09x on qo7 R4U2 -O1, but moving ptxas's other producers off that barrier cost 1% geomean overall, so it is off by default |
+| Phase 7 latent bug | `hoist()` checked producer distance for registers, not guard predicates. The verifier caught a load placed 1 cycle after its 13-cycle ISETP; fixed |
+| `-maxrregcount` | ptxas ignores it when the source has `__launch_bounds__`; capped builds use `__launch_bounds__(128, 8)` |
+
 ### Phase 8: our own block scheduler (`lab/resched.py`, `lab/verify.py`, `pair_latency`, `mufu_latency`, `resched_rand`)
 
 Every basic block is list-scheduled from a dependence DAG on top of ptxas's register allocation,

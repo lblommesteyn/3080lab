@@ -77,7 +77,24 @@ def ptx_to_cubin(ptx: str, flags: list[str] | None = None) -> tuple[bytes, str]:
         return out.read_bytes(), r.stderr + r.stdout
 
 
+_DIS_CACHE: dict = {}
+
+
 def disassemble(cubin: bytes) -> str:
+    """nvdisasm -hex (memoized by content: rewrite passes disassemble the same bytes many times)."""
+    import hashlib
+    key = hashlib.sha1(cubin).digest()
+    hit = _DIS_CACHE.get(key)
+    if hit is not None:
+        return hit
+    out = _disassemble(cubin)
+    if len(_DIS_CACHE) > 512:
+        _DIS_CACHE.clear()
+    _DIS_CACHE[key] = out
+    return out
+
+
+def _disassemble(cubin: bytes) -> str:
     with tempfile.TemporaryDirectory() as d:
         p = Path(d) / "k.cubin"
         p.write_bytes(cubin)

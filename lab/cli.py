@@ -4,6 +4,7 @@
   3080lab sass dependent_ffma          # compile only, no GPU
   3080lab run dependent_ffma           # queues through pcslurm, waits, prints report
   3080lab run dependent_ffma --local   # run in this process (what the queued job does)
+  3080lab optimize k.cubin --block 128 # split-sector analysis, prediction, safe rewrite
 """
 from __future__ import annotations
 
@@ -131,6 +132,21 @@ def cmd_table(a):
     print(text)
 
 
+def cmd_optimize(a):
+    from . import costmodel, optimize
+    src = Path(a.cubin).read_bytes()
+    out, rep = optimize.optimize(src, a.kernel, costmodel.Launch(block=a.block, grid=a.grid, trips=a.trips),
+                                 mode=a.mode)
+    rep.pop("_cubins", None)
+    print(optimize.summary(rep))
+    dst = Path(a.output or (Path(a.cubin).with_suffix("").as_posix() + ".opt.cubin"))
+    dst.write_bytes(out)
+    print(f"wrote {dst}")
+    if a.report:
+        rep2 = json.loads(json.dumps(rep, default=lambda o: None))
+        Path(a.report).write_text(json.dumps(rep2, indent=1))
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="3080lab")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -158,6 +174,16 @@ def main(argv=None):
     sh.add_argument("path")
     sh.set_defaults(fn=cmd_show)
     sub.add_parser("table").set_defaults(fn=cmd_table)
+    o = sub.add_parser("optimize", help="detect, predict, rewrite and validate split-sector loads in a cubin")
+    o.add_argument("cubin")
+    o.add_argument("--kernel", default="k")
+    o.add_argument("--block", type=int, default=128, help="threads per block (occupancy for the cost model)")
+    o.add_argument("--grid", type=int, help="blocks per launch (default: 4 full waves)")
+    o.add_argument("--trips", type=float, help="main-loop trips per warp (whole-kernel time incl. fixed cost)")
+    o.add_argument("--mode", choices=("guided", "blind"), default="guided")
+    o.add_argument("-o", "--output")
+    o.add_argument("--report", help="write the full decision report as JSON")
+    o.set_defaults(fn=cmd_optimize)
     a = p.parse_args(argv)
     if a.cmd == "run" and not a.local and os.environ.get("LAB_FORCE_LOCAL"):
         a.local = True

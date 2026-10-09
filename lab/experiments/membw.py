@@ -265,7 +265,7 @@ extern "C" __global__ void __launch_bounds__(1024) k(int stride, int iters, unsi
 
 
 def registry():
-    exps = [Coalesce(), Width(), MLP(), SmemBanks(), L1Wavefronts(), SplitSector(), SplitGap()]
+    exps = [Coalesce(), Width(), MLP(), SmemBanks(), L1Wavefronts(), SplitSector(), SplitGap(), SplitMech(), SplitPhase()]
     return {e.name: e for e in exps}
 
 
@@ -443,4 +443,182 @@ extern "C" __global__ void __launch_bounds__(256) k(const unsigned char* __restr
         st["launch"]["grid"] = blocks
         st["launch"]["args"][5] = ctypes.c_uint64(st["T"])
         st["useful"] = blocks * 256 * v.params["iters"] * 32 * v.params["G"]
+        return st
+
+
+@dataclass
+class SplitMech(SplitGap):
+    """Why do far-apart sector halves cost DRAM bandwidth? Varies, independently:
+      G     rows whose first halves are requested before any second half (intervening requests)
+      fill  dependent FFMAs between the two batches (a pure time gap, no extra requests)
+      wait  second halves issued only after the first halves' DATA arrived (address depends on it)
+      cache .nc (L1-allocating, LDG.CONSTANT) or .cg (L1 bypass)
+    If only `fill` hurts: a pending miss is not merged. If `wait` restores full speed: the second
+    half hits once the fill completed. If only G hurts: requests in between evict/serialize."""
+
+    def __post_init__(self):
+        self.name = "mem_split_mech"
+        self.description = "split-sector penalty mechanism: request gap vs time gap vs completed fill"
+
+    def source(self, v):
+        G, pat, fill, wait, cache = (v.params[k] for k in ("G", "pattern", "fill", "wait", "cache"))
+        q = "nc" if cache == "nc" else "cg"
+        first = [f"(base + {g} * 1024 + lane * 32)" if pat == "split" else f"(base + {g} * 1024 + lane * 16)"
+                 for g in range(G)]
+        second = [f"(base2 + {g} * 1024 + lane * 32 + 16)" if pat == "split" else f"(base2 + {g} * 1024 + 512 + lane * 16)"
+                  for g in range(G)]
+        ld = lambda idx, a: (f'asm volatile("ld.global.{q}.v4.u32 {{%0,%1,%2,%3}}, [%4];" : "=r"(r{idx}.x), '  # noqa: E731
+                             f'"=r"(r{idx}.y), "=r"(r{idx}.z), "=r"(r{idx}.w) : "l"(B + {a}));')
+        firsts = "\n    ".join(ld(i, a) for i, a in enumerate(first))
+        seconds = "\n    ".join(ld(G + i, a) for i, a in enumerate(second))
+        dep = " ^ ".join(f"r{i}.x" for i in range(G))
+        base2 = f"base + ((unsigned long long)({dep}) & zmask)" if wait else "base"
+        # time gap: nanosleep is a scheduling barrier for ptxas (an FFMA filler got spread around)
+        filler = f'asm volatile("nanosleep.u32 {fill};" ::: "memory");' if fill else ""
+        decl = " ".join(f"uint4 r{i};" for i in range(2 * G))
+        fold = " ^ ".join(f"r{i}.x ^ r{i}.y ^ r{i}.z ^ r{i}.w" for i in range(2 * G))
+        return f"""
+extern "C" __global__ void __launch_bounds__(256) k(const unsigned char* __restrict__ B, unsigned long long mask,
+    int stride, int iters, unsigned* sink, unsigned long long* T)
+{{
+  {TIMED_HEAD}
+  unsigned long long warp = (blockIdx.x * 256ull + threadIdx.x) >> 5, nw = gridDim.x * 8ull;
+  unsigned long long zmask = (unsigned long long)stride;          // runtime 0
+  unsigned lane = threadIdx.x & 31, acc = 0;
+  float f = (float)lane, fz = (float)stride;
+  for (int i = 0; i < iters; ++i) {{
+    unsigned long long base = ((warp + i * nw) * {1024 * G}ull) & mask;
+    {decl}
+    {firsts}
+    {filler}
+    unsigned long long base2 = {base2};
+    {seconds}
+    acc ^= {fold};
+  }}
+  if (acc == 0x9e3779b9u || f == 12345.f) sink[0] = acc;
+  {TIMED_TAIL}
+}}
+"""
+
+    def variants(self, opts):
+        out = []
+        for cache in ("nc", "cg"):
+            for G in (1, 2, 4, 8, 16, 32):
+                for pat in ("contig", "split"):
+                    out.append(Variant(f"{cache}/G{G}/{pat}", {"size": 256 * MB, "stride": 0, "iters": max(8, 256 // G),
+                                                              "warps": 8, "pattern": pat, "G": G, "fill": 0,
+                                                              "wait": False, "cache": cache}))
+            for fill in ((100, 400, 1600) if cache == "cg" else ()):   # ptxas hoists .nc loads across it
+                out.append(Variant(f"{cache}/G1/split/fill{fill}", {"size": 256 * MB, "stride": 0, "iters": 256,
+                                                                     "warps": 8, "pattern": "split", "G": 1,
+                                                                     "fill": fill, "wait": False, "cache": cache}))
+            if cache == "nc":
+                # cold-start hypothesis (optimize benchmark): is the re-fetch a steady-state effect?
+                # few trips per warp, one wave, G=16 (reuse distance far beyond L2)
+                for it in (1, 2, 4, 32):
+                    for pat in ("contig", "split"):
+                        out.append(Variant(f"nc/G16/{pat}/it{it}", {"size": 256 * MB, "stride": 0, "iters": it,
+                                                                   "warps": 8, "pattern": pat, "G": 16, "fill": 0,
+                                                                   "wait": False, "cache": "nc"}))
+            for G in (8, 32):
+                out.append(Variant(f"{cache}/G{G}/split/wait", {"size": 256 * MB, "stride": 0,
+                                                                 "iters": max(8, 256 // G), "warps": 8,
+                                                                 "pattern": "split", "G": G, "fill": 0,
+                                                                 "wait": True, "cache": cache}))
+                out.append(Variant(f"{cache}/G{G}/contig/wait", {"size": 256 * MB, "stride": 0,
+                                                                  "iters": max(8, 256 // G), "warps": 8,
+                                                                  "pattern": "contig", "G": G, "fill": 0,
+                                                                  "wait": True, "cache": cache}))
+        return out
+
+
+@dataclass
+class SplitPhase(SplitGap):
+    """Does hoisting the later sector halves pay off in every launch regime? (optimize benchmark:
+    multi-wave GEMVs gain 1.3-1.6x, short sub-wave ones lose up to 8%.)
+    Each warp runs T trips: first halves of G rows -> C dependent FFMAs on that data -> second halves.
+      late:    second-half addresses depend on the compute result (forced late, like ptxas's GEMV order)
+      hoisted: second halves issued with the first halves (what lab/optimize.py produces)
+    Grid size sets the number of waves; occupancy is fixed by __launch_bounds__(128, 12)."""
+
+    def __post_init__(self):
+        self.name = "mem_split_phase"
+        self.description = "late vs hoisted sector halves across waves and trips (regime test)"
+
+    def source(self, v):
+        G, C, order = v.params["G"], v.params["C"], v.params["order"]
+        ld = lambda idx, a: (f'asm volatile("ld.global.nc.v4.u32 {{%0,%1,%2,%3}}, [%4];" : "=r"(r{idx}.x), '  # noqa: E731
+                             f'"=r"(r{idx}.y), "=r"(r{idx}.z), "=r"(r{idx}.w) : "l"(B + {a}));')
+        first = "\n      ".join(ld(g, f"(base + {g} * 1024 + lane * 32)") for g in range(G))
+        second = "\n      ".join(ld(G + g, f"(base2 + {g} * 1024 + lane * 32 + 16)") for g in range(G))
+        dep = " ^ ".join(f"r{g}.x" for g in range(G))
+        chain = "\n      ".join('asm volatile("fma.rn.f32 %0, %0, %1, %1;" : "+f"(f) : "f"(fz));' for _ in range(C))
+        decl = " ".join(f"uint4 r{i};" for i in range(2 * G))
+        fold = " ^ ".join(f"r{i}.x ^ r{i}.y ^ r{i}.z ^ r{i}.w" for i in range(2 * G))
+        if order == "late":
+            body = f"""{first}
+      f += (float)({dep});
+      {chain}
+      unsigned long long base2 = base + ((unsigned long long)__float_as_uint(f) & zmask);
+      {second}"""
+        else:
+            # "early": first halves of all rows, then second halves, then compute (ptxas schedules it);
+            # "paired" = "early" rewritten by lab/optimize.py (each later half right after its partner)
+            body = f"""unsigned long long base2 = base;
+      {first}
+      {second}
+      f += (float)({dep});
+      {chain}"""
+        return f"""
+extern "C" __global__ void __launch_bounds__(128, 12) k(const unsigned char* __restrict__ B, unsigned long long mask,
+    int stride, int iters, unsigned* sink, unsigned long long* T)
+{{
+  {TIMED_HEAD}
+  unsigned long long warp = (blockIdx.x * 128ull + threadIdx.x) >> 5, nw = gridDim.x * 4ull;
+  unsigned long long zmask = (unsigned long long)stride;          // runtime 0
+  unsigned lane = threadIdx.x & 31, acc = 0;
+  float f = (float)lane, fz = (float)stride;
+  for (int i = 0; i < iters; ++i) {{
+    unsigned long long base = ((warp + i * nw) * {1024 * G}ull) & mask;
+    {decl}
+    {body}
+    acc ^= {fold};
+  }}
+  if (acc == 0x9e3779b9u || f == 12345.f) sink[0] = acc;
+  {TIMED_TAIL}
+}}
+"""
+
+    def variants(self, opts):
+        out = []
+        for waves in (0.25, 0.5, 1, 2, 4):
+            for trips in (2, 8):
+                for order in ("late", "early", "paired"):
+                    out.append(Variant(f"w{waves}/t{trips}/{order}", {"size": 256 * MB, "stride": 0, "iters": trips,
+                                                                       "warps": 4, "G": 8, "C": 256, "order": order,
+                                                                       "waves": waves, "pattern": "split"}))
+        return out
+
+    def build_key(self, v):
+        return v.params["order"]
+
+    def transform(self, cubin, v):
+        if v.params["order"] != "paired":
+            return cubin
+        from lab import optimize
+        c = optimize.candidates(cubin, "k")["hoist+rename"]
+        if "cubin" not in c or c["moves"] == 0 or optimize.validate(c["cubin"], cubin):
+            raise SystemExit("optimizer could not pair the halves")
+        return c["cubin"]
+
+    def prepare(self, dev, v):
+        blocks = max(1, int(68 * 12 * v.params["waves"]))          # 12 blocks of 128 per SM = one wave
+        st = Coalesce.prepare(self, dev, v)
+        dev.free(st["T"])
+        st["T"] = dev.alloc(blocks * 16)
+        st["blocks"] = blocks
+        st["launch"]["grid"] = blocks
+        st["launch"]["block"] = 128
+        st["launch"]["args"][5] = ctypes.c_uint64(st["T"])
+        st["useful"] = blocks * 128 * v.params["iters"] * 32 * v.params["G"]
         return st
