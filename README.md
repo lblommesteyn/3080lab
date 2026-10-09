@@ -568,6 +568,37 @@ those halves exceeds the L2, the halves are fetched from DRAM twice, and re-pair
 | Phase 7 latent bug | `hoist()` checked producer distance for registers, not guard predicates. The verifier caught a load placed 1 cycle after its 13-cycle ISETP; fixed |
 | `-maxrregcount` | ptxas ignores it when the source has `__launch_bounds__`; capped builds use `__launch_bounds__(128, 8)` |
 
+### Batched decode kernels (`lab/qwen_batched.py`, `scripts/batched_gemv_bench.py`)
+
+llama.cpp b11485 batched decode (`llama-batched-bench`, Qwen2.5-1.5B Q4_0, flash attention, prompt 128,
+128 generated per sequence), in tok/s summed over sequences: B=1 336, 2 614, 4 964, 8 1420, 16 2424,
+32 3566. Prefill is about 17-18K tok/s.
+
+At B = 1 our decode is 509 tok/s, but a token step re-reads all weights for each sequence. Two
+batched Q4_0 GEMVs read each weight once for B input vectors:
+
+- **CUDA cores** (`gemv_batched_source`). Dequantize one 32-bit word (8 weights) and FMA it against
+  the matching 8 values of all B vectors. Correct (bitwise equal to the single-vector kernel), but
+  only about 2.3x over B separate launches at B = 4. At B = 8, the per-weight FMAs and 244
+  registers make it compute- and occupancy-bound; capping at 128 registers makes it spill.
+- **Tensor cores** (`gemv_mma_source`, `mma.sync` m16n8k16 fp16 -> fp32). A warp owns 16 rows; Q4_0
+  nibble pairs become `half2` via the 0x6400 exponent trick, scaled by the block's fp16 scale; the
+  B input columns are converted bf16 -> fp16. Each A fragment is reused across ceil(B/8) n-tiles.
+  The error against the fp32 single-vector kernel is 2e-4 to 5e-3 (weights rounded to fp16).
+  Memory parallelism matters most: one block of weights in flight per warp left gate_up at
+  220 GB/s. With 8 split-K warps and 4 blocks in flight (S = 8, U = 4), per launch:
+
+| us per launch | B = 1 | 4 | 8 | 16 | 32 | production single-vector, per vector |
+|---|---|---|---|---|---|---|
+| qkv 2048 x 1536 | 5.4 | 5.9 | 7.3 | 11.0 | 20.3 | 5.3 |
+| o 1536 x 1536 | 5.3 | 8.8 | 7.6 | 10.9 | 19.0 | 4.7 |
+| gate_up 17920 x 1536 | 30.3 | 34.7 | 46.8 | 80.4 | 146 | 25.4 |
+| down 1536 x 8960 | 32.3 | 37.0 | 38.8 | 52.7 | 92 | 14.5 |
+
+`down` (long K, only 96 row tiles of 16) lacks parallelism at small B. Next: end-to-end batched
+decode (batched attention over separate KV caches, norms, embedding, the Q6_K head) against the
+llama.cpp numbers above.
+
 ### Phase 8: our own block scheduler (`lab/resched.py`, `lab/verify.py`, `pair_latency`, `mufu_latency`, `resched_rand`)
 
 Every basic block is list-scheduled from a dependence DAG on top of ptxas's register allocation,
