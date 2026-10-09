@@ -493,71 +493,71 @@ Pipeline for one kernel:
 The cause is **L2 reuse distance**. Once the bytes requested GPU-wide between the two halves
 exceed the 5 MB L2, the second half is fetched from DRAM again.
 
-**Benchmark** (`docs/optimize_benchmark.md`). 100 int4 GEMV kernels:
-- 16 shapes (Qwen2.5-1.5B/3B/7B, Llama-3-8B and Llama-7B-like projections, small squares);
-- 5 load layouts;
-- `-O1` and 64-register-cap variants, where the cap makes ptxas spill.
+**Benchmark** (`docs/optimize_benchmark.md`). 120 int4 GEMV kernels:
+- **Suite A, 57 kernels:** 9 shapes x 5 load layouts, plus -O1 and 64-register-cap variants, where
+  the cap makes ptxas spill.
+- **Suite B, 43 kernels:** Qwen2.5-3B, Llama-3-8B and small-square shapes, never used while
+  building or revising anything.
+- **Suite C, 20 kernels:** high register pressure (R16U2, R8U4, R16U1).
 
-Suite B was never used while building or revising anything. Each kernel ran on two random input
-seeds with 60 interleaved timed launches per arm.
+Each kernel ran on two random input seeds. Timing: 60 launches per arm, each after a read-only
+64 MB L2 flush, with arm order shuffled every round; I report the 20%-trimmed mean of the in-kernel
+span. Byte-identical binaries give the noise floor: 1.2-1.5% at 8 us and above, 7.9% below.
 
 - **Correctness: 0 failures.** Every rewritten kernel's output is bitwise equal to ptxas's. Every
   arm matches a float64 reference.
-- **Timing method.** The 20%-trimmed mean of the in-kernel span. The plain mean was skewed by rare
-  preempted launches, and the median cannot resolve the 1.02 us globaltimer tick. Byte-identical
-  binaries measure the noise floor: 5-6% below 8 us, 2-3% at 8-20 us, 1.2% above 20 us.
 
-| held-out geomean speedup vs ptxas | suite A (56) | suite B (43) |
-|---|---|---|
-| source fix (lane-contiguous, where a layout has one) | 1.108 | 1.165 |
-| blind rewrite | 1.033 | 1.074 |
-| guided v1 | 1.034 | 1.074 |
-| guided v3 | 1.034 | 1.067 |
+| held-out geomean speedup vs ptxas | A (56) | B (43) | C (20) |
+|---|---|---|---|
+| source fix (lane-contiguous, where a layout has one) | 1.098 | 1.188 | 1.369 |
+| blind rewrite | 1.036 | 1.074 | 1.055 |
+| guided v1 | 1.037 | 1.075 | 1.053 |
+| guided v3 | 1.036 | 1.072 | 1.050 |
 
-- **Phase 7 recovered automatically:** 7B gate_up R8U2 goes 94.7 -> 62.7 us (1.51x).
+- **Phase 7 recovered automatically:** 7B gate_up R8U2 goes 94.3 -> 62.7 us (1.50x).
 - **Unseen kernels improved:**
-  - Llama-3-8B gate_up: 1.62x (R8U2), 1.58x (R4U2);
+  - Llama-3-8B gate_up: 1.62x (R8U2), 1.59x (R4U2);
   - Llama-7B up: 1.57x;
-  - Qwen2.5-3B gate_up: 1.47x / 1.43x;
-  - Llama-3-8B down: 1.16x;
-  - spilling 64-register builds: 1.24x to 1.37x.
+  - Qwen2.5-3B gate_up: 1.47x and 1.43x; at R16U2, 1.33x;
+  - Llama-3-8B down: 1.14x;
+  - spilling 64-register builds: 1.17x to 1.38x.
 - **Decision accuracy** (v3), counting kernels where the rewrite measurably helps or hurts:
-  15/19 on A and 12/13 on B.
-- **Speedup prediction error** (median): 4.0% on A and 4.9% on B for v3, against 12-15% for v1.
+  14/15 on A, 13/15 on B, 5/9 on C.
+- **Speedup prediction error** (median): 4.1% on A, 4.9% on B and 24% on C for v3, against 11-34%
+  for v1.
 
 **Prediction-guided vs blind: not better.** I measured regret against a per-kernel oracle (the
 better of ptxas and the rewrite, with differences inside the noise band counted as ties):
 
-| policy | regret, A | regret, B |
-|---|---|---|
-| never rewrite | 3.61% | 7.39% |
-| blind rewrite | 0.36% | 0.00% |
-| guided v1 | 0.29% | -0.02% |
-| guided v3 | 0.31% | 0.47% |
+| policy | A | B | C |
+|---|---|---|---|
+| never rewrite | 3.49% | 7.38% | 7.13% |
+| blind rewrite | 0.07% | 0.04% | 1.37% |
+| guided v1 | -0.07% | 0.02% | 1.57% |
+| guided v3 | -0.01% | 0.44% | 1.95% |
 
-The hoist almost never hurts on this kernel family, so blind is already near the oracle. Guided
-v3's extra regret on B is one missed win: Llama-3-8B down, R4U2 at 64 registers, 1.22x, where v3
-predicted 0.96x. The predictor's value here is the explanation and its 4-5% error, not speed.
+On ordinary GEMVs the hoist essentially never hurts, so blind is already at the oracle. Under high
+register pressure it does hurt: R8U4 at 1536 columns runs at 0.81x after renaming takes it from 96
+to 195 registers (20 -> 8 resident warps per SM). Neither model predicts that, so suite C is
+where a better occupancy model would pay off.
 
 **When and why it beats ptxas.** Under register pressure ptxas issues the second 16 B halves of a
-lane's 32 B sector 20 to 30 loads after the first (u_major order). The rewrite pays off whenever
-the reuse distance of those halves exceeds the L2:
+lane's 32 B sector 20 to 30 loads after the first (u_major order). When the reuse distance of
+those halves exceeds the L2, the halves are fetched from DRAM twice, and re-pairing them gains:
 - multi-wave grids: 1.3x to 1.6x;
-- long-K sub-wave grids: about 1.2x.
+- long-K sub-wave grids: 1.1x to 1.2x;
+- short sub-wave grids (qo7, sq4k): nothing.
 
-Short sub-wave launches are neutral. The 3 to 8% losses on the qo7 shapes (3584x3584, about 2 trips
-per warp) are real; 300-launch re-measurements confirmed them.
-
-**Failed hypotheses and fixes found along the way** (all kept in the code or this record):
+**Failed hypotheses and corrections** (all kept in the code or this record):
 
 | item | outcome |
 |---|---|
-| v2: re-fetches only cost time at the bandwidth roof (latency regime) | made zero difference: the kernels v1 got wrong never sat in that regime |
-| v3 fix: m(D) curve in useful bytes vs D in sector bytes (a 2x unit mismatch) | fixed; prediction error 11.7% -> 4.0% |
-| v3 fix: SM simulator's predicted latency-hiding gain from moved loads | not real on the GPU; v3 keeps the original's issue time |
+| v2: re-fetches only cost time at the bandwidth roof (latency regime) | made zero difference: the mispredicted kernels never sat in that regime |
+| v3 fix: m(D) curve in useful bytes vs D in sector bytes (a 2x unit mismatch) | fixed; prediction error 11% -> 4% |
+| v3 fix: SM simulator's predicted latency-hiding gain from moved loads | did not exist on the GPU; v3 keeps the original's issue time |
 | cold start (first trip immune) | refuted: m = 0.96 at 1 trip |
-| static stall overhead of the rewrite | +0.1% to +0.5%, too small to explain anything |
-| false scoreboard dependence | confirmed: hoisted loads keep ptxas's barrier, so earlier waits on that barrier also wait for them. Giving them their own barrier (`schedule.dedicate_barrier`, opt-in) won 1.08x on qo7 R8U2 and 1.09x on qo7 R4U2 -O1, but moving ptxas's other producers off that barrier cost 1% geomean overall, so it is off by default |
+| **measurement artifact**: with a fixed arm order, each arm inherited the previous arm's L2 contents | byte-identical binaries differed by a full 1 us tick on 6 MB weights. The apparent 4-8% losses on qo7, and my 300-launch "confirmation" of them, came from this. Fixed by a cold L2 plus shuffled order. A first flush by memset raised noise to 14-28% (write-backs of dirty lines landing inside the timed kernel); a read-only flush fixed that. |
+| false scoreboard dependence (hoisted loads keep ptxas's barrier) | plausible, but the only supporting gains (1.08x on qo7) came from the biased runs. With clean timing, `schedule.dedicate_barrier` nets -1% geomean, so it is opt-in and unconfirmed |
 | Phase 7 latent bug | `hoist()` checked producer distance for registers, not guard predicates. The verifier caught a load placed 1 cycle after its 13-cycle ISETP; fixed |
 | `-maxrregcount` | ptxas ignores it when the source has `__launch_bounds__`; capped builds use `__launch_bounds__(128, 8)` |
 

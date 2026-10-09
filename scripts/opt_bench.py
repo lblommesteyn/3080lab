@@ -15,8 +15,8 @@ v2 fixes it from first principles. v2 on A is therefore post hoc; v2's held-out 
 Arms: orig (ptxas), srcfix (lane-contiguous source where the layout has one), blind (hoist+rename
 whenever it validates), guided_v1 / guided_v2 (rewrite iff predicted speedup >= 1.02).
 Outputs of rewritten arms must equal orig bitwise; every arm must match a float64 reference; two
-random input seeds. Timing: in-kernel globaltimer span, which ticks in ~1.02 us steps, so the MEAN
-over 60 launches (random tick phase makes it unbiased) is reported, not the median.
+random input seeds. Timing: in-kernel globaltimer span (ticks in ~1.02 us steps) of 60 launches per
+arm, each after a read-only 64 MB L2 flush, arm order shuffled per round; 20%-trimmed mean.
 """
 import os
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")     # parallel build workers: one BLAS thread each
@@ -42,8 +42,12 @@ SUITES = {
           ("kv7", 512, 3584)],
     "B": [("qo3", 2048, 2048), ("gu3", 22016, 2048), ("dn3", 2048, 11008), ("gu8", 28672, 4096),
           ("dn8", 4096, 14336), ("sq1k", 1024, 1024), ("sq2k", 2048, 2048)],
+    # suite C: high register pressure (renaming may cost occupancy); decisions frozen before measuring
+    "C": [("gu3", 22016, 2048), ("up11k", 11008, 4096), ("qo7", 3584, 3584), ("dn8", 4096, 14336),
+          ("gu15", 17920, 1536)],
 }
-VARIANT_SHAPES = {"A": ("gu15", "qo7", "sq4k"), "B": ("gu3", "dn8")}
+LAYOUTS_BY_SUITE = {"C": [(16, 2, "u_major"), (8, 4, "u_major"), (16, 1, "u_major"), (16, 2, "lane_contig")]}
+VARIANT_SHAPES = {"A": ("gu15", "qo7", "sq4k"), "B": ("gu3", "dn8"), "C": ()}
 LAYOUTS = [(8, 2, "u_major"), (4, 2, "u_major"), (4, 1, "u_major"), (8, 2, "lane_contig"), (4, 2, "r_major")]
 # register cap: -maxrregcount is ignored when the source has __launch_bounds__, so the cap is applied
 # as __launch_bounds__(128, 8) (8 blocks of 128 threads per SM -> at most 64 registers)
@@ -55,7 +59,7 @@ GROUP = 128
 def specs(suite):
     out = []
     for s, n, k in SUITES[suite]:
-        for r, u, wo in LAYOUTS:
+        for r, u, wo in LAYOUTS_BY_SUITE.get(suite, LAYOUTS):
             out.append(dict(shape=s, N=n, K=k, R=r, U=u, worder=wo, flags="default"))
     for s, n, k in SUITES[suite]:
         if s in VARIANT_SHAPES[suite]:
@@ -181,6 +185,26 @@ def run1(suite, i):
     arms = {a: p.read_bytes() for a, p in arms.items() if p.exists()}
     ks = {a: Kernel.load(dev, c, "k") for a, c in arms.items()}
     rec = {"times": {a: [] for a in arms}, "hash": {a: [] for a in arms}, "err": {a: [] for a in arms}}
+    # Every timed launch starts with a cold L2 (64 MB memset streams through the 5 MB L2), and arm order
+    # is shuffled each round: with a fixed order, byte-identical binaries differed by a full timer tick on
+    # weights near the L2 size (qo7, 6.4 MB), because each arm inherited the previous arm's L2 contents.
+    import random as _random
+    rng_order = _random.Random(12345)
+    # read-only flush: a memset leaves 5 MB of DIRTY lines whose write-backs then land inside the timed
+    # kernel (noise floor rose to 14-28%); reading 64 MB leaves the L2 full of clean, unrelated lines
+    from lab import toolchain
+    FLUSH = 64 << 20
+    flush = dev.alloc(FLUSH)
+    dev.memset(flush, FLUSH)
+    fsink = dev.alloc(16)
+    fk = Kernel.load(dev, toolchain.build(r"""
+extern "C" __global__ void k(const uint4* __restrict__ p, unsigned long long n, unsigned* out) {
+  unsigned acc = 0;
+  for (unsigned long long i = blockIdx.x * 256ull + threadIdx.x; i < n; i += gridDim.x * 256ull) {
+    uint4 v = __ldcg(p + i); acc ^= v.x ^ v.y ^ v.z ^ v.w; }
+  if (acc == 0x9e3779b9u) out[0] = acc;
+}""").cubin, "k")
+    fargs = [ctypes.c_uint64(flush), ctypes.c_uint64(FLUSH // 16), ctypes.c_uint64(fsink)]
     n_t = int(os.environ.get("OPT_BENCH_TRIALS", "60"))
     for seed, trials in ((1, n_t), (2, 10)):
         data = prepare(dev, sp, seed)
@@ -191,14 +215,20 @@ def run1(suite, i):
             y = dev.dtoh(np.zeros(sp["N"], np.float32), data["Y"])
             rec["hash"][a].append(hashlib.sha1(y.tobytes()).hexdigest()[:12])
             rec["err"][a].append(float(np.max(np.abs(y - data["ref"])) / np.max(np.abs(data["ref"]))))
-        for _ in range(trials):                          # interleaved timing
-            for a, kern in ks.items():
+        for _ in range(trials):                          # interleaved timing, shuffled, cold L2
+            order = list(ks.items())
+            rng_order.shuffle(order)
+            for a, kern in order:
+                fk.launch(68 * 8, 256, fargs)
+                dev.sync()                               # the flush must not overlap the timed kernel
                 kern.launch(data["blocks"], 128, data["args"])
                 dev.sync()
                 t = dev.dtoh(np.zeros(2 * data["blocks"], np.uint64), data["T"]).reshape(-1, 2)
                 rec["times"][a].append(int(t[:, 1].max() - t[:, 0].min()) / 1e3)
         for z in ("W", "S", "X", "Y", "T"):
             dev.free(data[z])
+    dev.free(flush)
+    dev.free(fsink)
     mean = {a: st.mean(v) for a, v in rec["times"].items()}
     tag = os.environ.get("OPT_BENCH_TAG", f"{suite}2")
     (OUT / f"{f}.run_{tag}.json").write_text(json.dumps(rec))
@@ -310,7 +340,8 @@ def report():
                          {v: reps[v]["candidates"].get("hoist+rename", {}).get("predicted_speedup") for v in reps},
                          sum(p["streaming"] for p in reps[1]["split_pairs"]) if 1 in reps else None))
         all_fails += [f"[{suite}] {x}" for x in fails]
-        tag = {"A": "suite A (v1 held out; v3 revised on A, post hoc)", "B": "suite B (v1 and v3 both held out)"}[suite]
+        tag = {"A": "suite A (v1 held out; v3 revised on A, post hoc)", "B": "suite B (v1 and v3 both held out)",
+               "C": "suite C: high register pressure (v1 and v3 held out)"}[suite]
         L += [f"## {tag}: {len(rows)} kernels", ""]
         L.append("| arm | kernels | geomean speedup | best | worst | regressions (<0.98) |")
         L.append("|---|---|---|---|---|---|")
@@ -340,6 +371,9 @@ def report():
         for pol, rw in (("never rewrite", None), ("blind (hoist)", "blind"), ("guided v1 (hoist)", "guided_v1"),
                         ("guided v3 (hoist)", "guided_v3"), ("ablation: blind hoist+dedicate", "blindD")):
             reg, worst, nk = 0.0, 1.0, 0
+            if rw is not None and any(rw not in res[sp["id"]].get("times", {}) for sp in specs(suite)
+                                      if sp["id"] in res and "fault" not in res[sp["id"]]):
+                continue                                   # arm not measured in this suite
             for sp in specs(suite):
                 i = sp["id"]
                 r = res.get(i)
