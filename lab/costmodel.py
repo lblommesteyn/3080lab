@@ -16,6 +16,7 @@ Only microbenchmark data enters the constants. Kernels it is evaluated on are ne
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass
 from functools import lru_cache
@@ -31,7 +32,7 @@ WARPS_IN_MECH = 68 * 2 * 8          # mem_split_mech launch: 136 blocks x 8 warp
 # bytes one first-half warp-load of mem_split_mech puts in L2: 32 lanes x 32 B stride x 16 B wide
 # touches 32 whole sectors = 1024 B. v1/v2 used the 512 useful bytes, while the kernel side counts
 # sector footprint (sectors.warp_bytes): a 2x unit mismatch that shifted the curve (fixed in v3).
-MECH_BYTES_PER_LOAD = {1: 512, 2: 512, 3: 1024}
+MECH_BYTES_PER_LOAD = {1: 512, 2: 512, 3: 1024, 4: 1024}
 
 
 @lru_cache(maxsize=None)
@@ -93,7 +94,7 @@ class Launch:
     trips: float | None = None           # loop trips per warp (None: steady state, fixed cost ignored)
 
 
-MODEL_VERSION = 3
+MODEL_VERSION = 3          # v4 (post hoc on suite C, not held-out validated) is opt-in
 
 
 @lru_cache(maxsize=None)
@@ -147,23 +148,35 @@ def predict(cubin: bytes, launch: Launch = Launch(), kernel: str = "k", version:
         i, j = idx[p.first.offset], idx[p.second.offset]
         between = sum(sectors.warp_bytes(x) for x in loop[i + 1:j] if sectors.streams(x))
         D = between * concurrent
+        if version >= 4 and launch.trips and launch.trips < 1:
+            D *= launch.trips                          # only that fraction of lanes requests anything
         m = refetch(D, l.cache, version)
         refetched += wb * p.overlap * m
         pairs.append({"first": p.first.offset, "second": p.second.offset, "overlap": round(p.overlap, 3),
                       "between_bytes": between, "D_mb": round(D / 2**20, 2), "m": round(m, 3)})
     mem = _mem()
     inflight = concurrent * unique
+    # (tried after suite C: inflight = concurrent x barrier-tracked OUTSTANDING bytes x active lanes.
+    #  Refuted: suite A/B median error 4% -> 24%, r_major wins predicted as losses. Not used;
+    #  outstanding_bytes() is kept for the record.)
     bw = mem.bw(inflight)                                  # GB/s == bytes/ns
     if version == 1:
         t_mem = warps_total * (unique + refetched) / bw        # ns per GPU trip
     else:
         t_mem = max(warps_total * unique / bw, warps_total * (unique + refetched) / mem.peak_gbps)
-    if version >= 3 and sm_reference is not None:
+    if version >= 4 and sm_reference is not None:
+        # v4: the reference instruction stream, at THIS cubin's occupancy (renaming can cost warps)
+        t_sm = _t_sm(sm_reference, launch, regs)
+    elif version >= 3 and sm_reference is not None:
         t_sm = _t_sm(sm_reference, launch)
     else:
         t_sm = _t_sm(cubin, launch)
     t = max(t_mem, t_sm)
-    if version >= 3 and launch.trips:
+    if version >= 4 and launch.trips:
+        # a partial trip (K shorter than one lane sweep) still pays a full trip of latency/issue but
+        # moves only its share of bytes
+        t = fixed_overhead_us() * 1e3 + max(math.ceil(launch.trips) * t_sm, launch.trips * t_mem)
+    elif version >= 3 and launch.trips:
         t = fixed_overhead_us() * 1e3 + launch.trips * t
     return {"t_ns": t, "regs": regs, "resident_warps_sm": wres, "concurrent_warps": concurrent,
             "unique_bytes_per_warp_trip": unique, "refetched_bytes_per_warp_trip": refetched,
@@ -172,12 +185,13 @@ def predict(cubin: bytes, launch: Launch = Launch(), kernel: str = "k", version:
 
 
 @lru_cache(maxsize=64)
-def _t_sm(cubin: bytes, launch: Launch) -> float:
-    """SM-simulator time per GPU trip (ns): every warp of the grid does one loop trip."""
+def _t_sm(cubin: bytes, launch: Launch, regs: int | None = None) -> float:
+    """SM-simulator time per GPU trip (ns): every warp of the grid does one loop trip.
+    regs overrides the occupancy (v4: the original's stream at a rewrite's register count)."""
     from . import model
     text = toolchain.disassemble(cubin)
     ins = sass.parse(text)
-    regs = regcount(text)
+    regs = regs or regcount(text)
     wpb = (launch.block + 31) // 32
     wres = resident_warps_per_sm(regs, launch.block)
     grid = launch.grid or (wres // wpb) * SMS * 4
@@ -187,3 +201,23 @@ def _t_sm(cubin: bytes, launch: Launch) -> float:
     w_sim = max(1, min(wres, -(-warps_total // SMS)))
     sim = model.simulate(body, warps=w_sim, iters=6, mem_level="DRAM", sim_iters=6, version=1)
     return sim["per_iter"] * ((warps_total / SMS) / w_sim) / F_CLK_GHZ
+
+
+def outstanding_bytes(ins, a) -> float:
+    """Time-averaged streaming bytes one warp has in flight in the loop body (barrier tracked)."""
+    body = sass.loop_body(ins) or ins
+    wb = {l.offset: (sectors.warp_bytes(l) if sectors.streams(l) else 0) for l in a.loads}
+    out = {b: 0 for b in range(6)}
+    tot = tw = 0
+    for pass_ in range(2):                             # second pass: loop-carried steady state
+        for x in body:
+            for b in range(6):
+                if x.wait >> b & 1:
+                    out[b] = 0
+            if x.opcode.startswith("LDG") and x.wbar != 7:
+                out[x.wbar] += wb.get(x.offset, 0)
+            if pass_:
+                w = x.stall or 1
+                tot += sum(out.values()) * w
+                tw += w
+    return tot / tw if tw else 0.0

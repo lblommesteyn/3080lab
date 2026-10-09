@@ -558,6 +558,8 @@ those halves exceeds the L2, the halves are fetched from DRAM twice, and re-pair
 | cold start (first trip immune) | refuted: m = 0.96 at 1 trip |
 | **measurement artifact**: with a fixed arm order, each arm inherited the previous arm's L2 contents | byte-identical binaries differed by a full 1 us tick on 6 MB weights. The apparent 4-8% losses on qo7, and my 300-launch "confirmation" of them, came from this. Fixed by a cold L2 plus shuffled order. A first flush by memset raised noise to 14-28% (write-backs of dirty lines landing inside the timed kernel); a read-only flush fixed that. |
 | false scoreboard dependence (hoisted loads keep ptxas's barrier) | plausible, but the only supporting gains (1.08x on qo7) came from the biased runs. With clean timing, `schedule.dedicate_barrier` nets -1% geomean, so it is opt-in and unconfirmed |
+| v4, post hoc on suite C: SM term at the rewrite's occupancy, partial-lane trips and reuse distance | principled and harmless on A and B (3.8% / 4.8% error) but suite C error unchanged (24%): gu15 R8U4 still predicted 1.02x against 0.81x measured. Not held-out validated, so opt-in (`version=4`); v3 stays the default |
+| in-flight bytes from barrier tracking (Little's law per outstanding load) | refuted: A and B median error 4% -> 24%, r_major wins predicted as losses |
 | Phase 7 latent bug | `hoist()` checked producer distance for registers, not guard predicates. The verifier caught a load placed 1 cycle after its 13-cycle ISETP; fixed |
 | `-maxrregcount` | ptxas ignores it when the source has `__launch_bounds__`; capped builds use `__launch_bounds__(128, 8)` |
 
