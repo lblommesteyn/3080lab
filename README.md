@@ -698,26 +698,31 @@ One sequence, P prompt tokens per pass. Per layer: RMSNorm, QKV, a K/V-write pas
 tokens, causal attention, O, RMSNorm, gate_up, down. Correctness: the KV cache and last-token
 logits against token-by-token prefill through the validated decode step; perplexity on README text.
 
-| prefill tok/s | P = 128 | 256 | 512 |
-|---|---|---|---|
-| v2 GEMVs, chunks of 32, per-token attention | | | 7,171 |
-| cuBLAS on per-layer fp16-dequantized weights, one chunk | 7,369 | | 9,342 |
-| int8 GEMM, per-token attention | | | 14,606 |
-| **int8 GEMM + tensor-core flash attention** | **16,261** | **19,636** | **22,056** |
-| llama.cpp b11485 (`llama-bench -fa 1`, 10 reps, about +-1K) | 10,225 | 14,379 | 17,727 |
-| ratio | **1.59** | **1.37** | **1.24** |
+| prefill tok/s | P = 128 | 256 | 512 | 1024 | 2048 |
+|---|---|---|---|---|---|
+| v2 GEMVs, chunks of 32, per-token attention | | | 7,171 | | |
+| cuBLAS on per-layer fp16-dequantized weights, one chunk (chunks of 512 beyond) | 7,369 | | 9,342 | 10,291 | 10,924 |
+| int8 GEMM, per-token attention | | | 14,606 | | |
+| int8 GEMM (register weights) + tensor-core flash attention | 16,261 | 19,636 | 22,056 | | |
+| **int8 GEMM (multistage) + flash attention, chunks of 512 beyond** | **17,290** | **20,253** | **21,424** | **20,910** | **19,277** |
+| llama.cpp b11485 (`llama-bench -fa 1`, about +-1.5K) | 10,225 | 14,379 | 17,727 | 16,756 | 15,946 |
+| ratio | **1.69** | **1.41** | **1.21** | **1.25** | **1.21** |
+
+Prompts longer than 512 run in chunks of 512 against a `maxlen`-sized KV cache (`maxlen=` argument,
+default max(512, P)); the last-token argmax matches the token-by-token reference at 1024 and 2048.
+llama.cpp's pp512 measured 15,910 +- 1,718 in the later session, so the 512 ratio is between 1.21 and 1.35.
 
 Where the 55 ms of the cuBLAS path went at P = 512 (ablation): matmuls 27 ms (at the fp16 x fp16 ->
 fp32 tensor-core peak), attention 13 ms, dequantization 5 ms, torch epilogues and the rest 10 ms.
 
-- **int8 GEMM** (`pack_q4_i8`, `QUANT_Q8`, `gemm_q4i8_source`), llama.cpp MMQ-style: activations
+- **int8 GEMM** (`pack_q4_i8`, `QUANT_Q8`, `gemm_q4i8_ms_source`; `gemm_q4i8_source` is the first version), llama.cpp MMQ-style: activations
   quantized to int8 per 32 values (scale, sum), `mma.m16n8k32.u8.s8` on the raw Q4_0 nibbles, then
   y += dw * dx * (dot - 8 sum) in fp32 per 32-k block. The MMA's C operand carries
   0x4B400000 - 8 sum, so the int32 result is already the float bit pattern of 2^23 + 2^22 + (dot - 8 sum):
   no I2F, no integer correction. Bias, residual and SwiGLU are fused into the epilogue, and no
-  dequantized weights are written. It runs at 55-70 TOPS of the measured 271: the loop still issues
-  about 31 instructions per MMA (12 of them the per-block fp32 scaling) against a 16-cycle MMA
-  interval, and the best tile (4 warps, 32 rows x 64 tokens, 167 registers) keeps 3 blocks per SM.
+  dequantized weights are written. It runs at 55-80 TOPS of the measured 271 (see below for what
+  bounds it). Tiles per GEMM: 128 rows x 64 tokens, 8 warps, 2 blocks per SM for qkv and gate_up;
+  64 x 64, 4 warps, 3 blocks per SM for o and down (N = 1536 leaves too few 128-row blocks).
   Per layer at P = 512: 865 us against cuBLAS's 948 us plus dequantization.
 - **Flash attention** (`flash_prefill_source`): one block per head and 64 tokens; Q (RoPE, bf16)
   is held in A fragments, K/V tiles of 64 positions are shared by the 4 warps through shared memory,
@@ -731,6 +736,38 @@ fp32 tensor-core peak), attention 13 ms, dequantization 5 ms, torch epilogues an
 Tested hypotheses on the int8 GEMM: quarter-rate I2F as the bottleneck (magic-number conversion:
 no change); register pressure (forced 2 blocks per SM at 128 registers: no change); smaller
 blocks with more blocks per SM: +15%.
+
+What bounds the int8 GEMM (`prefill_gemm_bench.py`, P = 512, per layer):
+
+| change | per layer (us) | gate_up (us) |
+|---|---|---|
+| first version (register weights, 64 x 64 tiles) | 865 | 448 |
+| issue diet: 31 -> 19 instructions per MMA (ldmatrix B, one 128-bit C-operand load) | 861 | 448 |
+| token tiles fastest in the grid (blocks sharing weights run together) | 837-853 | 431-435 |
+| multistage: weights through shared memory, 3-stage cp.async ring | 813-830 | 399-405 |
+| ablation: no MMA (integer op on the same operands) | 817 | 400 |
+| ablation: no per-block fp32 scaling (one add per output) | 779 | 383 |
+| 128-row tiles, 8 warps, 2 blocks per SM (qkv, gate_up) | 763 | 357 |
+
+- **The prefetch had distance zero.** The first version loaded the next stage's weight fragments
+  into registers one stage ahead. Global loads complete out of order, so they get no counted wait:
+  ptxas put both stages' loads on one scoreboard (SB5) and the first wait for this stage's weights,
+  about 20 instructions later, also waited for the prefetch. A fake data dependency
+  (`wq & (K >> 30)`, zero but opaque) moved the loads after the wait, but at the 3-blocks-per-SM
+  register cap (168) two live stages of weights do not fit: ptxas then sank the loads to the end of
+  the stage or spilled them. A branch merge point also makes ptxas wait on every outstanding load.
+  The fix is the CUTLASS one: weights go global -> shared with cp.async (counted groups,
+  `wait_group NSTG - 2`), which also frees the weight registers (168 -> 151).
+- **Not compute.** Replacing every MMA with an integer op leaves the time unchanged, and removing
+  the fp32 scaling saves 4%. The loop is bound by moving X and W: with 64-row tiles the 1.1 MB
+  of int8 X and scales is re-read by each of the 280 gate_up row-blocks (about 430 MB from L2 per
+  call, ~1.1 TB/s). 128-row tiles cut that to 275 MB but gained 11%, so traffic is not the whole
+  bound either; every 16-warp-per-SM configuration beat every 8-warp one.
+- **The benchmark gains did not reach the full model.** End to end the multistage kernel prefills
+  512 tokens at 21.4-21.7K tok/s, level with the committed first version (22.1K); the 128-row tiles
+  changed nothing end to end. The first version after the issue diet and grid swap ran 3.8-6.4K
+  tok/s end to end (80-135 ms at P = 512, varying run to run) while the isolated benchmark timed it
+  steady at ~850 us per layer: unexplained, and the reason the multistage kernel is the default.
 
 ### Phase 8: our own block scheduler (`lab/resched.py`, `lab/verify.py`, `pair_latency`, `mufu_latency`, `resched_rand`)
 

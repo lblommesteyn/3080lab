@@ -1017,9 +1017,11 @@ QUANT_Q8 = r"""
 extern "C" __global__ void k(const __nv_bfloat16* __restrict__ X, signed char* __restrict__ Xq, float* __restrict__ Xd,
                              int* __restrict__ Xs, int P, int K)
 {
-  // one warp per 32-value block: int8 q = round(x / d), d = amax / 127. Xd, Xs are block-major [K/32][P].
-  // Xs = 0x4B400000 - 8 sum(q): the GEMM passes it as the MMA's C operand, so the int32 result is
-  // the bit pattern of 2^23 + 2^22 + (dot - 8 sum) as a float (Q4_0 offset correction + int -> float)
+  // one warp per 32-value block: int8 q = round(x / d), d = amax / 127. Token pairs are interleaved:
+  // Xd [P/2][K/32][2] (d of tokens 2p, 2p+1), Xs [P/2][K/32][4] = (c0, c1, c0, c1) with
+  // c = 0x4B400000 - 8 sum(q): the GEMM loads it as the MMA's C operand quad in one 128-bit read, so
+  // the int32 result is the bit pattern of 2^23 + 2^22 + (dot - 8 sum) as a float (Q4_0 offset
+  // correction + int -> float, no I2F). P must be even.
   size_t blk = (size_t)blockIdx.x * (blockDim.x / 32) + threadIdx.x / 32;
   int lane = threadIdx.x & 31;
   if (blk >= (size_t)P * (K / 32)) return;
@@ -1031,24 +1033,29 @@ extern "C" __global__ void k(const __nv_bfloat16* __restrict__ X, signed char* _
   Xq[blk * 32 + lane] = (signed char)q;
   int s = q;
   for (int o = 16; o; o >>= 1) s += __shfl_xor_sync(0xffffffffu, s, o);
-  size_t tok = blk / (K / 32), kb = blk % (K / 32);
-  if (lane == 0) { Xd[kb * P + tok] = d; Xs[kb * P + tok] = 0x4B400000 - 8 * s; }
+  size_t tok = blk / (K / 32), kb = blk % (K / 32), pr = ((tok >> 1) * (K / 32) + kb);
+  if (lane == 0) { Xd[pr * 2 + (tok & 1)] = d; Xs[pr * 4 + (tok & 1)] = Xs[pr * 4 + 2 + (tok & 1)] = 0x4B400000 - 8 * s; }
 }
 """
 
 
-def gemm_q4i8_source(WM: int, WN: int, MT: int, NT: int, epi: str = "store", KB: int = 4, MINB: int = 1) -> str:
+def gemm_q4i8_source(WM: int, WN: int, MT: int, NT: int, epi: str = "store", KB: int = 4, MINB: int = 1,
+                     WDEP: bool = False) -> str:
     """Prefill GEMM Y[P, N] = X[P, K] W[N, K]^T on int8 tensor cores (mma m16n8k32 u8 x s8 -> s32),
-    llama.cpp MMQ-style: W = Q4_0 (pack_q4_i8), X = per-32-block int8 (QUANT_Q8: Xq [P, K], Xd and Xs block-major [K/32, P];
-    P a multiple of 4).
+    llama.cpp MMQ-style: W = Q4_0 (pack_q4_i8), X = per-32-block int8 (QUANT_Q8: Xq [P, K], Xd and Xs
+    token-pair interleaved; P a multiple of 4). B fragments by ldmatrix.x4 (two k-blocks per load),
+    C operand quads (Q4_0 correction + magic float exponent) by one 128-bit shared load.
     Per k32 block: d = mma(nibbles q, xq) (exact int32), y += dw * dx * (d - 8 sum(xq)).
     Block tile BM = 16 MT WM weight rows x BN = 8 NT WN tokens; KB k32 blocks per stage; X tiles go
     global -> shared with cp.async (double buffer, rows padded to dodge bank conflicts), weights
     straight to registers one stage ahead. Epilogue through shared memory with _mma_epi (bias,
-    residual, SwiGLU fused). Grid (N / BM, ceil(P / BN))."""
+    residual, SwiGLU fused). Grid (ceil(P / BN), N / BM).
+    WDEP: the next stage's weight loads take a fake data dependency on this stage's weights. Global
+    loads complete out of order, so ptxas gives them no counted wait: it hoisted the prefetch next to
+    this stage's loads on one scoreboard, and the first wait covered both (prefetch distance zero)."""
     BM, BN = 16 * MT * WM, 8 * NT * WN
     XS = KB * 32 + 16
-    stage = BN * XS + BN * KB * 8
+    stage = BN * XS + BN * KB * 12
     smem = max(2 * stage, BM * (BN + 1) * 4)
     assert smem <= 48 * 1024, f"static shared memory {smem} > 48 KB"
     assert KB % 2 == 0
@@ -1076,7 +1083,9 @@ extern "C" __global__ void __launch_bounds__({32 * WM * WN}, {MINB}) k(
   const int warp = threadIdx.x >> 5, lane = threadIdx.x & 31, g = lane >> 2, t = lane & 3;
   const int wm = warp % WM, wn = warp / WM;
   const int nthr = {32 * WM * WN};
-  const int row0 = blockIdx.x * BM, n0 = blockIdx.y * BN;
+  // token tiles vary fastest: the ceil(P / BN) blocks sharing a weight tile run together, so weights
+  // come from DRAM once (weight-tile-fastest order re-read them ceil(P / BN) times)
+  const int row0 = blockIdx.y * BM, n0 = blockIdx.x * BN;
   const int C = K / 64, KBT = K / 32, stages = KBT / KB;
   int tile[MT];
   #pragma unroll
@@ -1087,52 +1096,75 @@ extern "C" __global__ void __launch_bounds__({32 * WM * WN}, {MINB}) k(
     #pragma unroll
     for (int n = 0; n < NT; ++n) c[m][n][0] = c[m][n][1] = c[m][n][2] = c[m][n][3] = 0.f;
   auto xs = [&](int st) {{ return sm + st * {stage}; }};
+  // per-thread copy pieces, addresses computed once: stage s adds s * (bytes per stage) to the source
+  constexpr int NX = (BN * KB * 2 + {32 * WM * WN} - 1) / {32 * WM * WN};
+  constexpr int NSC = ((BN / 2) * KB * 6 / 4 + {32 * WM * WN} - 1) / {32 * WM * WN};
+  const unsigned char* gsrc[NX + NSC]; unsigned soff[NX + NSC]; unsigned sinc[NX + NSC]; bool okp[NX + NSC], live[NX + NSC];
+  #pragma unroll
+  for (int u = 0; u < NX; ++u) {{
+    int i = threadIdx.x + u * nthr, tok = i / (KB * 2), piece = i % (KB * 2), gt = n0 + tok;
+    live[u] = i < BN * KB * 2; okp[u] = live[u] && gt < P;
+    gsrc[u] = reinterpret_cast<const unsigned char*>(Xq + (size_t)(okp[u] ? gt : 0) * K + piece * 16);
+    soff[u] = tok * XS + piece * 16; sinc[u] = okp[u] ? KB * 32 : 0;
+  }}
+  #pragma unroll
+  for (int u = 0; u < NSC; ++u) {{
+    int i = threadIdx.x + u * nthr, pr = i / (KB * 6 / 4), j = i % (KB * 6 / 4), gp = n0 / 2 + pr;
+    live[NX + u] = i < (BN / 2) * KB * 6 / 4; okp[NX + u] = live[NX + u] && 2 * gp < P;
+    size_t row = (size_t)(okp[NX + u] ? gp : 0) * KBT;
+    if (j < KB / 2) {{                                          // xd: [BN/2][KB][2] floats
+      gsrc[NX + u] = reinterpret_cast<const unsigned char*>(Xd + (row + 2 * j) * 2);
+      soff[NX + u] = BN * XS + (pr * KB + 2 * j) * 8; sinc[NX + u] = okp[NX + u] ? KB * 8 : 0;
+    }} else {{                                                  // xsum: [BN/2][KB][4] ints
+      gsrc[NX + u] = reinterpret_cast<const unsigned char*>(Xs + (row + (j - KB / 2)) * 4);
+      soff[NX + u] = BN * XS + BN * KB * 4 + (pr * KB + (j - KB / 2)) * 16; sinc[NX + u] = okp[NX + u] ? KB * 16 : 0;
+    }}
+  }}
   auto load_x = [&](int st, int s) {{
     unsigned char* base = xs(st);
-    for (int i = threadIdx.x; i < BN * KB * 2; i += nthr) {{
-      int tok = i / (KB * 2), piece = i % (KB * 2), gt = n0 + tok;
-      bool ok = gt < P;
-      cp16(base + tok * XS + piece * 16, Xq + (size_t)(ok ? gt : 0) * K + s * KB * 32 + piece * 16, ok);
-    }}
-    float* xd = reinterpret_cast<float*>(base + BN * XS);      // [KB][BN]
-    int* xsum = reinterpret_cast<int*>(xd + BN * KB);           // [KB][BN]
-    for (int i = threadIdx.x; i < KB * (BN / 4) * 2; i += nthr) {{
-      int which = i / (KB * (BN / 4)), j = i % (KB * (BN / 4)), kb = j / (BN / 4), piece = j % (BN / 4), gt = n0 + 4 * piece;
-      bool ok = gt < P;
-      size_t src = (size_t)(s * KB + kb) * P + (ok ? gt : 0);
-      if (which == 0) cp16(xd + kb * BN + 4 * piece, Xd + src, ok);
-      else cp16(xsum + kb * BN + 4 * piece, Xs + src, ok);
-    }}
+    #pragma unroll
+    for (int u = 0; u < NX + NSC; ++u)
+      if (live[u]) cp16(base + soff[u], gsrc[u] + (size_t)s * sinc[u], okp[u]);
     asm volatile("cp.async.commit_group;");
   }};
   uint4 wq[2][MT][KB / 2]; uint2 sq[2][MT][KB / 2];
-  auto load_w = [&](uint4 (&wr)[MT][KB / 2], uint2 (&sr)[MT][KB / 2], int s) {{
+  auto load_w = [&](uint4 (&wr)[MT][KB / 2], uint2 (&sr)[MT][KB / 2], int s, int z) {{
     #pragma unroll
     for (int m = 0; m < MT; ++m)
       #pragma unroll
       for (int j = 0; j < KB / 2; ++j) {{
-        size_t o = (size_t)tile[m] * C + s * (KB / 2) + j;
+        size_t o = (size_t)tile[m] * C + s * (KB / 2) + j + z;
         wr[m][j] = W[o * 32 + lane]; sr[m][j] = S[o * 8 + g];
       }}
   }};
   load_x(0, 0);
-  load_w(wq[0], sq[0], 0);
+  load_w(wq[0], sq[0], 0, 0);
   #pragma unroll 1
   for (int s0 = 0; s0 < stages; s0 += 2) {{
     #pragma unroll
     for (int p = 0; p < 2; ++p) {{
       const int s = s0 + p;
       if (s >= stages) break;
-      if (s + 1 < stages) {{ load_x((s + 1) & 1, s + 1); load_w(wq[p ^ 1], sq[p ^ 1], s + 1); }}
+      if (s + 1 < stages) {{ load_x((s + 1) & 1, s + 1); {"" if WDEP else "load_w(wq[p ^ 1], sq[p ^ 1], s + 1, 0);"} }}
       if (s + 1 < stages) asm volatile("cp.async.wait_group 1;"); else asm volatile("cp.async.wait_group 0;");
       __syncthreads();
+      {"load_w(wq[p ^ 1], sq[p ^ 1], min(s + 1, stages - 1), (int)(wq[p][0][0].x & sq[p][0][0].x & (unsigned)(K >> 30)));   // branch-free: a merge point makes ptxas wait on every load" if WDEP else ""}
       const unsigned char* xb = xs(s & 1);
-      const float* xd = reinterpret_cast<const float*>(xb + BN * XS) + wn * NT * 8 + 2 * t;
-      const int* xsum = reinterpret_cast<const int*>(xb + BN * XS + BN * KB * 4) + wn * NT * 8 + 2 * t;
-      const unsigned char* xr = xb + (wn * NT * 8 + g) * XS + 4 * t;
+      const float* xd = reinterpret_cast<const float*>(xb + BN * XS) + ((wn * NT * 8) / 2 + t) * KB * 2;
+      const int* xsum = reinterpret_cast<const int*>(xb + BN * XS + BN * KB * 4) + ((wn * NT * 8) / 2 + t) * KB * 4;
+      const unsigned xr = (unsigned)__cvta_generic_to_shared(xb + (wn * NT * 8 + (lane & 7)) * XS + 16 * (lane >> 3));
       #pragma unroll
-      for (int kb = 0; kb < KB; ++kb) {{
-        const int j = kb >> 1, hs = kb & 1;
+      for (int kp = 0; kp < KB / 2; ++kp) {{
+      unsigned bfr[NT][4]; float4 dxp[NT];
+      #pragma unroll
+      for (int n = 0; n < NT; ++n) {{
+        asm volatile("ldmatrix.sync.aligned.m8n8.x4.shared.b16 {{%0,%1,%2,%3}}, [%4];"
+                     : "=r"(bfr[n][0]), "=r"(bfr[n][1]), "=r"(bfr[n][2]), "=r"(bfr[n][3]) : "r"(xr + n * 8 * XS + kp * 64));
+        dxp[n] = *reinterpret_cast<const float4*>(xd + n * 4 * KB * 2 + kp * 4);
+      }}
+      #pragma unroll
+      for (int hs = 0; hs < 2; ++hs) {{
+        const int kb = 2 * kp + hs, j = kp;
         unsigned a[MT][4]; float dwA[MT], dwB[MT];
         #pragma unroll
         for (int m = 0; m < MT; ++m) {{
@@ -1145,23 +1177,22 @@ extern "C" __global__ void __launch_bounds__({32 * WM * WN}, {MINB}) k(
         }}
         #pragma unroll
         for (int n = 0; n < NT; ++n) {{
-          unsigned b0 = *reinterpret_cast<const unsigned*>(xr + n * 8 * XS + kb * 32);
-          unsigned b1 = *reinterpret_cast<const unsigned*>(xr + n * 8 * XS + kb * 32 + 16);
-          const float2 dx = *reinterpret_cast<const float2*>(xd + kb * BN + n * 8);
-          const int2 sx = *reinterpret_cast<const int2*>(xsum + kb * BN + n * 8);
-          const float dx0 = dx.x, dx1 = dx.y;
+          const unsigned b0 = bfr[n][2 * hs], b1 = bfr[n][2 * hs + 1];
+          const int4 sx = *reinterpret_cast<const int4*>(xsum + n * 4 * KB * 4 + kb * 4);
+          const float dx0 = hs ? dxp[n].z : dxp[n].x, dx1 = hs ? dxp[n].w : dxp[n].y;
           #pragma unroll
           for (int m = 0; m < MT; ++m) {{
             int d0, d1, d2, d3;
-            asm volatile("mma.sync.aligned.m16n8k32.row.col.s32.u8.s8.s32 {{%0,%1,%2,%3}}, {{%4,%5,%6,%7}}, {{%8,%9}}, {{%10,%11,%10,%11}};"
+            asm volatile("mma.sync.aligned.m16n8k32.row.col.s32.u8.s8.s32 {{%0,%1,%2,%3}}, {{%4,%5,%6,%7}}, {{%8,%9}}, {{%10,%11,%12,%13}};"
                          : "=r"(d0), "=r"(d1), "=r"(d2), "=r"(d3)
-                         : "r"(a[m][0]), "r"(a[m][1]), "r"(a[m][2]), "r"(a[m][3]), "r"(b0), "r"(b1), "r"(sx.x), "r"(sx.y));
+                         : "r"(a[m][0]), "r"(a[m][1]), "r"(a[m][2]), "r"(a[m][3]), "r"(b0), "r"(b1), "r"(sx.x), "r"(sx.y), "r"(sx.z), "r"(sx.w));
             c[m][n][0] = fmaf(dwA[m] * dx0, __int_as_float(d0) - 12582912.f, c[m][n][0]);
             c[m][n][1] = fmaf(dwA[m] * dx1, __int_as_float(d1) - 12582912.f, c[m][n][1]);
             c[m][n][2] = fmaf(dwB[m] * dx0, __int_as_float(d2) - 12582912.f, c[m][n][2]);
             c[m][n][3] = fmaf(dwB[m] * dx1, __int_as_float(d3) - 12582912.f, c[m][n][3]);
           }}
         }}
+      }}
       }}
       __syncthreads();
     }}
@@ -1185,6 +1216,206 @@ extern "C" __global__ void __launch_bounds__({32 * WM * WN}, {MINB}) k(
 }}
 """
 
+
+def gemm_q4i8_ms_source(WM: int, WN: int, MT: int, NT: int, epi: str = "store", KB: int = 2, NSTG: int = 3,
+                        MINB: int = 1, ABL: str = "") -> str:
+    """gemm_q4i8_source with weights through shared memory: a NSTG-deep cp.async ring holds X, its
+    scales AND the weight fragments + scales of each stage (one barrier per stage, CUTLASS-style
+    multistage). Why: the register version's weight prefetch had distance zero. Global loads complete
+    out of order, so ptxas gives them no counted wait; it put both stages' loads on one scoreboard
+    (the first wait covered the prefetch too), and with two stages of weights live it hits the
+    register cap of 3 blocks / SM and sinks or spills them whatever the source order. cp.async groups
+    are counted (wait_group NSTG - 2), so the prefetch distance is NSTG - 1 stages, and the weight
+    registers are freed. Weight tiles are fragment-packed (pack_q4_i8): lane l of a warp reads the
+    16 B it needs at tile * 512 + 16 l (conflict-free); the wn warps sharing rows read one copy.
+    Same args and grid as gemm_q4i8_source. ABL (timing ablations only, wrong results): "noepi" replaces
+    the per-block fp32 scaling with one add per output, "noimma" replaces the MMA with an integer op on
+    the same operands."""
+    if ABL == "noimma":
+        mma = "d0 = a[m][0] ^ b0 ^ sx.x; d1 = a[m][1] ^ b1 ^ sx.y; d2 = a[m][2] ^ b0 ^ sx.z; d3 = a[m][3] ^ b1 ^ sx.w;"
+    else:
+        mma = ('asm volatile("mma.sync.aligned.m16n8k32.row.col.s32.u8.s8.s32 {%0,%1,%2,%3}, {%4,%5,%6,%7}, {%8,%9}, {%10,%11,%12,%13};"\n'
+               '                         : "=r"(d0), "=r"(d1), "=r"(d2), "=r"(d3)\n'
+               '                         : "r"(a[m][0]), "r"(a[m][1]), "r"(a[m][2]), "r"(a[m][3]), "r"(b0), "r"(b1), "r"(sx.x), "r"(sx.y), "r"(sx.z), "r"(sx.w));')
+    if ABL == "noepi":
+        epi_ = ('c[m][n][0] += __int_as_float(d0); c[m][n][1] += __int_as_float(d1);\n'
+                '            c[m][n][2] += __int_as_float(d2); c[m][n][3] += __int_as_float(d3);')
+    else:
+        epi_ = ('c[m][n][0] = fmaf(dwA[m] * dx0, __int_as_float(d0) - 12582912.f, c[m][n][0]);\n'
+                '            c[m][n][1] = fmaf(dwA[m] * dx1, __int_as_float(d1) - 12582912.f, c[m][n][1]);\n'
+                '            c[m][n][2] = fmaf(dwB[m] * dx0, __int_as_float(d2) - 12582912.f, c[m][n][2]);\n'
+                '            c[m][n][3] = fmaf(dwB[m] * dx1, __int_as_float(d3) - 12582912.f, c[m][n][3]);')
+    BM, BN = 16 * MT * WM, 8 * NT * WN
+    XS = KB * 32 + 16
+    TW = (BM // 16) * (KB // 2)                                    # weight 16x64 tiles per stage
+    XB = BN * XS + BN * KB * 12                                    # X bytes per stage
+    stage = XB + TW * 576
+    smem = max(NSTG * stage, BM * (BN + 1) * 4)
+    assert smem <= 48 * 1024, f"static shared memory {smem} > 48 KB"
+    assert KB % 2 == 0 and NSTG >= 2
+    nthr = 32 * WM * WN
+    body = _mma_epi(epi).replace("red[rr + 1][b]", "RED(rr + 1, bl)")
+    return f"""
+#include <cuda_bf16.h>
+#include <cuda_fp16.h>
+#define MT {MT}
+#define NT {NT}
+#define WM {WM}
+#define KB {KB}
+#define BM {BM}
+#define BN {BN}
+#define XS {XS}
+#define NSTG {NSTG}
+#define RED(r, c) redp[(r) * (BN + 1) + (c)]
+__device__ __forceinline__ void cp16(void* dst, const void* src, bool valid) {{
+  unsigned d = (unsigned)__cvta_generic_to_shared(dst);
+  asm volatile("cp.async.cg.shared.global [%0], [%1], 16, %2;" :: "r"(d), "l"(src), "r"(valid ? 16 : 0));
+}}
+extern "C" __global__ void __launch_bounds__({nthr}, {MINB}) k(
+    const uint4* __restrict__ W, const uint2* __restrict__ S, const signed char* __restrict__ Xq,
+    const float* __restrict__ Xd, const int* __restrict__ Xs, void* Y, const void* AUX, int N, int K, int P)
+{{
+  __shared__ __align__(16) unsigned char sm[{smem}];
+  const int warp = threadIdx.x >> 5, lane = threadIdx.x & 31, g = lane >> 2, t = lane & 3;
+  const int wm = warp % WM, wn = warp / WM;
+  const int nthr = {nthr};
+  const int row0 = blockIdx.y * BM, n0 = blockIdx.x * BN;
+  const int C = K / 64, KBT = K / 32, stages = KBT / KB;
+  float c[MT][NT][4];
+  #pragma unroll
+  for (int m = 0; m < MT; ++m)
+    #pragma unroll
+    for (int n = 0; n < NT; ++n) c[m][n][0] = c[m][n][1] = c[m][n][2] = c[m][n][3] = 0.f;
+  // per-thread copy pieces, addresses computed once: stage s adds s * sinc to the source
+  constexpr int NX = (BN * KB * 2 + {nthr} - 1) / {nthr};
+  constexpr int NSC = ((BN / 2) * KB * 6 / 4 + {nthr} - 1) / {nthr};
+  constexpr int NW = ({TW} * 32 + {nthr} - 1) / {nthr};
+  constexpr int NS = ({TW} * 4 + {nthr} - 1) / {nthr};
+  constexpr int NP = NX + NSC + NW + NS;
+  const unsigned char* gsrc[NP]; unsigned soff[NP]; unsigned sinc[NP]; bool okp[NP], live[NP];
+  #pragma unroll
+  for (int u = 0; u < NX; ++u) {{
+    int i = threadIdx.x + u * nthr, tok = i / (KB * 2), piece = i % (KB * 2), gt = n0 + tok;
+    live[u] = i < BN * KB * 2; okp[u] = live[u] && gt < P;
+    gsrc[u] = reinterpret_cast<const unsigned char*>(Xq + (size_t)(okp[u] ? gt : 0) * K + piece * 16);
+    soff[u] = tok * XS + piece * 16; sinc[u] = okp[u] ? KB * 32 : 0;
+  }}
+  #pragma unroll
+  for (int u = 0; u < NSC; ++u) {{
+    const int v = NX + u;
+    int i = threadIdx.x + u * nthr, pr = i / (KB * 6 / 4), j = i % (KB * 6 / 4), gp = n0 / 2 + pr;
+    live[v] = i < (BN / 2) * KB * 6 / 4; okp[v] = live[v] && 2 * gp < P;
+    size_t row = (size_t)(okp[v] ? gp : 0) * KBT;
+    if (j < KB / 2) {{                                          // xd: [BN/2][KB][2] floats
+      gsrc[v] = reinterpret_cast<const unsigned char*>(Xd + (row + 2 * j) * 2);
+      soff[v] = BN * XS + (pr * KB + 2 * j) * 8; sinc[v] = okp[v] ? KB * 8 : 0;
+    }} else {{                                                  // xsum: [BN/2][KB][4] ints
+      gsrc[v] = reinterpret_cast<const unsigned char*>(Xs + (row + (j - KB / 2)) * 4);
+      soff[v] = BN * XS + BN * KB * 4 + (pr * KB + (j - KB / 2)) * 16; sinc[v] = okp[v] ? KB * 16 : 0;
+    }}
+  }}
+  #pragma unroll
+  for (int u = 0; u < NW; ++u) {{                              // weight tiles: [BM/16][KB/2] x 512 B
+    const int v = NX + NSC + u;
+    int i = threadIdx.x + u * nthr, tt = i / ((KB / 2) * 32), r = i % ((KB / 2) * 32);
+    live[v] = okp[v] = i < {TW} * 32;
+    const int tile = min(row0 / 16 + tt, N / 16 - 1);
+    gsrc[v] = reinterpret_cast<const unsigned char*>(W + (size_t)tile * C * 32 + r);
+    soff[v] = {XB} + i * 16; sinc[v] = (KB / 2) * 512;
+  }}
+  #pragma unroll
+  for (int u = 0; u < NS; ++u) {{                              // weight scales: [BM/16][KB/2] x 64 B
+    const int v = NX + NSC + NW + u;
+    int i = threadIdx.x + u * nthr, tt = i / ((KB / 2) * 4), r = i % ((KB / 2) * 4);
+    live[v] = okp[v] = i < {TW} * 4;
+    const int tile = min(row0 / 16 + tt, N / 16 - 1);
+    gsrc[v] = reinterpret_cast<const unsigned char*>(S + (size_t)tile * C * 8) + r * 16;
+    soff[v] = {XB + TW * 512} + i * 16; sinc[v] = (KB / 2) * 64;
+  }}
+  auto load = [&](int slot, int s) {{
+    unsigned char* base = sm + slot * {stage};
+    #pragma unroll
+    for (int u = 0; u < NP; ++u)
+      if (live[u]) cp16(base + soff[u], gsrc[u] + (size_t)s * sinc[u], okp[u]);
+  }};
+  #pragma unroll
+  for (int i = 0; i < NSTG - 1; ++i) {{
+    if (i < stages) load(i, i);
+    asm volatile("cp.async.commit_group;");
+  }}
+  int slot = 0, lslot = NSTG - 1;
+  #pragma unroll 1
+  for (int s = 0; s < stages; ++s) {{
+    asm volatile("cp.async.wait_group %0;" :: "n"(NSTG - 2));
+    __syncthreads();                                            // stage s landed; slot of s - 1 is free
+    if (s + NSTG - 1 < stages) load(lslot, s + NSTG - 1);
+    asm volatile("cp.async.commit_group;");
+    const unsigned char* xb = sm + slot * {stage};
+    const uint4* wsm = reinterpret_cast<const uint4*>(xb + {XB}) + (wm * MT) * (KB / 2) * 32 + lane;
+    const uint2* ssm = reinterpret_cast<const uint2*>(xb + {XB + TW * 512}) + (wm * MT) * (KB / 2) * 8 + g;
+    const float* xd = reinterpret_cast<const float*>(xb + BN * XS) + ((wn * NT * 8) / 2 + t) * KB * 2;
+    const int* xsum = reinterpret_cast<const int*>(xb + BN * XS + BN * KB * 4) + ((wn * NT * 8) / 2 + t) * KB * 4;
+    const unsigned xr = (unsigned)__cvta_generic_to_shared(xb + (wn * NT * 8 + (lane & 7)) * XS + 16 * (lane >> 3));
+    #pragma unroll
+    for (int kp = 0; kp < KB / 2; ++kp) {{
+      unsigned bfr[NT][4]; float4 dxp[NT]; uint4 wq[MT]; uint2 sq[MT];
+      #pragma unroll
+      for (int m = 0; m < MT; ++m) {{ wq[m] = wsm[(m * (KB / 2) + kp) * 32]; sq[m] = ssm[(m * (KB / 2) + kp) * 8]; }}
+      #pragma unroll
+      for (int n = 0; n < NT; ++n) {{
+        asm volatile("ldmatrix.sync.aligned.m8n8.x4.shared.b16 {{%0,%1,%2,%3}}, [%4];"
+                     : "=r"(bfr[n][0]), "=r"(bfr[n][1]), "=r"(bfr[n][2]), "=r"(bfr[n][3]) : "r"(xr + n * 8 * XS + kp * 64));
+        dxp[n] = *reinterpret_cast<const float4*>(xd + n * 4 * KB * 2 + kp * 4);
+      }}
+      #pragma unroll
+      for (int hs = 0; hs < 2; ++hs) {{
+        const int kb = 2 * kp + hs;
+        unsigned a[MT][4]; float dwA[MT], dwB[MT];
+        #pragma unroll
+        for (int m = 0; m < MT; ++m) {{
+          unsigned w0 = hs ? wq[m].z : wq[m].x, w1 = hs ? wq[m].w : wq[m].y;
+          a[m][0] = w0 & 0x0F0F0F0Fu; a[m][1] = (w0 >> 4) & 0x0F0F0F0Fu;
+          a[m][2] = w1 & 0x0F0F0F0Fu; a[m][3] = (w1 >> 4) & 0x0F0F0F0Fu;
+          unsigned sv = hs ? sq[m].y : sq[m].x;
+          __half2 h2 = *reinterpret_cast<__half2*>(&sv);
+          dwA[m] = __low2float(h2); dwB[m] = __high2float(h2);
+        }}
+        #pragma unroll
+        for (int n = 0; n < NT; ++n) {{
+          const unsigned b0 = bfr[n][2 * hs], b1 = bfr[n][2 * hs + 1];
+          const int4 sx = *reinterpret_cast<const int4*>(xsum + n * 4 * KB * 4 + kb * 4);
+          const float dx0 = hs ? dxp[n].z : dxp[n].x, dx1 = hs ? dxp[n].w : dxp[n].y;
+          #pragma unroll
+          for (int m = 0; m < MT; ++m) {{
+            int d0, d1, d2, d3;
+            {mma}
+            {epi_}
+          }}
+        }}
+      }}
+    }}
+    slot = slot == NSTG - 1 ? 0 : slot + 1; lslot = lslot == NSTG - 1 ? 0 : lslot + 1;
+  }}
+  asm volatile("cp.async.wait_group 0;");
+  __syncthreads();
+  float* redp = reinterpret_cast<float*>(sm);
+  #pragma unroll
+  for (int m = 0; m < MT; ++m)
+    #pragma unroll
+    for (int n = 0; n < NT; ++n) {{
+      const int rr = 16 * (wm * MT + m) + g, cc = wn * NT * 8 + n * 8 + 2 * t;
+      RED(rr, cc) = c[m][n][0]; RED(rr, cc + 1) = c[m][n][1];
+      RED(rr + 8, cc) = c[m][n][2]; RED(rr + 8, cc + 1) = c[m][n][3];
+    }}
+  __syncthreads();
+  for (int i = threadIdx.x; i < BM * BN; i += nthr) {{
+    const int rr = i % BM, bl = i / BM, b = n0 + bl, r = row0 + rr;
+    if (b >= P) continue;
+    float a = RED(rr, bl);
+    {body}
+  }}
+}}
+"""
 
 def flash_prefill_source(WQ: int = 4, maxlen: int = 512) -> str:
     """Causal prefill attention on tensor cores (FlashAttention-2 style, bf16 mma m16n8k16, fp32

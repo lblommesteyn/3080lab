@@ -1,7 +1,7 @@
 """Prefill GEMM: int8 tensor-core Q4_0 (lab/qwen_batched.gemm_q4i8_source) vs cuBLAS on fp16-dequantized
 weights, Qwen2.5-1.5B shapes, P tokens.
 
-  pcslurm submit -- python scripts/prefill_gemm_bench.py [P=512] [WM=4 WN=2 MT=2 NT=4 KB=4]
+  pcslurm submit -- python scripts/prefill_gemm_bench.py [P=512] [WM=4 WN=2 MT=2 NT=4 KB=4 MINB=1] [MS=1 NSTG=3]
 
 Error: max |Y - ref| / max |ref|, ref = fp32 X @ fp32 dequantized W. Ours includes the per-32 int8
 quantization of X (as llama.cpp's MMQ); its time is reported separately. Timing as batched_gemv_bench.
@@ -23,10 +23,10 @@ SHAPES = [("qkv", 2048, 1536), ("o", 1536, 1536), ("gu", 17920, 1536), ("down", 
 
 
 def main():
-    cfg = {"P": 512, "WM": 4, "WN": 2, "MT": 2, "NT": 4, "KB": 4, "MINB": 1}
+    cfg = {"P": 512, "WM": 4, "WN": 2, "MT": 2, "NT": 4, "KB": 4, "MINB": 1, "MS": 0, "NSTG": 3, "ABL": ""}
     for a in sys.argv[1:]:
         k, v = a.split("=")
-        cfg[k] = int(v)
+        cfg[k] = int(v) if v.lstrip("-").isdigit() else v
     print("config", cfg, flush=True)
     P = cfg["P"]
     torch.zeros(1, device="cuda")
@@ -47,10 +47,11 @@ def main():
         ref = X.float() @ w32.t()
         Xq = torch.zeros(P, K, dtype=torch.int8, device="cuda")
         Xd = torch.zeros(P, K // 32, device="cuda")
-        Xs = torch.zeros(P, K // 32, dtype=torch.int32, device="cuda")
+        Xs = torch.zeros(2 * P, K // 32, dtype=torch.int32, device="cuda")    # (c0, c1, c0, c1) quads per token pair
         nb = P * K // 32
         qargs = [X.data_ptr(), Xq.data_ptr(), Xd.data_ptr(), Xs.data_ptr(), ctypes.c_int32(P), ctypes.c_int32(K)]
-        kern = BB.Kern(QB.gemm_q4i8_source(cfg["WM"], cfg["WN"], cfg["MT"], cfg["NT"], "resid", cfg["KB"], cfg["MINB"]))
+        gen = (lambda *a: QB.gemm_q4i8_ms_source(*a[:6], cfg["NSTG"], a[6], cfg["ABL"])) if cfg["MS"] else QB.gemm_q4i8_source
+        kern = BB.Kern(gen(cfg["WM"], cfg["WN"], cfg["MT"], cfg["NT"], "resid", cfg["KB"], cfg["MINB"]))
         BM, BN = 16 * cfg["MT"] * cfg["WM"], 8 * cfg["NT"] * cfg["WN"]
         Y = torch.zeros(P, N, device="cuda")
         gargs = [Wp.data_ptr(), Sp.data_ptr(), Xq.data_ptr(), Xd.data_ptr(), Xs.data_ptr(), Y.data_ptr(), 0,
@@ -60,7 +61,7 @@ def main():
             quant.launch((nb + 7) // 8, 256, qargs)
 
         def run_g():
-            kern.launch(N // BM, 32 * cfg["WM"] * cfg["WN"], gargs, (P + BN - 1) // BN)
+            kern.launch((P + BN - 1) // BN, 32 * cfg["WM"] * cfg["WN"], gargs, N // BM)
         run_q(); run_g()
         torch.cuda.synchronize()
         err = float((Y - ref).abs().max() / ref.abs().max())

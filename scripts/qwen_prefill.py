@@ -1,6 +1,6 @@
 """Chunked prefill of Qwen2.5-1.5B (llama.cpp's Q4_0 GGUF weights): P prompt tokens of one sequence per pass.
 
-  pcslurm submit -- python scripts/qwen_prefill.py [P=128] [chunk=32,128] [modes=v2,cublas]
+  pcslurm submit -- python scripts/qwen_prefill.py [P=128] [chunk=32,128] [modes=v2,cublas,i8] [maxlen=..] [fa=0] [ms=0] [ppl=1]
 
 Per layer: RMSNorm, QKV, a K/V-write pass for all chunk tokens, causal attention (one block per head
 and token, the decode attention kernel with a token index from blockIdx.y on a shared KV cache),
@@ -54,6 +54,10 @@ extern "C" __global__ void k(const unsigned* __restrict__ W, const __half* __res
 V2CFG = D.CONFIG2
 FA = "fa=0" not in sys.argv
 I8CFG = (2, 2, 2, 4, 4, 3)       # gemm_q4i8 (WM, WN, MT, NT, KB, MINB), scripts/prefill_gemm_bench.py sweep
+MS = "ms=0" not in sys.argv      # i8 GEMM: multistage, weights through shared memory (gemm_q4i8_ms_source)
+# per GEMM (WM, WN, MT, NT, KB, NSTG, MINB), prefill_gemm_bench.py sweeps at P = 512: 128-row tiles cut the
+# re-reads of X for the wide matrices; o and down (N = 1536) need the 64-row tile to fill 68 SMs
+I8MS = {"qkv": (4, 2, 2, 4, 4, 2, 2), "o": (2, 2, 2, 4, 2, 3, 3), "gu": (4, 2, 2, 4, 4, 2, 2), "down": (2, 2, 2, 4, 2, 3, 3)}
 
 
 class Prefill:
@@ -93,17 +97,23 @@ class Prefill:
             self.ws = torch.zeros(4 * P * 2 * m.inter, device=dev)
             self.cnt = torch.zeros(2048, dtype=torch.int32, device=dev)
         elif mode == "i8":
-            WM, WN, MT, NT, KB, MINB = I8CFG
-            self.BM, self.BN, self.nthr = 16 * MT * WM, 8 * NT * WN, 32 * WM * WN
-            self.g = {name: Kern(QB.gemm_q4i8_source(WM, WN, MT, NT, epi, KB, MINB))
-                      for name, epi in (("qkv", "biasf"), ("o", "resid"), ("gu", "swiglu"), ("down", "resid"))}
+            self.g, self.tile = {}, {}
+            for name, epi in (("qkv", "biasf"), ("o", "resid"), ("gu", "swiglu"), ("down", "resid")):
+                if MS:
+                    WM, WN, MT, NT, KB, NSTG, MINB = I8MS[name]
+                    src = QB.gemm_q4i8_ms_source(WM, WN, MT, NT, epi, KB, NSTG, MINB)
+                else:
+                    WM, WN, MT, NT, KB, MINB = I8CFG
+                    src = QB.gemm_q4i8_source(WM, WN, MT, NT, epi, KB, MINB)
+                self.g[name] = Kern(src)
+                self.tile[name] = (16 * MT * WM, 8 * NT * WN, 32 * WM * WN)       # BM, BN, threads
             self.k_q = Kern(QB.QUANT_Q8)
             if not hasattr(m, "packed_i8"):
                 m.packed_i8 = [{name: QB.pack_q4_i8(*L[name]) for name in ("qkv", "o", "gu", "down")} for L in m.L]
             kmax = max(H, m.inter)
             self.xq = torch.zeros(P, kmax, dtype=torch.int8, device=dev)
             self.xd = torch.zeros(kmax // 32, P, device=dev)
-            self.xs = torch.zeros(kmax // 32, P, dtype=torch.int32, device=dev)
+            self.xs = torch.zeros(kmax // 32, 2 * P, dtype=torch.int32, device=dev)   # C quads per token pair
         else:
             self.k_deq = Kern(DEQ)
             self.w16 = torch.empty(2 * m.inter * H, dtype=torch.float16, device=dev)   # largest layer matrix
@@ -133,7 +143,8 @@ class Prefill:
         self.k_q.launch((nb + 7) // 8, 256, [X.data_ptr(), self.xq.data_ptr(), self.xd.data_ptr(), self.xs.data_ptr(),
                                              ctypes.c_int32(P), ctypes.c_int32(K)])
         W, S = self.m.packed_i8[i][name]
-        self.g[name].launch((N // self.BM, (P + self.BN - 1) // self.BN), self.nthr,
+        BM, BN, nthr = self.tile[name]
+        self.g[name].launch(((P + BN - 1) // BN, N // BM), nthr,
                             [W.data_ptr(), S.data_ptr(), self.xq.data_ptr(), self.xd.data_ptr(), self.xs.data_ptr(),
                              Y.data_ptr(), aux, ctypes.c_int32(N), ctypes.c_int32(K), ctypes.c_int32(P)])
 
@@ -266,6 +277,8 @@ def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     args = dict(a.split("=") for a in sys.argv[1:])
     P = int(args.get("P", 128))
+    # KV cache length (cache, RoPE tables, attention smem): default 512 (decode scripts); prompts need P <= maxlen
+    Q.MAX_LEN = int(args.get("maxlen", max(512, P)))
     chunks = [int(x) for x in args.get("chunk", "32,128").split(",")]
     modes = args.get("modes", "v2,cublas,i8").split(",")
     torch.zeros(1, device=dev)
