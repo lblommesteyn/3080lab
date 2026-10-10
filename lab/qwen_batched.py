@@ -254,6 +254,11 @@ def _mma_epi(epi: str) -> str:
       float u = red[rr + 1][b];
       ((__nv_bfloat16*)Y)[(size_t)b * (N / 2) + r / 2] = __float2bfloat16_rn(a / (1.f + __expf(-a)) * u);
     }"""
+    if epi == "swiglu16":   # as swiglu, fp16 output (input of a v3 GEMV)
+        return """if ((rr & 1) == 0 && r < N) {
+      float u = red[rr + 1][b];
+      ((__half*)Y)[(size_t)b * (N / 2) + r / 2] = __float2half_rn(a / (1.f + __expf(-a)) * u);
+    }"""
     store = {
         "store": "((__nv_bfloat16*)Y)[(size_t)b * N + r] = __float2bfloat16_rn(a);",
         "biasf": "((__nv_bfloat16*)Y)[(size_t)b * N + r] = __float2bfloat16_rn(a + ((const float*)AUX)[r]);",
@@ -457,7 +462,8 @@ def pack_q6_mma(L, Hb, SC, D):
     return Lp, Hp, SCp, Dp
 
 
-def gemv_v2_source(WM: int, WK: int, MT: int, B: int, epi: str = "store", PF: int = 1, KS: int = 1) -> str:
+def gemv_v2_source(WM: int, WK: int, MT: int, B: int, epi: str = "store", PF: int = 1, KS: int = 1,
+                   ACC16: bool = False) -> str:
     """Tensor-core Q4_0 x [B, K] on pack_q4_mma weights, for batched decode.
 
     Block = WM x WK warps; R = 16 * MT * WM rows. Each iteration the block stages
@@ -468,7 +474,8 @@ def gemv_v2_source(WM: int, WK: int, MT: int, B: int, epi: str = "store", PF: in
     reduced in a fixed order (deterministic). KS > 1 also splits K across gridDim.y = KS blocks
     (for short-N shapes like down, 96 row tiles on 68 SMs): each writes its partial to WS
     [KS][B][N] fp32, and the last block of a row tile (per-tile counter in CNT, self-resetting)
-    sums the KS partials in a fixed order and applies the epilogue."""
+    sums the KS partials in a fixed order and applies the epilogue. ACC16: the MMAs accumulate one
+    64-k chunk in fp16 (twice the fp32-accumulate rate on GA102), added to the fp32 sums per chunk."""
     NT = (B + 7) // 8
     R = 16 * MT * WM
     KC = 64 * WK
@@ -482,6 +489,7 @@ def gemv_v2_source(WM: int, WK: int, MT: int, B: int, epi: str = "store", PF: in
 #define WM {WM}
 #define WK {WK}
 #define PF {PF}
+#define ACC16 {int(ACC16)}
 __device__ __forceinline__ unsigned dq(unsigned w, int j, unsigned d2) {{
   unsigned h = ((w >> (4 * j)) & 0x000F000Fu) | 0x64006400u;
   __half2 v = __hsub2(*reinterpret_cast<__half2*>(&h), __float2half2_rn(1032.f));
@@ -558,6 +566,13 @@ extern "C" __global__ void __launch_bounds__({32 * WM * WK}) k(
           dA[m][0] = __byte_perm(lo, 0, 0x1010); dB[m][0] = __byte_perm(lo, 0, 0x3232);
           dA[m][1] = __byte_perm(hi, 0, 0x1010); dB[m][1] = __byte_perm(hi, 0, 0x3232);
         }}
+#if ACC16
+        unsigned hc[MT][NT][2];
+        #pragma unroll
+        for (int m = 0; m < MT; ++m)
+          #pragma unroll
+          for (int n = 0; n < NT; ++n) hc[m][n][0] = hc[m][n][1] = 0u;
+#endif
         #pragma unroll
         for (int h = 0; h < 2; ++h) {{
           unsigned bf[NT][4];
@@ -581,11 +596,27 @@ extern "C" __global__ void __launch_bounds__({32 * WM * WK}) k(
             for (int n = 0; n < NT; ++n)
               #pragma unroll
               for (int m = 0; m < MT; ++m)
+#if ACC16
+                asm volatile("mma.sync.aligned.m16n8k16.row.col.f16.f16.f16.f16 {{%0,%1}}, {{%2,%3,%4,%5}}, {{%6,%7}}, {{%0,%1}};"
+                             : "+r"(hc[m][n][0]), "+r"(hc[m][n][1])
+                             : "r"(a[m][0]), "r"(a[m][1]), "r"(a[m][2]), "r"(a[m][3]), "r"(bf[n][2 * ss]), "r"(bf[n][2 * ss + 1]));
+#else
                 asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 {{%0,%1,%2,%3}}, {{%4,%5,%6,%7}}, {{%8,%9}}, {{%0,%1,%2,%3}};"
                              : "+f"(c[m][n][0]), "+f"(c[m][n][1]), "+f"(c[m][n][2]), "+f"(c[m][n][3])
                              : "r"(a[m][0]), "r"(a[m][1]), "r"(a[m][2]), "r"(a[m][3]), "r"(bf[n][2 * ss]), "r"(bf[n][2 * ss + 1]));
+#endif
           }}
         }}
+#if ACC16
+        #pragma unroll
+        for (int m = 0; m < MT; ++m)
+          #pragma unroll
+          for (int n = 0; n < NT; ++n) {{
+            float2 lo = __half22float2(*reinterpret_cast<__half2*>(&hc[m][n][0]));
+            float2 hi = __half22float2(*reinterpret_cast<__half2*>(&hc[m][n][1]));
+            c[m][n][0] += lo.x; c[m][n][1] += lo.y; c[m][n][2] += hi.x; c[m][n][3] += hi.y;
+          }}
+#endif
       }}
     }}
   }}
@@ -796,5 +827,156 @@ extern "C" __global__ void __launch_bounds__({32 * WM * WK}) k(
     int rr = i % {R}, b = i / {R}, r = row0 + rr;
     if (r < N) Y[(size_t)b * N + r] = red[rr][b];
   }}
+}}
+"""
+
+
+def gemv_v3_source(WM: int, WK: int, MT: int, B: int, epi: str = "store", NS: int = 3, KS: int = 1) -> str:
+    """gemv_v2_source with an asynchronous pipeline: the input X is fp16 already (the producers
+    write fp16), and both X chunks and the fragment-packed weights go global -> shared memory with
+    cp.async through an NS-stage ring, NS - 1 iterations ahead, one barrier per iteration. v2
+    ablations: staging (load + bf16 -> fp16 + store) was a third of the B = 32 time, and the
+    synchronous weight loads most of the B = 8 time, while deeper register prefetch made it worse.
+    Same arguments as v2 (X is const __half*)."""
+    NT = (B + 7) // 8
+    R = 16 * MT * WM
+    KC = 64 * WK
+    XS = KC + 8
+    nw = WM * WK
+    smem = NS * (NT * 8 * XS * 2 + nw * MT * (512 + 64)) + R * NT * 8 * 4
+    assert smem <= 48 * 1024, f"static shared memory {smem} B > 48 KB"
+    return f"""
+#include <cuda_bf16.h>
+#include <cuda_fp16.h>
+#define B_ {B}
+#define NT {NT}
+#define MT {MT}
+#define WM {WM}
+#define WK {WK}
+#define NS {NS}
+__device__ __forceinline__ unsigned dq(unsigned w, int j, unsigned d2) {{
+  unsigned h = ((w >> (4 * j)) & 0x000F000Fu) | 0x64006400u;
+  __half2 v = __hsub2(*reinterpret_cast<__half2*>(&h), __float2half2_rn(1032.f));
+  v = __hmul2(v, *reinterpret_cast<__half2*>(&d2));
+  return *reinterpret_cast<unsigned*>(&v);
+}}
+__device__ __forceinline__ void cp16(void* dst, const void* src, bool valid) {{
+  unsigned d = (unsigned)__cvta_generic_to_shared(dst);
+  asm volatile("cp.async.cg.shared.global [%0], [%1], 16, %2;" :: "r"(d), "l"(src), "r"(valid ? 16 : 0));
+}}
+__device__ __forceinline__ void cp8(void* dst, const void* src) {{
+  unsigned d = (unsigned)__cvta_generic_to_shared(dst);
+  asm volatile("cp.async.ca.shared.global [%0], [%1], 8;" :: "r"(d), "l"(src));
+}}
+extern "C" __global__ void __launch_bounds__({32 * nw}) k(
+    const uint4* __restrict__ W, const uint2* __restrict__ S, const __half* __restrict__ X,
+    void* Y, const void* AUX, int N, int K, float* __restrict__ WS, int* __restrict__ CNT)
+{{
+  __shared__ __align__(16) __half xs[NS][NT * 8][{XS}];
+  __shared__ __align__(16) uint4 wsm[NS][{nw}][MT][32];
+  __shared__ __align__(16) uint2 ssm[NS][{nw}][MT][8];
+  __shared__ float red[{R}][NT * 8];
+  const int warp = threadIdx.x >> 5, lane = threadIdx.x & 31, g = lane >> 2, t = lane & 3;
+  const int wm = warp % WM, wk = warp / WM;
+  const int nthr = 32 * WM * WK;
+  const int row0 = blockIdx.x * {R};
+  const int C = K / 64, T = N / 16;
+  const int Cy = (C + {KS} - 1) / {KS}, cb = blockIdx.y * Cy, ce = min(C, cb + Cy);
+  const int iters = (ce - cb + WK - 1) / WK;
+  for (int i = threadIdx.x; i < NS * (NT * 8 - B_) * {XS}; i += nthr) {{
+    int st = i / ((NT * 8 - B_) * {XS}), r = i % ((NT * 8 - B_) * {XS});
+    xs[st][B_ + r / {XS}][r % {XS}] = __float2half(0.f);
+  }}
+  int tile[MT];
+  #pragma unroll
+  for (int m = 0; m < MT; ++m) tile[m] = min(row0 / 16 + wm * MT + m, T - 1);
+  float c[MT][NT][4];
+  #pragma unroll
+  for (int m = 0; m < MT; ++m)
+    #pragma unroll
+    for (int n = 0; n < NT; ++n) c[m][n][0] = c[m][n][1] = c[m][n][2] = c[m][n][3] = 0.f;
+  auto issue = [&](int itq) {{
+    if (itq < iters) {{
+      const int st = itq % NS, k0 = (cb + itq * WK) * 64;
+      for (int i = threadIdx.x; i < B_ * {KC // 8}; i += nthr) {{
+        int b = i / {KC // 8}, kk = (i % {KC // 8}) * 8;
+        bool ok = k0 + kk < K;
+        cp16(&xs[st][b][kk], X + (size_t)b * K + (ok ? k0 + kk : 0), ok);
+      }}
+      const int ch = cb + itq * WK + wk;
+      if (ch < ce) {{
+        #pragma unroll
+        for (int m = 0; m < MT; ++m) {{
+          cp16(&wsm[st][warp][m][lane], W + ((size_t)tile[m] * C + ch) * 32 + lane, true);
+          if (lane < 8) cp8(&ssm[st][warp][m][lane], S + ((size_t)tile[m] * C + ch) * 8 + lane);
+        }}
+      }}
+    }}
+    asm volatile("cp.async.commit_group;");
+  }};
+  #pragma unroll
+  for (int p = 0; p < NS - 1; ++p) issue(p);
+  #pragma unroll 1
+  for (int it = 0; it < iters; ++it) {{
+    asm volatile("cp.async.wait_group %0;" :: "n"(NS - 2));
+    __syncthreads();
+    issue(it + NS - 1);
+    const int st = it % NS;
+    if (cb + it * WK + wk < ce) {{
+      unsigned dA[MT][2], dB[MT][2];
+      uint4 wq[MT];
+      #pragma unroll
+      for (int m = 0; m < MT; ++m) {{
+        wq[m] = wsm[st][warp][m][lane];
+        uint2 sv = ssm[st][warp][m][g];
+        dA[m][0] = __byte_perm(sv.x, 0, 0x1010); dB[m][0] = __byte_perm(sv.x, 0, 0x3232);
+        dA[m][1] = __byte_perm(sv.y, 0, 0x1010); dB[m][1] = __byte_perm(sv.y, 0, 0x3232);
+      }}
+      #pragma unroll
+      for (int h = 0; h < 2; ++h) {{
+        unsigned bf[NT][4];
+        #pragma unroll
+        for (int n = 0; n < NT; ++n) {{
+          unsigned addr = (unsigned)__cvta_generic_to_shared(&xs[st][n * 8 + (lane & 7)][wk * 64 + h * 32 + 8 * (lane >> 3)]);
+          asm volatile("ldmatrix.sync.aligned.m8n8.x4.shared.b16 {{%0,%1,%2,%3}}, [%4];"
+                       : "=r"(bf[n][0]), "=r"(bf[n][1]), "=r"(bf[n][2]), "=r"(bf[n][3]) : "r"(addr));
+        }}
+        #pragma unroll
+        for (int ss = 0; ss < 2; ++ss) {{
+          const int s = 2 * h + ss;
+          unsigned a[MT][4];
+          #pragma unroll
+          for (int m = 0; m < MT; ++m) {{
+            unsigned w = s == 0 ? wq[m].x : s == 1 ? wq[m].y : s == 2 ? wq[m].z : wq[m].w;
+            a[m][0] = dq(w, 0, dA[m][h]); a[m][1] = dq(w, 1, dB[m][h]);
+            a[m][2] = dq(w, 2, dA[m][h]); a[m][3] = dq(w, 3, dB[m][h]);
+          }}
+          #pragma unroll
+          for (int n = 0; n < NT; ++n)
+            #pragma unroll
+            for (int m = 0; m < MT; ++m)
+              asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 {{%0,%1,%2,%3}}, {{%4,%5,%6,%7}}, {{%8,%9}}, {{%0,%1,%2,%3}};"
+                           : "+f"(c[m][n][0]), "+f"(c[m][n][1]), "+f"(c[m][n][2]), "+f"(c[m][n][3])
+                           : "r"(a[m][0]), "r"(a[m][1]), "r"(a[m][2]), "r"(a[m][3]), "r"(bf[n][2 * ss]), "r"(bf[n][2 * ss + 1]));
+        }}
+      }}
+    }}
+  }}
+  asm volatile("cp.async.wait_group 0;");
+  for (int s = 0; s < WK; ++s) {{
+    if (wk == s) {{
+      #pragma unroll
+      for (int m = 0; m < MT; ++m)
+        #pragma unroll
+        for (int n = 0; n < NT; ++n) {{
+          float* r0 = &red[16 * (wm * MT + m) + g][n * 8 + 2 * t];
+          float* r8 = &red[16 * (wm * MT + m) + g + 8][n * 8 + 2 * t];
+          if (s == 0) {{ r0[0] = c[m][n][0]; r0[1] = c[m][n][1]; r8[0] = c[m][n][2]; r8[1] = c[m][n][3]; }}
+          else {{ r0[0] += c[m][n][0]; r0[1] += c[m][n][1]; r8[0] += c[m][n][2]; r8[1] += c[m][n][3]; }}
+        }}
+    }}
+    __syncthreads();
+  }}
+{_v2_tail(R, KS, epi)}
 }}
 """

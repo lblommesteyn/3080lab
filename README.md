@@ -654,6 +654,17 @@ single-sequence decode (509) is still better there.
 | down 1536 x 8960 | 20.3 (1,4,1,4) | 26.0 (1,4,1,4) | 41.6 (2,2,1,4) |
 | sum per layer, v2 (v1 tuned) | 64 (81.5) | 79 (124) | 124 (184) |
 
+**What did not help after v2** (gate_up at B = 32 is 55 us, the fp32-accumulate tensor-core floor is 30 us):
+
+| hypothesis | test | result |
+|---|---|---|
+| tensor-core rate binds (fp32 accumulate is half rate on GA102) | `ACC16`: fp16 accumulation per 64-k chunk, flushed to fp32 | 53.5-57.9 us, no gain: not MMA-bound |
+| weight-load latency binds (constant weights: 29.6 -> 18.3 us at B = 8) | register prefetch 2-3 iterations ahead (`PF`) | slower (gu B = 32 69-84 us), more registers and partial groups |
+| input staging binds (skipping it: 58 -> 39 us at B = 32) | `gemv_v3_source`: producers write fp16, X and weights via `cp.async` through a 2-4 stage shared-memory ring, one barrier per iteration | gu 54.5 us, qkv/o 1-2 us faster, down slower: the ring's shared memory (up to 47 KB per block) cuts occupancy; not integrated |
+
+Dequantization is not a cost (replacing it: 58.1 -> 54.1 us). Removing the MMAs is not a valid
+ablation: the compiler then deletes the dequantization and weight loads that only fed them.
+
 With v2, every B (32 included) matches the single-sequence decode for 73-74 of 128 tokens before
 diverging at a near-tie. `--v1` selects the old kernels.
 

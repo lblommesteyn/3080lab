@@ -69,18 +69,22 @@ VARIANT = {}
 MMA = False
 BIG = False
 V2 = False
+V3 = False
 
 
 def main():
     global VARIANT
     S_ = int(sys.argv[1]) if len(sys.argv) > 1 else 2
-    global MMA, BIG, V2
+    global MMA, BIG, V2, V3
     for a in sys.argv[2:]:
         if a == "mma":
             MMA = True
             continue
         if a == "v2":              # S is ignored; VARIANT = WM, WK, MT, PF
             MMA = V2 = True
+            continue
+        if a == "v3":              # VARIANT = WM, WK, MT, NS, KS; fp16 X
+            MMA = V2 = V3 = True
             continue
         if a == "big":
             BIG = True
@@ -113,8 +117,11 @@ def main():
                                                        ctypes.c_int32(K)])
             Wb, Sb, blk, extra, gy = W, Sc, 32 * S_, [], 1
             if V2:
-                v = {"WM": 4, "WK": 2, "MT": 2, "PF": 1, "KS": 1, **VARIANT}
-                batched = Kern(QB.gemv_v2_source(v["WM"], v["WK"], v["MT"], B, epi, v["PF"], v["KS"]))
+                v = {"WM": 4, "WK": 2, "MT": 2, "PF": 1, "KS": 1, "ACC16": 0, **VARIANT}
+                if V3:
+                    batched = Kern(QB.gemv_v3_source(v["WM"], v["WK"], v["MT"], B, epi, VARIANT.get("NS", 3), v["KS"]))
+                else:
+                    batched = Kern(QB.gemv_v2_source(v["WM"], v["WK"], v["MT"], B, epi, v["PF"], v["KS"], bool(v["ACC16"])))
                 extra = [WS.data_ptr(), CNT.data_ptr()]
                 gy = v["KS"]
                 R = 16 * v["MT"] * v["WM"]
@@ -124,7 +131,8 @@ def main():
                 batched = Kern(QB.gemv_mma_source(S_, B, epi, **VARIANT) if MMA else QB.gemv_batched_source(S_, B, epi, **VARIANT))
                 grid_b = (N + 16 * VARIANT.get("MT", 1) - 1) // (16 * VARIANT.get("MT", 1)) if MMA else (N + 3) // 4
             Y = torch.zeros(B, nout, dtype=ytype, device=dev)
-            batched.launch(grid_b, blk, [Wb.data_ptr(), Sb.data_ptr(), X.data_ptr(), Y.data_ptr(),
+            Xin = X.half() if V3 else X
+            batched.launch(grid_b, blk, [Wb.data_ptr(), Sb.data_ptr(), Xin.data_ptr(), Y.data_ptr(),
                                          aux.data_ptr(), ctypes.c_int32(N), ctypes.c_int32(K), *extra], gy)
             torch.cuda.synchronize()
             err = float((Y.float() - Yref.float()).abs().max() / Yref.float().abs().max().clamp_min(1e-6))
@@ -136,7 +144,7 @@ def main():
                                                            ctypes.c_int32(K)])
 
             def run_batched():
-                batched.launch(grid_b, blk, [Wb.data_ptr(), Sb.data_ptr(), X.data_ptr(), Y.data_ptr(),
+                batched.launch(grid_b, blk, [Wb.data_ptr(), Sb.data_ptr(), Xin.data_ptr(), Y.data_ptr(),
                                              aux.data_ptr(), ctypes.c_int32(N), ctypes.c_int32(K), *extra], gy)
             ts, tb = timeit(run_single), timeit(run_batched)
             row.append(f"B{B}: {ts:6.1f} -> {tb:6.1f} us ({ts / tb:4.2f}x, {batched.regs}r, err {err:.1e})")
