@@ -625,9 +625,33 @@ config at B = 32 it matches for 84 tokens again, at 4607 tok/s.
 |---|---|---|---|---|---|
 | ours, S = 8, U = 4, MT = 1 | 342 | 1258 | 2133 | 2989 | 3556 |
 | ours, tuned per shape | | 1278 | 2501 | 3618 | **5002** |
-| ours, tuned + Q6_K tensor-core head | | **1384** | **2680** | **3717** | (cuBLAS head) |
+| ours, tuned + Q6_K tensor-core head | | 1384 | 2680 | 3717 | (cuBLAS head) |
+| ours, v2 GEMVs (packed weights, shared-memory inputs) | | **1753** | **3248** | **5191** | **6595** |
 | llama.cpp b11485 | 336 | 964 | 1420 | 2424 | 3566 |
-| ratio, best | | **1.44** | **1.89** | **1.53** | **1.40** |
+| ratio, best | | **1.82** | **2.29** | **2.14** | **1.85** |
+
+**v2 GEMVs** (`pack_q4_mma`, `gemv_v2_source`). Three changes to the tensor-core kernel:
+1. Weights are repacked once into fragment order: per 16 x 64 tile each lane loads one uint4
+   (a warp reads 512 contiguous bytes), and `(w >> 4j) & 0x000F000F` is A register j as a nibble
+   pair. v1 had all 4 lanes of a row group load the same 16 bytes and pick their nibbles.
+   Scales are 8 bytes per row group, read as a broadcast; total bytes equal Q4_0.
+2. Each block stages its input chunk in shared memory once (bf16 -> fp16), and warps read B
+   fragments with `ldmatrix.x4`. v1 re-read and re-converted the whole input per 16-row tile.
+   At B = 32 that was 7x the weight bytes in cache traffic.
+3. For short-N shapes (down: 96 row tiles on 68 SMs), K is also split across KS blocks. Partials
+   go to a workspace, and the last block per tile (self-resetting counter) sums them in a fixed
+   order. The result stays deterministic.
+
+| us per launch, best (WM, WK, MT, KS) | B = 8 | 16 | 32 |
+|---|---|---|---|
+| qkv 2048 x 1536 | 7.8 (1,4,1,4) | 8.9 (2,4,1,2) | 14.0 (2,4,1,2) |
+| o 1536 x 1536 | 7.1 (1,8,1,2) | 8.7 (2,4,1,2) | 13.3 (2,4,1,1) |
+| gate_up 17920 x 1536 | 28.6 (4,2,2,1) | 35.4 (2,4,1,1) | 55.3 (2,4,1,1) |
+| down 1536 x 8960 | 20.3 (1,4,1,4) | 26.0 (1,4,1,4) | 41.6 (2,2,1,4) |
+| sum per layer, v2 (v1 tuned) | 64 (81.5) | 79 (124) | 124 (184) |
+
+With v2, every B (32 included) matches the single-sequence decode for 73-74 of 128 tokens before
+diverging at a near-tie. `--v1` selects the old kernels.
 
 **LM head** (`head_q6_mma_source`, `scripts/head_bench.py`). The fp16-dequantized head reads 467 MB
 per step; Q6_K is 191 MB. The tensor-core kernel keeps each sub-block's raw q - 32 in the A

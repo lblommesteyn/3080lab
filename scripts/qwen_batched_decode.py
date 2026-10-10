@@ -38,6 +38,13 @@ CONFIG = {
     16: {"qkv": (8, 4, 2), "o": (8, 4, 2), "gu": (8, 2, 2), "down": (16, 2, 2)},
     32: {"qkv": (8, 4, 2), "o": (8, 4, 2), "gu": (4, 2, 4), "down": (8, 4, 2)},
 }
+# v2 GEMVs (packed fragment-order weights): (WM, WK, MT, KS) per shape, from batched_gemv_bench.py v2 sweeps
+CONFIG2 = {
+    8: {"qkv": (1, 4, 1, 4), "o": (1, 8, 1, 2), "gu": (4, 2, 2, 1), "down": (1, 4, 1, 4)},
+    16: {"qkv": (2, 4, 1, 2), "o": (2, 4, 1, 2), "gu": (2, 4, 1, 1), "down": (1, 4, 1, 4)},
+    32: {"qkv": (2, 4, 1, 2), "o": (2, 4, 1, 1), "gu": (2, 4, 1, 1), "down": (2, 2, 1, 4)},
+}
+V2 = "--v1" not in sys.argv
 HEAD = {8: (6, 4, 1), 16: (8, 2, 2), 32: None}      # Q6_K head (S, U, MT), from scripts/head_bench.py; None = cuBLAS fp16
 
 
@@ -91,8 +98,17 @@ class Batched:
         bucket = 8 if B <= 8 else 16 if B <= 16 else 32
         cfg = CONFIG[bucket]
         self.cfg = cfg
-        self.g = {name: Kern(QB.gemv_mma_source(cfg[name][0], B, epi, cfg[name][1], cfg[name][2])) for name, epi in
-                  (("qkv", "biasf"), ("o", "resid"), ("gu", "swiglu"), ("down", "resid"))}
+        if V2:
+            self.cfg = cfg = CONFIG2[bucket]
+            self.g = {name: Kern(QB.gemv_v2_source(cfg[name][0], cfg[name][1], cfg[name][2], B, epi, 1, cfg[name][3]))
+                      for name, epi in (("qkv", "biasf"), ("o", "resid"), ("gu", "swiglu"), ("down", "resid"))}
+            if not hasattr(m, "packed"):
+                m.packed = [{name: QB.pack_q4_mma(*L[name]) for name in ("qkv", "o", "gu", "down")} for L in m.L]
+            self.ws = torch.zeros(4 * B * 2 * m.inter, device=dev)
+            self.cnt = torch.zeros(2048, dtype=torch.int32, device=dev)
+        else:
+            self.g = {name: Kern(QB.gemv_mma_source(cfg[name][0], B, epi, cfg[name][1], cfg[name][2])) for name, epi in
+                      (("qkv", "biasf"), ("o", "resid"), ("gu", "swiglu"), ("down", "resid"))}
         self.k_emb = Kern(batchify(KS.EMBED_F32, "tok += b_; h += (size_t)b_ * H;"))
         self.k_rms = Kern(batchify(KS.RMSNORM_F32W_1P, "h += (size_t)b_ * H; out += (size_t)b_ * H;"))
         attn = KS.ATTN4 % {"maxlen": Q.MAX_LEN}
@@ -110,6 +126,14 @@ class Batched:
             self.head16 = m.head16
 
     def gemv(self, name, wsplit, X, Y, aux, N, K):
+        if V2:
+            W, S = self.m.packed[self.layer][name]
+            WM, WK, MT, KS = self.cfg[name]
+            R = 16 * MT * WM
+            self.g[name].launch(((N + R - 1) // R, KS), 32 * WM * WK,
+                                [W.data_ptr(), S.data_ptr(), X.data_ptr(), Y.data_ptr(), aux, ctypes.c_int32(N),
+                                 ctypes.c_int32(K), self.ws.data_ptr(), self.cnt.data_ptr()])
+            return
         W, S = wsplit
         S_, _, MT = self.cfg[name]
         self.g[name].launch((N + 16 * MT - 1) // (16 * MT), 32 * S_, [W.data_ptr(), S.data_ptr(), X.data_ptr(), Y.data_ptr(),
@@ -124,6 +148,7 @@ class Batched:
         self.k_emb.launch((4, B), 512, [m.embed.data_ptr(), self.tok.data_ptr(), self.h.data_ptr(), ctypes.c_int32(H)])
         scale = ctypes.c_float(1.0 / math.sqrt(m.hd))
         for i, L in enumerate(m.L):
+            self.layer = i
             self.rms(L["ln1"])
             self.gemv("qkv", L["qkv"], self.x, self.qkv, L["qkv_b"].data_ptr(), self.nq, H)
             self.k_attn.launch((m.nh, B), 512, [self.qkv.data_ptr(), m.cos.data_ptr(), m.sin.data_ptr(),
