@@ -402,21 +402,59 @@ def pack_q4_mma(W, S):
     T, C = N // 16, K // 64
     w = W.to(torch.int64) & 0xFFFFFFFF
     q = torch.stack([(w >> (4 * i)) & 15 for i in range(8)], -1).reshape(N, K)
-    Q = q.reshape(T, 16, C, 64)
-    top, bot = Q[:, :8], Q[:, 8:]                                   # [T, 8(g), C, 64]
-    s = torch.arange(4, device=W.device)[:, None]
-    t = torch.arange(4, device=W.device)[None, :]
-    k0 = (16 * s + 2 * t).reshape(-1)                               # (s, t) flattened
-    word = torch.zeros(T, 8, C, 16, dtype=torch.int64, device=W.device)
-    for byte, off in enumerate((0, 8, 1, 9)):
-        word |= (top[..., k0 + off] | (bot[..., k0 + off] << 4)) << (8 * byte)
-    word = word.reshape(T, 8, C, 4, 4).permute(0, 2, 1, 4, 3)       # [T, C, g, t, s]
-    word = torch.where(word >= 2**31, word - 2**32, word).to(torch.int32)
-    Wp = word.reshape(T, C, 32, 4).contiguous()
+    Wp = _i32(_frag_words(q))
     Sv = S.reshape(T, 16, C, 2)
     Sp = torch.stack([Sv[:, :8, :, 0], Sv[:, 8:, :, 0], Sv[:, :8, :, 1], Sv[:, 8:, :, 1]], -1)  # [T, 8, C, 4]
     Sp = Sp.permute(0, 2, 1, 3).contiguous()
     return Wp, Sp
+
+
+def _frag_words(q):
+    """q int64 [N, K] of 4-bit values -> int64 [N/16, K/64, 32, 4] fragment-order words (see pack_q4_mma)."""
+    import torch
+    N, K = q.shape
+    T, C = N // 16, K // 64
+    Q = q.reshape(T, 16, C, 64)
+    top, bot = Q[:, :8], Q[:, 8:]                                   # [T, 8(g), C, 64]
+    s = torch.arange(4, device=q.device)[:, None]
+    t = torch.arange(4, device=q.device)[None, :]
+    k0 = (16 * s + 2 * t).reshape(-1)                               # (s, t) flattened
+    word = torch.zeros(T, 8, C, 16, dtype=torch.int64, device=q.device)
+    for byte, off in enumerate((0, 8, 1, 9)):
+        word |= (top[..., k0 + off] | (bot[..., k0 + off] << 4)) << (8 * byte)
+    word = word.reshape(T, 8, C, 4, 4).permute(0, 2, 1, 4, 3)       # [T, C, g, t, s]
+    return word.reshape(T, C, 32, 4)
+
+
+def _i32(word):
+    import torch
+    return torch.where(word >= 2**31, word - 2**32, word).to(torch.int32).contiguous()
+
+
+def pack_q6_mma(L, Hb, SC, D):
+    """Repack the Q6_K-exact head from qwen_gguf (L, Hb, SC, D; see head_q6_mma_source) into fragment
+    order for head_v2_source, same 6.5625 bits per weight:
+      Lp  int32 [T, C, 32, 4]  low nibbles, exactly the pack_q4_mma layout
+      Hp  int32 [T, C, 32, 2]  high 2-bit fields in the same nibble slots; word 0 holds k-steps 0
+                               (bits 0-1 of each slot) and 1 (bits 2-3), word 1 k-steps 2 and 3
+      SCp int8  [T, C, 8, 8]   sub-block scales: row g k-steps 0-3, then row g+8
+      Dp  fp16  [T, K/256, 8, 2] super-block scales of rows g, g+8"""
+    import torch
+    N = L.shape[0]
+    K = L.shape[1] * 8
+    T, C = N // 16, K // 64
+    lw = L.to(torch.int64) & 0xFFFFFFFF
+    hw = Hb.to(torch.int64) & 0xFFFFFFFF
+    lo = torch.stack([(lw >> (4 * i)) & 15 for i in range(8)], -1).reshape(N, K)
+    hi = torch.stack([(hw >> (2 * i)) & 3 for i in range(16)], -1).reshape(N, K)
+    Lp = _i32(_frag_words(lo))
+    hf = _frag_words(hi)
+    Hp = _i32(torch.stack([hf[..., 0] | (hf[..., 1] << 2), hf[..., 2] | (hf[..., 3] << 2)], -1))
+    sc = SC.reshape(T, 16, C, 4)
+    SCp = torch.cat([sc[:, :8], sc[:, 8:]], -1).permute(0, 2, 1, 3).contiguous()    # [T, C, 8, 8]
+    d = D.reshape(T, 16, K // 256)
+    Dp = torch.stack([d[:, :8], d[:, 8:]], -1).permute(0, 2, 1, 3).contiguous()     # [T, K/256, 8, 2]
+    return Lp, Hp, SCp, Dp
 
 
 def gemv_v2_source(WM: int, WK: int, MT: int, B: int, epi: str = "store", PF: int = 1, KS: int = 1) -> str:
@@ -605,3 +643,158 @@ def _v2_tail(R: int, KS: int, epi: str) -> str:
     float a = red[rr][b];
     {_mma_epi(epi)}
   }}"""
+
+
+def head_v2_source(WM: int, WK: int, MT: int, B: int, PF: int = 1) -> str:
+    """Q6_K LM head on pack_q6_mma weights, with the gemv_v2_source structure (shared-memory fp16
+    inputs via ldmatrix, fragment-order weights streamed PF iterations ahead, WK split-K warps
+    reduced in a fixed order). A = raw q - 32 (exact); each k-step is one Q6_K sub-block, MMA'd
+    into a zeroed accumulator and added with D * SC in fp32 (as head_q6_mma_source). Y fp32 [B, N]."""
+    NT = (B + 7) // 8
+    R = 16 * MT * WM
+    KC = 64 * WK
+    XS = KC + 8
+    return f"""
+#include <cuda_bf16.h>
+#include <cuda_fp16.h>
+#define B_ {B}
+#define NT {NT}
+#define MT {MT}
+#define WM {WM}
+#define WK {WK}
+#define PF {PF}
+__device__ __forceinline__ unsigned dq6(unsigned lw, unsigned hw, int j) {{
+  unsigned h = ((lw >> (4 * j)) & 0x000F000Fu) | (((hw >> (4 * j)) & 0x00030003u) << 4) | 0x64006400u;
+  __half2 v = __hsub2(*reinterpret_cast<__half2*>(&h), __float2half2_rn(1056.f));
+  return *reinterpret_cast<unsigned*>(&v);
+}}
+extern "C" __global__ void __launch_bounds__({32 * WM * WK}) k(
+    const uint4* __restrict__ L, const uint2* __restrict__ H, const uint2* __restrict__ SC,
+    const __half2* __restrict__ D, const __nv_bfloat16* __restrict__ X, float* __restrict__ Y, int N, int K)
+{{
+  __shared__ __align__(16) __half xs[NT * 8][{XS}];
+  __shared__ float red[{R}][NT * 8];
+  const int warp = threadIdx.x >> 5, lane = threadIdx.x & 31, g = lane >> 2, t = lane & 3;
+  const int wm = warp % WM, wk = warp / WM;
+  const int nthr = 32 * WM * WK;
+  const int row0 = blockIdx.x * {R};
+  const int C = K / 64, T = N / 16, KD = K / 256;
+  const int iters = (C + WK - 1) / WK;
+  for (int i = threadIdx.x; i < (NT * 8 - B_) * {XS}; i += nthr) xs[B_ + i / {XS}][i % {XS}] = __float2half(0.f);
+  int tile[MT];
+  #pragma unroll
+  for (int m = 0; m < MT; ++m) tile[m] = min(row0 / 16 + wm * MT + m, T - 1);
+  float c[MT][NT][4];
+  #pragma unroll
+  for (int m = 0; m < MT; ++m)
+    #pragma unroll
+    for (int n = 0; n < NT; ++n) c[m][n][0] = c[m][n][1] = c[m][n][2] = c[m][n][3] = 0.f;
+  uint4 lq[PF + 1][MT]; uint2 hq[PF + 1][MT], sq[PF + 1][MT]; __half2 dd[PF + 1][MT];
+  #pragma unroll
+  for (int p = 0; p < PF; ++p) {{
+    int ch = min(p * WK + wk, C - 1);
+    #pragma unroll
+    for (int m = 0; m < MT; ++m) {{
+      size_t o = (size_t)tile[m] * C + ch;
+      lq[p][m] = L[o * 32 + lane]; hq[p][m] = H[o * 32 + lane]; sq[p][m] = SC[o * 8 + g];
+      dd[p][m] = D[((size_t)tile[m] * KD + (ch >> 2)) * 8 + g];
+    }}
+  }}
+  #pragma unroll 1
+  for (int it = 0; it < iters; it += PF + 1) {{
+    #pragma unroll
+    for (int p = 0; p <= PF; ++p) {{
+      const int itp = it + p;
+      if (itp >= iters) break;
+      {{
+        int ch = min((itp + PF) * WK + wk, C - 1);
+        const int slot = (p + PF) % (PF + 1);
+        #pragma unroll
+        for (int m = 0; m < MT; ++m) {{
+          size_t o = (size_t)tile[m] * C + ch;
+          lq[slot][m] = L[o * 32 + lane]; hq[slot][m] = H[o * 32 + lane]; sq[slot][m] = SC[o * 8 + g];
+          dd[slot][m] = D[((size_t)tile[m] * KD + (ch >> 2)) * 8 + g];
+        }}
+      }}
+      const int k0 = itp * {KC};
+      __syncthreads();
+      for (int i = threadIdx.x; i < B_ * {KC // 8}; i += nthr) {{
+        int b = i / {KC // 8}, kk = (i % {KC // 8}) * 8;
+        uint4 v = make_uint4(0u, 0u, 0u, 0u);
+        if (k0 + kk < K) v = *reinterpret_cast<const uint4*>(X + (size_t)b * K + k0 + kk);
+        unsigned in[4] = {{v.x, v.y, v.z, v.w}}, out[4];
+        #pragma unroll
+        for (int e = 0; e < 4; ++e) {{
+          __half2 h = __floats2half2_rn(__uint_as_float(in[e] << 16), __uint_as_float(in[e] & 0xffff0000u));
+          out[e] = *reinterpret_cast<unsigned*>(&h);
+        }}
+        *reinterpret_cast<uint4*>(&xs[b][kk]) = make_uint4(out[0], out[1], out[2], out[3]);
+      }}
+      __syncthreads();
+      if (itp * WK + wk < C) {{
+        float sA[MT][4], sB[MT][4];
+        #pragma unroll
+        for (int m = 0; m < MT; ++m) {{
+          float da = __low2float(dd[p][m]), db = __high2float(dd[p][m]);
+          unsigned x0 = sq[p][m].x, x1 = sq[p][m].y;
+          #pragma unroll
+          for (int s = 0; s < 4; ++s) {{
+            sA[m][s] = da * (float)(signed char)(x0 >> (8 * s));
+            sB[m][s] = db * (float)(signed char)(x1 >> (8 * s));
+          }}
+        }}
+        #pragma unroll
+        for (int h = 0; h < 2; ++h) {{
+          unsigned bf[NT][4];
+          #pragma unroll
+          for (int n = 0; n < NT; ++n) {{
+            unsigned addr = (unsigned)__cvta_generic_to_shared(&xs[n * 8 + (lane & 7)][wk * 64 + h * 32 + 8 * (lane >> 3)]);
+            asm volatile("ldmatrix.sync.aligned.m8n8.x4.shared.b16 {{%0,%1,%2,%3}}, [%4];"
+                         : "=r"(bf[n][0]), "=r"(bf[n][1]), "=r"(bf[n][2]), "=r"(bf[n][3]) : "r"(addr));
+          }}
+          #pragma unroll
+          for (int ss = 0; ss < 2; ++ss) {{
+            const int s = 2 * h + ss;
+            unsigned a[MT][4];
+            #pragma unroll
+            for (int m = 0; m < MT; ++m) {{
+              unsigned lw = s == 0 ? lq[p][m].x : s == 1 ? lq[p][m].y : s == 2 ? lq[p][m].z : lq[p][m].w;
+              unsigned hw = (h ? hq[p][m].y : hq[p][m].x) >> (2 * ss);
+              a[m][0] = dq6(lw, hw, 0); a[m][1] = dq6(lw, hw, 1); a[m][2] = dq6(lw, hw, 2); a[m][3] = dq6(lw, hw, 3);
+            }}
+            #pragma unroll
+            for (int n = 0; n < NT; ++n)
+              #pragma unroll
+              for (int m = 0; m < MT; ++m) {{
+                float d0 = 0.f, d1 = 0.f, d2 = 0.f, d3 = 0.f;
+                asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 {{%0,%1,%2,%3}}, {{%4,%5,%6,%7}}, {{%8,%9}}, {{%0,%1,%2,%3}};"
+                             : "+f"(d0), "+f"(d1), "+f"(d2), "+f"(d3)
+                             : "r"(a[m][0]), "r"(a[m][1]), "r"(a[m][2]), "r"(a[m][3]), "r"(bf[n][2 * ss]), "r"(bf[n][2 * ss + 1]));
+                c[m][n][0] = fmaf(sA[m][s], d0, c[m][n][0]); c[m][n][1] = fmaf(sA[m][s], d1, c[m][n][1]);
+                c[m][n][2] = fmaf(sB[m][s], d2, c[m][n][2]); c[m][n][3] = fmaf(sB[m][s], d3, c[m][n][3]);
+              }}
+          }}
+        }}
+      }}
+    }}
+  }}
+  for (int s = 0; s < WK; ++s) {{
+    if (wk == s) {{
+      #pragma unroll
+      for (int m = 0; m < MT; ++m)
+        #pragma unroll
+        for (int n = 0; n < NT; ++n) {{
+          float* r0 = &red[16 * (wm * MT + m) + g][n * 8 + 2 * t];
+          float* r8 = &red[16 * (wm * MT + m) + g + 8][n * 8 + 2 * t];
+          if (s == 0) {{ r0[0] = c[m][n][0]; r0[1] = c[m][n][1]; r8[0] = c[m][n][2]; r8[1] = c[m][n][3]; }}
+          else {{ r0[0] += c[m][n][0]; r0[1] += c[m][n][1]; r8[0] += c[m][n][2]; r8[1] += c[m][n][3]; }}
+        }}
+    }}
+    __syncthreads();
+  }}
+  for (int i = threadIdx.x; i < {R} * B_; i += nthr) {{
+    int rr = i % {R}, b = i / {R}, r = row0 + rr;
+    if (r < N) Y[(size_t)b * N + r] = red[rr][b];
+  }}
+}}
+"""

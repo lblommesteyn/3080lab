@@ -4,7 +4,7 @@
 
 GEMVs: tensor-core Q4_0 kernels (lab/qwen_batched.gemv_mma_source). Embedding, RMSNorm, attention
 and argmax are the single-sequence kernels with a batch index from blockIdx.y offsetting their
-pointers. LM head: tensor-core Q6_K kernel (lab/qwen_batched.head_q6_mma_source, 191 MB per step) up
+pointers. LM head: head_v2_source on fragment-packed Q6_K (default), or with --v1 the tensor-core Q6_K kernel (lab/qwen_batched.head_q6_mma_source, 191 MB per step) up
 to B = 16; at B = 32 that kernel is slower than cuBLAS on the head dequantized once to fp16 (467 MB).
 Correctness: B copies of one prompt must give identical sequences, compared to the validated
 single-sequence decode (scripts/qwen_gguf.py) token by token.
@@ -116,7 +116,13 @@ class Batched:
                                           "out += (size_t)b_ * NH * HD; "
                                           "kc += (size_t)b_ * NKV * MAXLEN * HD; vc += (size_t)b_ * NKV * MAXLEN * HD;"))
         self.hcfg = HEAD[bucket]
-        if self.hcfg:
+        if V2:
+            self.hcfg = (8, 1, 1)                       # head_v2 (WM, WK, MT), scripts/head_bench.py v2
+            self.k_head = Kern(QB.head_v2_source(*self.hcfg, B))
+            self.logits = torch.zeros(B, m.V, device=dev)
+            if not hasattr(m, "head_packed"):
+                m.head_packed = QB.pack_q6_mma(*m.head)
+        elif self.hcfg:
             S_, U, MT = self.hcfg
             self.k_head = Kern(QB.head_q6_mma_source(S_, B, U, MT))
             self.logits = torch.zeros(B, m.V, device=dev)
@@ -159,7 +165,13 @@ class Batched:
             self.gemv("gu", L["gu"], self.x, self.xm, 0, 2 * m.inter, H)
             self.gemv("down", L["down"], self.xm, self.h, 0, H, m.inter)
         self.rms(m.norm)
-        if self.hcfg:
+        if V2:
+            WM, WK, MT = self.hcfg
+            R = 16 * WM * MT
+            self.k_head.launch((m.V + R - 1) // R, 32 * WM * WK, [*(t.data_ptr() for t in m.head_packed), self.x.data_ptr(),
+                                                                  self.logits.data_ptr(), ctypes.c_int32(m.V), ctypes.c_int32(H)])
+            logits = self.logits
+        elif self.hcfg:
             S_, _, MT = self.hcfg
             V = m.V
             self.k_head.launch((V + 16 * MT - 1) // (16 * MT), 32 * S_, [*(t.data_ptr() for t in m.head), self.x.data_ptr(),

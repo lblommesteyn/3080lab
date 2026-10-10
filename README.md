@@ -626,9 +626,13 @@ config at B = 32 it matches for 84 tokens again, at 4607 tok/s.
 | ours, S = 8, U = 4, MT = 1 | 342 | 1258 | 2133 | 2989 | 3556 |
 | ours, tuned per shape | | 1278 | 2501 | 3618 | **5002** |
 | ours, tuned + Q6_K tensor-core head | | 1384 | 2680 | 3717 | (cuBLAS head) |
-| ours, v2 GEMVs (packed weights, shared-memory inputs) | | **1753** | **3248** | **5191** | **6595** |
+| ours, v2 GEMVs (packed weights, shared-memory inputs) | | 1753 | 3248 | 5191 | 6595 |
+| ours, v2 GEMVs + v2 Q6_K head | 468 | **1821** | **3420** | **5573** | **7106** |
 | llama.cpp b11485 | 336 | 964 | 1420 | 2424 | 3566 |
-| ratio, best | | **1.82** | **2.29** | **2.14** | **1.85** |
+| ratio, best | 1.39 | **1.89** | **2.41** | **2.30** | **1.99** |
+
+B = 2: 930 tok/s against llama.cpp's 614 (1.51x). B = 1 through this path: 468 tok/s; the
+single-sequence decode (509) is still better there.
 
 **v2 GEMVs** (`pack_q4_mma`, `gemv_v2_source`). Three changes to the tensor-core kernel:
 1. Weights are repacked once into fragment order: per 16 x 64 tile each lane loads one uint4
@@ -664,7 +668,13 @@ head (which got one argmax of 8 wrong on random inputs). Speed, real head 151936
 | Q6_K tensor cores, best (S, U, MT) | 342 (6,4,1) | 385 (6,4,1) | 434 (6,4,1) | 516 (8,2,2) | 1106 (8,2,2) |
 | cuBLAS on fp16 head | 661 | 677 | 683 | 690 | 704 |
 
-At B = 32 the kernel is input-bound: with 16 rows per tile it re-reads and re-converts the whole
+**v2 head** (`pack_q6_mma`, `head_v2_source`): the v2 GEMV structure on Q6_K repacked into fragment
+order (low nibbles as Q4_0, high 2-bit fields in the same slots with two k-steps per word, int8
+sub-block scales and fp16 super-block scales broadcast per row group), with the exact fp32 scaling
+above. With (WM, WK, MT) = (8, 1, 1): 286 / 290 / 292 / 311 / 368 us at B = 1 / 4 / 8 / 16 / 32,
+671 GB/s at B = 1, against cuBLAS's 660-705 us on the fp16 head. Logit error 4e-7 to 6e-7.
+
+At B = 32 the v1 head kernel is input-bound: with 16 rows per tile it re-reads and re-converts the whole
 [32, 1536] input for each of 9496 tiles (about 0.9 GB from cache), so B = 32 keeps cuBLAS.
 
 At B = 1 the single-vector path (509 tok/s) is the better choice. At B = 32 the step is 6.4 ms,

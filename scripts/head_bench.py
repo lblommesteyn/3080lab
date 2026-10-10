@@ -24,8 +24,11 @@ from lab.gguf import GGUF, q6_k_blocks  # noqa: E402
 
 
 def main():
-    cfg = {"S": 4, "U": 2, "MT": 2}
+    cfg = {"S": 4, "U": 2, "MT": 2, "WM": 4, "WK": 2, "PF": 1}
+    v2 = "v2" in sys.argv
     for a in sys.argv[1:]:
+        if a == "v2":
+            continue
         k, v = a.split("=")
         cfg[k] = int(v)
     print("config", cfg, flush=True)
@@ -40,18 +43,26 @@ def main():
     q, s = q6_k_blocks(b)
     w32 = (torch.from_numpy(q.astype(np.float32)).cuda() * torch.from_numpy(s.astype(np.float32)).cuda().repeat_interleave(16, 1)).reshape(N, K)
     w16 = w32.half()
+    if v2:
+        Lw, Hw, SCw, Dw = QB.pack_q6_mma(Lw, Hw, SCw, Dw)
     torch.manual_seed(0)
     for B in (1, 4, 8, 16, 32):
         X = (torch.randn(B, K, device="cuda") * 2).to(torch.bfloat16).contiguous()
         ref = X.float() @ w32.t()
-        kern = BB.Kern(QB.head_q6_mma_source(cfg["S"], B, cfg["U"], cfg["MT"]))
+        if v2:
+            kern = BB.Kern(QB.head_v2_source(cfg["WM"], cfg["WK"], cfg["MT"], B, cfg["PF"]))
+            R = 16 * cfg["MT"] * cfg["WM"]
+            nthr = 32 * cfg["WM"] * cfg["WK"]
+        else:
+            kern = BB.Kern(QB.head_q6_mma_source(cfg["S"], B, cfg["U"], cfg["MT"]))
+            R, nthr = 16 * cfg["MT"], 32 * cfg["S"]
         Y = torch.zeros(B, N, device="cuda")
-        grid = (N + 16 * cfg["MT"] - 1) // (16 * cfg["MT"])
+        grid = (N + R - 1) // R
         args = [Lw.data_ptr(), Hw.data_ptr(), SCw.data_ptr(), Dw.data_ptr(), X.data_ptr(), Y.data_ptr(),
                 ctypes.c_int32(N), ctypes.c_int32(K)]
 
         def ours():
-            kern.launch(grid, 32 * cfg["S"], args)
+            kern.launch(grid, nthr, args)
 
         def cublas():
             torch.matmul(X.half(), w16.t())
