@@ -70,12 +70,13 @@ MMA = False
 BIG = False
 V2 = False
 V3 = False
+BLIST = ()
 
 
 def main():
     global VARIANT
     S_ = int(sys.argv[1]) if len(sys.argv) > 1 else 2
-    global MMA, BIG, V2, V3
+    global MMA, BIG, V2, V3, BLIST
     for a in sys.argv[2:]:
         if a == "mma":
             MMA = True
@@ -90,6 +91,9 @@ def main():
             BIG = True
             continue
         k, v = a.split("=")
+        if k == "Bs":
+            BLIST = tuple(int(x) for x in v.split(","))
+            continue
         VARIANT[k] = int(v)
     print("variant", S_, VARIANT, flush=True)
     torch.zeros(1, device="cuda")
@@ -107,7 +111,7 @@ def main():
         nout = N // 2 if epi == "swiglu" else N
         ytype = torch.float32 if epi == "resid" else torch.bfloat16
         row = [f"{name:5s} N={N:5d} K={K:5d}"]
-        for B in (((1, 2, 4, 8, 16, 32) if not BIG else (8, 16, 32)) if MMA else (1, 2, 4, 8)):
+        for B in BLIST or (((1, 2, 4, 8, 16, 32) if not BIG else (8, 16, 32)) if MMA else (1, 2, 4, 8)):
             X = torch.randn(B, K, device=dev).to(torch.bfloat16).contiguous()
             # reference: the single-vector kernel on each vector
             Yref = torch.zeros(B, nout, dtype=ytype, device=dev)

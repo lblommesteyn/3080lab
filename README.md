@@ -692,6 +692,46 @@ At B = 1 the single-vector path (509 tok/s) is the better choice. At B = 32 the 
 of which the GEMVs are about 5.2 ms (28 layers x 184 us); they still run far below tensor-core
 peak, since per n-tile they convert bf16 inputs to fp16 and decode weights.
 
+### Prefill (`scripts/qwen_prefill.py`, `scripts/prefill_gemm_bench.py`)
+
+One sequence, P prompt tokens per pass. Per layer: RMSNorm, QKV, a K/V-write pass for all chunk
+tokens, causal attention, O, RMSNorm, gate_up, down. Correctness: the KV cache and last-token
+logits against token-by-token prefill through the validated decode step; perplexity on README text.
+
+| prefill tok/s | P = 128 | 256 | 512 |
+|---|---|---|---|
+| v2 GEMVs, chunks of 32, per-token attention | | | 7,171 |
+| cuBLAS on per-layer fp16-dequantized weights, one chunk | 7,369 | | 9,342 |
+| int8 GEMM, per-token attention | | | 14,606 |
+| **int8 GEMM + tensor-core flash attention** | **16,261** | **19,636** | **22,056** |
+| llama.cpp b11485 (`llama-bench -fa 1`, 10 reps, about +-1K) | 10,225 | 14,379 | 17,727 |
+| ratio | **1.59** | **1.37** | **1.24** |
+
+Where the 55 ms of the cuBLAS path went at P = 512 (ablation): matmuls 27 ms (at the fp16 x fp16 ->
+fp32 tensor-core peak), attention 13 ms, dequantization 5 ms, torch epilogues and the rest 10 ms.
+
+- **int8 GEMM** (`pack_q4_i8`, `QUANT_Q8`, `gemm_q4i8_source`), llama.cpp MMQ-style: activations
+  quantized to int8 per 32 values (scale, sum), `mma.m16n8k32.u8.s8` on the raw Q4_0 nibbles, then
+  y += dw * dx * (dot - 8 sum) in fp32 per 32-k block. The MMA's C operand carries
+  0x4B400000 - 8 sum, so the int32 result is already the float bit pattern of 2^23 + 2^22 + (dot - 8 sum):
+  no I2F, no integer correction. Bias, residual and SwiGLU are fused into the epilogue, and no
+  dequantized weights are written. It runs at 55-70 TOPS of the measured 271: the loop still issues
+  about 31 instructions per MMA (12 of them the per-block fp32 scaling) against a 16-cycle MMA
+  interval, and the best tile (4 warps, 32 rows x 64 tokens, 167 registers) keeps 3 blocks per SM.
+  Per layer at P = 512: 865 us against cuBLAS's 948 us plus dequantization.
+- **Flash attention** (`flash_prefill_source`): one block per head and 64 tokens; Q (RoPE, bf16)
+  is held in A fragments, K/V tiles of 64 positions are shared by the 4 warps through shared memory,
+  S = Q K^T and O += P V on bf16 tensor cores (`ldmatrix`, `ldmatrix.trans` for V), online softmax
+  with the causal mask. The per-token kernel re-read the whole prefix per (head, token) block,
+  about 22 GB of cache traffic per 512-token prefill.
+- **Quality**: on 512 tokens of this README, perplexity is 26.910 with fp16 weights and fp32
+  accumulation (cuBLAS path) and 26.940 with int8 activations (+0.1%). Last-token argmax matches
+  the token-by-token reference at every P tested.
+
+Tested hypotheses on the int8 GEMM: quarter-rate I2F as the bottleneck (magic-number conversion:
+no change); register pressure (forced 2 blocks per SM at 128 registers: no change); smaller
+blocks with more blocks per SM: +15%.
+
 ### Phase 8: our own block scheduler (`lab/resched.py`, `lab/verify.py`, `pair_latency`, `mufu_latency`, `resched_rand`)
 
 Every basic block is list-scheduled from a dependence DAG on top of ptxas's register allocation,
