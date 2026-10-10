@@ -4,8 +4,8 @@
 
 GEMVs: tensor-core Q4_0 kernels (lab/qwen_batched.gemv_mma_source). Embedding, RMSNorm, attention
 and argmax are the single-sequence kernels with a batch index from blockIdx.y offsetting their
-pointers. LM head: the Q6_K head dequantized once to fp16, cuBLAS matmul (reads 467 MB per step
-instead of 191 MB; amortized over B).
+pointers. LM head: tensor-core Q6_K kernel (lab/qwen_batched.head_q6_mma_source, 191 MB per step) up
+to B = 16; at B = 32 that kernel is slower than cuBLAS on the head dequantized once to fp16 (467 MB).
 Correctness: B copies of one prompt must give identical sequences, compared to the validated
 single-sequence decode (scripts/qwen_gguf.py) token by token.
 Throughput: tok/s = B x generated tokens / time, CUDA-graph replay, like llama-batched-bench TG.
@@ -38,6 +38,7 @@ CONFIG = {
     16: {"qkv": (8, 4, 2), "o": (8, 4, 2), "gu": (8, 2, 2), "down": (16, 2, 2)},
     32: {"qkv": (8, 4, 2), "o": (8, 4, 2), "gu": (4, 2, 4), "down": (8, 4, 2)},
 }
+HEAD = {8: (6, 4, 1), 16: (8, 2, 2), 32: None}      # Q6_K head (S, U, MT), from scripts/head_bench.py; None = cuBLAS fp16
 
 
 class Kern:
@@ -98,7 +99,15 @@ class Batched:
         self.k_attn = Kern(batchify(attn, "qkv += (size_t)b_ * (NH + 2 * NKV) * HD; posp += b_; "
                                           "out += (size_t)b_ * NH * HD; "
                                           "kc += (size_t)b_ * NKV * MAXLEN * HD; vc += (size_t)b_ * NKV * MAXLEN * HD;"))
-        self.head16 = m.head16
+        self.hcfg = HEAD[bucket]
+        if self.hcfg:
+            S_, U, MT = self.hcfg
+            self.k_head = Kern(QB.head_q6_mma_source(S_, B, U, MT))
+            self.logits = torch.zeros(B, m.V, device=dev)
+        else:
+            if not hasattr(m, "head16"):
+                m.head16 = head16(m)
+            self.head16 = m.head16
 
     def gemv(self, name, wsplit, X, Y, aux, N, K):
         W, S = wsplit
@@ -125,20 +134,29 @@ class Batched:
             self.gemv("gu", L["gu"], self.x, self.xm, 0, 2 * m.inter, H)
             self.gemv("down", L["down"], self.xm, self.h, 0, H, m.inter)
         self.rms(m.norm)
-        logits = torch.matmul(self.x.to(torch.float16), self.head16.t())
+        if self.hcfg:
+            S_, _, MT = self.hcfg
+            V = m.V
+            self.k_head.launch((V + 16 * MT - 1) // (16 * MT), 32 * S_, [*(t.data_ptr() for t in m.head), self.x.data_ptr(),
+                                                                         self.logits.data_ptr(), ctypes.c_int32(V), ctypes.c_int32(H)])
+            logits = self.logits
+        else:
+            logits = torch.matmul(self.x.to(torch.float16), self.head16.t())
         self.tok.copy_(logits.argmax(-1))
         self.pos += 1
 
 
-def load_model():
-    m = GG.GGUFQwen(None)
+def head16(m):
     g = GGUF(GG.GGUF_PATH)
     b, t = g.raw("output.weight")
     K, N = t.dims
     q, s = q6_k_blocks(b)
     w = (torch.from_numpy(q.astype(np.float32)).to(dev) * torch.from_numpy(s.astype(np.float32)).to(dev).repeat_interleave(16, 1))
-    m.head16 = w.reshape(N, K).to(torch.float16).contiguous()
-    return m
+    return w.reshape(N, K).to(torch.float16).contiguous()
+
+
+def load_model():
+    return GG.GGUFQwen(None)
 
 
 def run(m, B, ids):

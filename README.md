@@ -624,9 +624,24 @@ config at B = 32 it matches for 84 tokens again, at 4607 tok/s.
 | decode tok/s (128 generated per sequence) | B = 1 | 4 | 8 | 16 | 32 |
 |---|---|---|---|---|---|
 | ours, S = 8, U = 4, MT = 1 | 342 | 1258 | 2133 | 2989 | 3556 |
-| ours, tuned per shape | | 1278 | **2501** | **3618** | **5002** |
+| ours, tuned per shape | | 1278 | 2501 | 3618 | **5002** |
+| ours, tuned + Q6_K tensor-core head | | **1384** | **2680** | **3717** | (cuBLAS head) |
 | llama.cpp b11485 | 336 | 964 | 1420 | 2424 | 3566 |
-| ratio, tuned | | 1.33 | **1.76** | **1.49** | **1.40** |
+| ratio, best | | **1.44** | **1.89** | **1.53** | **1.40** |
+
+**LM head** (`head_q6_mma_source`, `scripts/head_bench.py`). The fp16-dequantized head reads 467 MB
+per step; Q6_K is 191 MB. The tensor-core kernel keeps each sub-block's raw q - 32 in the A
+fragment (exact in fp16), multiplies into a zeroed accumulator, and applies D x SC in fp32 per
+row. Its logit error against fp32 is 3e-7 to 6e-7 of the largest logit, against 4e-4 for the fp16
+head (which got one argmax of 8 wrong on random inputs). Speed, real head 151936 x 1536:
+
+| us | B = 1 | 4 | 8 | 16 | 32 |
+|---|---|---|---|---|---|
+| Q6_K tensor cores, best (S, U, MT) | 342 (6,4,1) | 385 (6,4,1) | 434 (6,4,1) | 516 (8,2,2) | 1106 (8,2,2) |
+| cuBLAS on fp16 head | 661 | 677 | 683 | 690 | 704 |
+
+At B = 32 the kernel is input-bound: with 16 rows per tile it re-reads and re-converts the whole
+[32, 1536] input for each of 9496 tiles (about 0.9 GB from cache), so B = 32 keeps cuBLAS.
 
 At B = 1 the single-vector path (509 tok/s) is the better choice. At B = 32 the step is 6.4 ms,
 of which the GEMVs are about 5.2 ms (28 layers x 184 us); they still run far below tensor-core

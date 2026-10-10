@@ -260,3 +260,127 @@ def _mma_epi(epi: str) -> str:
         "resid": "((float*)Y)[(size_t)b * N + r] += a;",
     }[epi]
     return f"if (r < N) {{ {store} }}"
+
+
+def head_q6_mma_source(S_: int, B: int, U: int = 1, MT: int = 1) -> str:
+    """Tensor-core Q6_K LM head, Y fp32 [B, N] = W x, on qwen_gguf's Q6_K-exact layout:
+      L  uint32 [N, K/8]   low 4 bits of q+32 (nibble i = weight 8w+i)
+      Hb uint32 [N, K/16]  high 2 bits (field i = weight 16w+i)
+      SC int8   [N, K/16]  sub-block scales;  D fp16 [N, K/256] super-block scales
+    The A fragment holds the raw q - 32 (exact in fp16 via 0x6400: (1024 + q) - 1056); each 16-wide
+    k-step (one Q6_K sub-block) goes into a zeroed accumulator, then c += D * SC * tmp in fp32 per
+    row, so no scale is rounded to fp16. Same tiling as gemv_mma_source (S split-K warps, MT
+    m-tiles, U 32-weight units in flight, deterministic shared-memory reduction)."""
+    NT = (B + 7) // 8
+    R = 16 * MT
+    return f"""
+#include <cuda_bf16.h>
+#include <cuda_fp16.h>
+#define SPLIT {S_}
+#define B_ {B}
+#define NT {NT}
+#define MT {MT}
+__device__ __forceinline__ unsigned q6pair(unsigned lw, unsigned hw, int t, int f) {{
+  unsigned q0 = ((lw >> (8 * t)) & 0xFu) | (((hw >> (2 * f)) & 3u) << 4);
+  unsigned q1 = ((lw >> (8 * t + 4)) & 0xFu) | (((hw >> (2 * f + 2)) & 3u) << 4);
+  unsigned h = q0 | (q1 << 16) | 0x64006400u;
+  __half2 v = __hsub2(*reinterpret_cast<__half2*>(&h), __float2half2_rn(1056.f));
+  return *reinterpret_cast<unsigned*>(&v);
+}}
+__device__ __forceinline__ unsigned xpair(const __nv_bfloat16* x) {{
+  __half2 v = __floats2half2_rn(__bfloat162float(x[0]), __bfloat162float(x[1]));
+  return *reinterpret_cast<unsigned*>(&v);
+}}
+extern "C" __global__ void __launch_bounds__({32 * S_}) k(
+    const uint4* __restrict__ L, const uint2* __restrict__ Hb, const unsigned short* __restrict__ SC,
+    const __half* __restrict__ D, const __nv_bfloat16* __restrict__ X, float* __restrict__ Y, int N, int K)
+{{
+  __shared__ float red[{R}][NT * 8];
+  int warp = threadIdx.x >> 5, lane = threadIdx.x & 31, g = lane >> 2, t = lane & 3;
+  int row0 = blockIdx.x * {R};
+  int KU = K / 32, KD = K / 256;
+  int chunk = (KU + SPLIT - 1) / SPLIT;
+  int jb = warp * chunk, je = min(KU, jb + chunk);
+  float c[MT][NT][4];
+  #pragma unroll
+  for (int m = 0; m < MT; ++m)
+    #pragma unroll
+    for (int n = 0; n < NT; ++n) c[m][n][0] = c[m][n][1] = c[m][n][2] = c[m][n][3] = 0.f;
+  int ra[MT], rb[MT];
+  #pragma unroll
+  for (int m = 0; m < MT; ++m) {{ ra[m] = min(row0 + 16 * m + g, N - 1); rb[m] = min(row0 + 16 * m + g + 8, N - 1); }}
+  #pragma unroll 1
+  for (int j0 = jb; j0 < je; j0 += {U}) {{
+    uint4 LA[{U}][MT], LB[{U}][MT];
+    uint2 HA[{U}][MT], HB[{U}][MT];
+    float sA[{U}][MT][2], sB[{U}][MT][2];
+    #pragma unroll
+    for (int u = 0; u < {U}; ++u) {{
+      int j = min(j0 + u, je - 1);
+      #pragma unroll
+      for (int m = 0; m < MT; ++m) {{
+        LA[u][m] = L[(size_t)ra[m] * KU + j]; LB[u][m] = L[(size_t)rb[m] * KU + j];
+        HA[u][m] = Hb[(size_t)ra[m] * KU + j]; HB[u][m] = Hb[(size_t)rb[m] * KU + j];
+        unsigned short ca = SC[(size_t)ra[m] * KU + j], cb = SC[(size_t)rb[m] * KU + j];
+        float da = __half2float(D[(size_t)ra[m] * KD + (j >> 3)]), db = __half2float(D[(size_t)rb[m] * KD + (j >> 3)]);
+        sA[u][m][0] = da * (float)(signed char)(ca & 0xff); sA[u][m][1] = da * (float)(signed char)(ca >> 8);
+        sB[u][m][0] = db * (float)(signed char)(cb & 0xff); sB[u][m][1] = db * (float)(signed char)(cb >> 8);
+      }}
+    }}
+    #pragma unroll
+    for (int u = 0; u < {U}; ++u) {{
+      if (j0 + u >= je) break;
+      int j = j0 + u;
+      #pragma unroll
+      for (int s = 0; s < 2; ++s) {{                // two sub-blocks of 16 per unit
+        unsigned a[MT][4];
+        #pragma unroll
+        for (int m = 0; m < MT; ++m) {{
+          unsigned l0a = s ? LA[u][m].z : LA[u][m].x, l1a = s ? LA[u][m].w : LA[u][m].y;
+          unsigned l0b = s ? LB[u][m].z : LB[u][m].x, l1b = s ? LB[u][m].w : LB[u][m].y;
+          unsigned ha = s ? HA[u][m].y : HA[u][m].x, hb = s ? HB[u][m].y : HB[u][m].x;
+          a[m][0] = q6pair(l0a, ha, t, 2 * t); a[m][1] = q6pair(l0b, hb, t, 2 * t);
+          a[m][2] = q6pair(l1a, ha, t, 2 * t + 8); a[m][3] = q6pair(l1b, hb, t, 2 * t + 8);
+        }}
+        int kk = j * 32 + s * 16 + 2 * t;
+        #pragma unroll
+        for (int n = 0; n < NT; ++n) {{
+          int col = n * 8 + g;
+          unsigned b0 = 0u, b1 = 0u;
+          if (col < B_) {{
+            const __nv_bfloat16* xr = X + (size_t)col * K + kk;
+            b0 = xpair(xr); b1 = xpair(xr + 8);
+          }}
+          #pragma unroll
+          for (int m = 0; m < MT; ++m) {{
+            float d0 = 0.f, d1 = 0.f, d2 = 0.f, d3 = 0.f;
+            asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 {{%0,%1,%2,%3}}, {{%4,%5,%6,%7}}, {{%8,%9}}, {{%0,%1,%2,%3}};"
+                         : "+f"(d0), "+f"(d1), "+f"(d2), "+f"(d3)
+                         : "r"(a[m][0]), "r"(a[m][1]), "r"(a[m][2]), "r"(a[m][3]), "r"(b0), "r"(b1));
+            c[m][n][0] = fmaf(sA[u][m][s], d0, c[m][n][0]); c[m][n][1] = fmaf(sA[u][m][s], d1, c[m][n][1]);
+            c[m][n][2] = fmaf(sB[u][m][s], d2, c[m][n][2]); c[m][n][3] = fmaf(sB[u][m][s], d3, c[m][n][3]);
+          }}
+        }}
+      }}
+    }}
+  }}
+  for (int s = 0; s < SPLIT; ++s) {{
+    if (warp == s) {{
+      #pragma unroll
+      for (int m = 0; m < MT; ++m)
+        #pragma unroll
+        for (int n = 0; n < NT; ++n) {{
+          float* r0 = &red[16 * m + g][n * 8 + 2 * t];
+          float* r8 = &red[16 * m + g + 8][n * 8 + 2 * t];
+          if (s == 0) {{ r0[0] = c[m][n][0]; r0[1] = c[m][n][1]; r8[0] = c[m][n][2]; r8[1] = c[m][n][3]; }}
+          else {{ r0[0] += c[m][n][0]; r0[1] += c[m][n][1]; r8[0] += c[m][n][2]; r8[1] += c[m][n][3]; }}
+        }}
+    }}
+    __syncthreads();
+  }}
+  for (int i = threadIdx.x; i < {R} * B_; i += blockDim.x) {{
+    int rr = i % {R}, b = i / {R}, r = row0 + rr;
+    if (r < N) Y[(size_t)b * N + r] = red[rr][b];
+  }}
+}}
+"""
