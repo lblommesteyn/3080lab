@@ -16,6 +16,7 @@ the whole prefill (CUDA graph), as llama-batched-bench's PP.
 import ctypes
 import math
 import sys
+import time
 from pathlib import Path
 
 import torch
@@ -58,6 +59,10 @@ MS = "ms=0" not in sys.argv      # i8 GEMM: multistage, weights through shared m
 # per GEMM (WM, WN, MT, NT, KB, NSTG, MINB), prefill_gemm_bench.py sweeps at P = 512: 128-row tiles cut the
 # re-reads of X for the wide matrices; o and down (N = 1536) need the 64-row tile to fill 68 SMs
 I8MS = {"qkv": (4, 2, 2, 4, 4, 2, 2), "o": (2, 2, 2, 4, 2, 3, 3), "gu": (4, 2, 2, 4, 4, 2, 2), "down": (2, 2, 2, 4, 2, 3, 3)}
+for _a in sys.argv[1:]:              # tile_<gemm>=WM,WN,MT,NT,KB,NSTG,MINB overrides one GEMM's tile
+    if _a.startswith("tile_"):
+        _k, _v = _a[5:].split("=")
+        I8MS[_k] = tuple(map(int, _v.split(",")))
 
 
 class Prefill:
@@ -227,18 +232,24 @@ def prefill(m, ids, chunk, mode):
     with torch.cuda.graph(graph):
         run_all()
     torch.cuda.synchronize()
-    for _ in range(3):
+    # warm for 0.5 s: 3 replays (~75 ms at P = 512) left the clock ramping and made end-to-end times
+    # erratic run to run (7-25K tok/s for the same build)
+    t_end = time.perf_counter() + 0.5
+    while time.perf_counter() < t_end:
         graph.replay()
-    torch.cuda.synchronize()
+        torch.cuda.synchronize()
     ts = []
-    for _ in range(5):
+    for _ in range(21):
         s, e = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
         s.record()
         graph.replay()
         e.record()
         torch.cuda.synchronize()
         ts.append(s.elapsed_time(e))
-    return pf, sorted(ts)[len(ts) // 2]
+    # minimum: the 3080 also drives the desktop, and other graphics contexts time-slice with us (38%
+    # utilization with no job queued), which only ever adds time; the median is printed alongside
+    prefill.median_ms = sorted(ts)[len(ts) // 2]
+    return pf, min(ts)
 
 
 def reference(m, ids):
@@ -303,7 +314,7 @@ def main():
             lg = logits_last(m, pf.h[chunk - 1])
             lerr = float((lg - ref_logits).abs().max() / ref_logits.abs().max()) if ref_logits is not None else float("nan")
             same = int(lg.argmax()) == int(ref_logits.argmax()) if ref_logits is not None else None
-            print(f"{mode:6s} chunk={chunk:4d} P={P}: {P / ms * 1e3:8.0f} tok/s ({ms:.2f} ms) | K err {kerr:.1e} V err {verr:.1e} "
+            print(f"{mode:6s} chunk={chunk:4d} P={P}: {P / ms * 1e3:8.0f} tok/s ({ms:.2f} ms min, {prefill.median_ms:.2f} median) | K err {kerr:.1e} V err {verr:.1e} "
                   f"| last logits err {lerr:.1e}, argmax same: {same}", flush=True)
             del pf
             torch.cuda.empty_cache()

@@ -768,6 +768,67 @@ What bounds the int8 GEMM (`prefill_gemm_bench.py`, P = 512, per layer):
   changed nothing end to end. The first version after the issue diet and grid swap ran 3.8-6.4K
   tok/s end to end (80-135 ms at P = 512, varying run to run) while the isolated benchmark timed it
   steady at ~850 us per layer: unexplained, and the reason the multistage kernel is the default.
+  **Update (Oct 10, later):** most of this is the desktop. The 3080 also drives the display, and
+  with no job queued it shows 38% utilization (browsers, Teams, Photos, a computer-use agent);
+  pcslurm serializes CUDA jobs, not graphics contexts. The same build then measured 5.5-25K tok/s
+  run to run. `qwen_prefill.py` now warms for 0.5 s and reports the minimum of 21 graph replays
+  (contention only adds time) with the median beside it: the default build prefills 512 tokens in
+  20.6-21.4 ms (24.0-24.9K tok/s; medians 23.7-29.0 ms) and 2048 in 110-116 ms (17.6-18.6K).
+  The earlier "erratic" kernel results above were measured before this fix.
+
+### Occupancy cost model for the multistage GEMM (`lab/gemm_model.py`, Oct 10)
+
+`lab/model.py` simulates the warps of one block running a straight loop. The int8 GEMM's tile choice
+trades things that model does not have: several blocks per SM (registers and shared memory decide
+how many), a block-wide barrier every stage, tensor-core and shared-memory ports, and the cp.async
+copy path. `gemm_model.py` simulates a whole SM on the kernel's real SASS ring loop with all of
+those, per wave of blocks, and adds the epilogue. Six new microbenchmarks supply the constants:
+
+| microbenchmark | finding |
+|---|---|
+| `smem_width` | shared memory is 128 B/cycle for LDS.64, LDS.128 and LDSM.x4, 64 B/cycle for LDS.32 (one request per 2 cycles); 4 warps reach 70-75% of it, 8 warps ~96% |
+| `l2_cpasync` | **cp.async costs one SM cycle per active lane, not per byte**: half the lanes take half the time, 8 B and 4 B copies take as long as 16 B. At 16 B per lane that is 2.1-2.2 TB/s GPU-wide, the familiar "L2 bandwidth", but it is an SM-side limit (one block per SM already reaches it). A lane alone in its 32 B sector costs 2 (16 B pieces one per line: 1.0 TB/s). Sharing is free: 8 or 34 blocks reading the same lines, or the same DRAM stream (misses merge in L2), all run at ~2.1 TB/s |
+| `mem_epilogue` | fp32 read-modify-write of a 64 MB output: 562 GB/s (16 warps/SM) to 660; plain stores ~690 |
+| `tc_tput_u8s8_s32`, `tc_lat_u8s8_s32` | the kernel's mixed-sign u8 x s8 MMA runs at the s8 x s8 rate (0.25 warp-MMAs per cycle per SM) |
+| NVML during the GEMM | **sustained int8 GEMM is power-capped**: 1725-1785 MHz at ~365 W (throttle reason SW power cap), not the 1.95 GHz light kernels run at |
+
+Ablations of the 64 x 64 tile (`ABL=noload` computes on whatever the ring holds, `nocompute` only
+copies, `noloop` runs prologue and epilogue only) and slopes over K at a fixed grid (fixed costs
+cancel) split each stage into its parts:
+
+| cycles per stage (1 wave, slope over K) | 64 x 64, 3 blocks/SM | 128 x 64, 2 blocks/SM |
+|---|---|---|
+| compute only, measured / simulated | 1445 / 1382 | 4390 / 3611 |
+| copies only, measured / simulated | 2047 / 1704 | 2545 / 2743 |
+| full kernel, measured / simulated | 2330 / 1779 | 4910 / 3847 |
+
+What this changes in the account above:
+- **The benchmark's gate_up time is ~40% epilogue.** `prefill_gemm_bench.py` uses the residual
+  epilogue for every GEMM: 73 MB of fp32 read-modify-write for gate_up, 160-180 us of the
+  ~360-400 (`noloop`). The full model's gate_up writes 1 B per output (SwiGLU), so the benchmark
+  overstates it there.
+- **"Bound by moving X and W" is the cp.async lane rate.** Copies alone run each stage in 2047
+  cycles for the 64 x 64 tile; the loop overlaps compute and copies well (full = copies + 14%).
+  Per output, the 128 x 64 tile needs 40% fewer copy lanes (X is re-read by half as many row
+  blocks), which is why it wins on gate_up.
+- **Two simulator bugs found on the way, both worth knowing.** The loop to simulate must be found by
+  its DEPBAR (in the copy-only build the epilogue loop is longer). Greedy-then-oldest scheduling lets
+  the lowest block race ahead and finish, after which the others run alone: steady state must be
+  measured while every block is still running, not extrapolated from the last stages (that read
+  2.9x too fast for 2 blocks of 8 warps).
+
+**Accuracy.** In sample (the 11 tiles above, 44 GEMM timings used for diagnosis, no constant fitted
+to them): median error 14.9%, 32/44 within 20%, and it picks the measured-best tile for gate_up, o
+and down (qkv: 4% off the best). **Held out** (`scripts/gemm_model_sweep.py` ranked 67 compiled
+tiles; 11 never-run tiles chosen across the predicted range, predictions written to
+`data/gemm_model_heldout_preds.json` before the GPU ran them): median error 12.7%, 35/44 within
+20%, but rank correlation only 0.5-0.55 (0.83 for down). The misses are one systematic bias:
+**tiles with 8 warps per SM run ~18% slower than predicted, 16-warp tiles ~5%**. Its top pick
+(128 x 64 with 4 warps, 255 registers) measured 716 us per layer against the 641 of the best
+held-out tile (128 x 32, 16 warps), so the model still under-charges low occupancy, the very
+effect ("16 warps beat 8") it was built to explain. Its best find, a 128 x 32 / 16-warp down tile
+(predicted 172.1 us, measured 172.4 vs 192 for the default), did not resolve end to end under
+desktop contention (two of three runs each way) and is not the default.
 
 ### Phase 8: our own block scheduler (`lab/resched.py`, `lab/verify.py`, `pair_latency`, `mufu_latency`, `resched_rand`)
 

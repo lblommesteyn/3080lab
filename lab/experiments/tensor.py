@@ -23,6 +23,7 @@ TC = {
     "bf16_f32": ("m16n8k16.row.col.f32.bf16.bf16.f32", 4, 2, 4, "f", "HMMA.16816.F32.BF16", 16, 8, 16),
     "tf32_f32": ("m16n8k8.row.col.f32.tf32.tf32.f32", 4, 2, 4, "f", "HMMA.1688.F32.TF32", 16, 8, 8),
     "s8_s32":   ("m16n8k32.row.col.s32.s8.s8.s32", 4, 2, 4, "r", "IMMA.16832.S8.S8", 16, 8, 32),
+    "u8s8_s32": ("m16n8k32.row.col.s32.u8.s8.s32", 4, 2, 4, "r", "IMMA.16832.U8.S8", 16, 8, 32),   # Q4 GEMM operand types
     "s4_s32":   ("m16n8k64.row.col.s32.s4.s4.s32", 4, 2, 4, "r", "IMMA.16864.S4.S4", 16, 8, 64),
     "b1_s32":   ("m16n8k256.row.col.s32.b1.b1.s32.and.popc", 4, 2, 4, "r", "BMMA.168256.AND.POPC", 16, 8, 256),
 }

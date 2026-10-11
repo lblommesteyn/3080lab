@@ -1230,7 +1230,12 @@ def gemm_q4i8_ms_source(WM: int, WN: int, MT: int, NT: int, epi: str = "store", 
     16 B it needs at tile * 512 + 16 l (conflict-free); the wn warps sharing rows read one copy.
     Same args and grid as gemm_q4i8_source. ABL (timing ablations only, wrong results): "noepi" replaces
     the per-block fp32 scaling with one add per output, "noimma" replaces the MMA with an integer op on
-    the same operands."""
+    the same operands, "noload" issues no copies in the loop (computes on whatever the ring holds),
+    "nocompute" skips the math (copies, waits and barriers only), "noloop" runs no stages (prologue and
+    epilogue only)."""
+    s_lim = "(K < 0 ? stages : 0)" if ABL == "noloop" else "stages"
+    ld_cond = "K < 0 && " if ABL == "noload" else ""
+    kp_lim = "(K < 0 ? KB / 2 : 0)" if ABL == "nocompute" else "KB / 2"
     if ABL == "noimma":
         mma = "d0 = a[m][0] ^ b0 ^ sx.x; d1 = a[m][1] ^ b1 ^ sx.y; d2 = a[m][2] ^ b0 ^ sx.z; d3 = a[m][3] ^ b1 ^ sx.w;"
     else:
@@ -1345,10 +1350,10 @@ extern "C" __global__ void __launch_bounds__({nthr}, {MINB}) k(
   }}
   int slot = 0, lslot = NSTG - 1;
   #pragma unroll 1
-  for (int s = 0; s < stages; ++s) {{
+  for (int s = 0; s < {s_lim}; ++s) {{
     asm volatile("cp.async.wait_group %0;" :: "n"(NSTG - 2));
     __syncthreads();                                            // stage s landed; slot of s - 1 is free
-    if (s + NSTG - 1 < stages) load(lslot, s + NSTG - 1);
+    if ({ld_cond}s + NSTG - 1 < stages) load(lslot, s + NSTG - 1);
     asm volatile("cp.async.commit_group;");
     const unsigned char* xb = sm + slot * {stage};
     const uint4* wsm = reinterpret_cast<const uint4*>(xb + {XB}) + (wm * MT) * (KB / 2) * 32 + lane;
@@ -1357,7 +1362,7 @@ extern "C" __global__ void __launch_bounds__({nthr}, {MINB}) k(
     const int* xsum = reinterpret_cast<const int*>(xb + BN * XS + BN * KB * 4) + ((wn * NT * 8) / 2 + t) * KB * 4;
     const unsigned xr = (unsigned)__cvta_generic_to_shared(xb + (wn * NT * 8 + (lane & 7)) * XS + 16 * (lane >> 3));
     #pragma unroll
-    for (int kp = 0; kp < KB / 2; ++kp) {{
+    for (int kp = 0; kp < {kp_lim}; ++kp) {{
       unsigned bfr[NT][4]; float4 dxp[NT]; uint4 wq[MT]; uint2 sq[MT];
       #pragma unroll
       for (int m = 0; m < MT; ++m) {{ wq[m] = wsm[(m * (KB / 2) + kp) * 32]; sq[m] = ssm[(m * (KB / 2) + kp) * 8]; }}

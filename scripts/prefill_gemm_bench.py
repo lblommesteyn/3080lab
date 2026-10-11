@@ -2,6 +2,7 @@
 weights, Qwen2.5-1.5B shapes, P tokens.
 
   pcslurm submit -- python scripts/prefill_gemm_bench.py [P=512] [WM=4 WN=2 MT=2 NT=4 KB=4 MINB=1] [MS=1 NSTG=3]
+      [ABL=noepi|noimma|noload|nocompute|noloop] [shapes=gu,1536x8960]
 
 Error: max |Y - ref| / max |ref|, ref = fp32 X @ fp32 dequantized W. Ours includes the per-32 int8
 quantization of X (as llama.cpp's MMQ); its time is reported separately. Timing as batched_gemv_bench.
@@ -23,7 +24,7 @@ SHAPES = [("qkv", 2048, 1536), ("o", 1536, 1536), ("gu", 17920, 1536), ("down", 
 
 
 def main():
-    cfg = {"P": 512, "WM": 4, "WN": 2, "MT": 2, "NT": 4, "KB": 4, "MINB": 1, "MS": 0, "NSTG": 3, "ABL": ""}
+    cfg = {"P": 512, "WM": 4, "WN": 2, "MT": 2, "NT": 4, "KB": 4, "MINB": 1, "MS": 0, "NSTG": 3, "ABL": "", "shapes": ""}
     for a in sys.argv[1:]:
         k, v = a.split("=")
         cfg[k] = int(v) if v.lstrip("-").isdigit() else v
@@ -35,7 +36,11 @@ def main():
     torch.manual_seed(0)
     quant = BB.Kern(QB.QUANT_Q8)
     tot_o = tot_c = 0.0
-    for name, N, K in SHAPES:
+    shapes = SHAPES
+    if cfg["shapes"]:       # e.g. shapes=gu,1536x8960 (name or NxK)
+        named = {n: (n, a, b) for n, a, b in SHAPES}
+        shapes = [named[x] if x in named else (x, *map(int, x.split("x"))) for x in cfg["shapes"].split(",")]
+    for name, N, K in shapes:
         W = torch.randint(-2**31, 2**31 - 1, (N, K // 8), dtype=torch.int64, device="cuda").to(torch.int32)
         Sc = (torch.rand(N, K // 32, device="cuda") * 0.02).half()
         w = W.to(torch.int64) & 0xFFFFFFFF
