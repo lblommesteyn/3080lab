@@ -1574,3 +1574,279 @@ extern "C" __global__ void __launch_bounds__({32 * WQ}) k(
   }}
 }}
 """
+
+
+def flash_prefill_v2_source(WQ: int = 4, maxlen: int = 512) -> str:
+    """flash_prefill_source with the K/V loads overlapped and the heaviest blocks first. v1 loads K and V
+    of a 64-position tile together and waits for both (cp.async.wait_group 0) before any math, so
+    every tile exposes a full load latency with 4 warps per block to hide it. Here K and V are
+    separate groups (FlashAttention-2 order): K of tile j + 1 loads during softmax and P V of tile j,
+    V of tile j + 1 during S = Q K^T of tile j + 1 (same shared memory, two more barriers per tile).
+    Causal blocks are unequal (the last 64 tokens of a chunk at position 1536 see 2048 keys, the
+    first 1600), so blockIdx.y counts from the end of the chunk: the longest blocks are scheduled
+    first and the short ones fill the tail. Same arguments and grid as v1."""
+    s = flash_prefill_source(WQ, maxlen)
+
+    def rep(a, b):
+        nonlocal s
+        assert s.count(a) == 1, a
+        s = s.replace(a, b)
+    rep("const int nthr = 32 * WQ, b0 = blockIdx.y * QR;",
+        "const int nthr = 32 * WQ, b0 = (gridDim.y - 1 - blockIdx.y) * QR;")
+    rep("""  #pragma unroll 1
+  for (int j0 = 0; j0 <= last; j0 += 64) {
+    for (int i = threadIdx.x; i < 64 * 16 * 2; i += nthr) {
+      int which = i / (64 * 16), r = (i / 16) % 64, c = i % 16, j = min(j0 + r, last);
+      if (which == 0) cp16(&Ks[r * RS + c * 8], kb + (size_t)j * HD + c * 8);
+      else cp16(&Vs[r * RS + c * 8], vb + (size_t)j * HD + c * 8);
+    }
+    asm volatile("cp.async.commit_group;");
+    asm volatile("cp.async.wait_group 0;");
+    __syncthreads();
+    if (j0 <= wlast) {
+      float s[8][4];
+""", """  auto load_kv = [&](int which, int jb) {
+    const __nv_bfloat16* src = which ? vb : kb;
+    __nv_bfloat16* dst = which ? Vs : Ks;
+    for (int i = threadIdx.x; i < 64 * 16; i += nthr) {
+      int r = i / 16, c = i % 16, j = min(jb + r, last);
+      cp16(&dst[r * RS + c * 8], src + (size_t)j * HD + c * 8);
+    }
+  };
+  load_kv(0, 0);
+  asm volatile("cp.async.commit_group;");
+  load_kv(1, 0);
+  asm volatile("cp.async.commit_group;");
+  #pragma unroll 1
+  for (int j0 = 0; j0 <= last; j0 += 64) {
+    asm volatile("cp.async.wait_group 1;");                     // K of this tile (V may be in flight)
+    __syncthreads();
+    const bool act = j0 <= wlast;
+    float s[8][4];
+    if (act) {
+""")
+    rep("""      float xA = mA, xB = mB;
+""", """    }
+    __syncthreads();                                            // every warp is done with K
+    if (j0 + 64 <= last) load_kv(0, j0 + 64);
+    asm volatile("cp.async.commit_group;");
+    if (act) {
+      float xA = mA, xB = mB;
+""")
+    rep("""      #pragma unroll
+      for (int kk = 0; kk < 4; ++kk) {""", """    }
+    asm volatile("cp.async.wait_group 1;");                     // V of this tile (next K may be in flight)
+    __syncthreads();
+    if (act) {
+      #pragma unroll
+      for (int kk = 0; kk < 4; ++kk) {""")
+    rep("""      }
+    }
+    __syncthreads();
+  }
+""", """      }
+    }
+    __syncthreads();                                            // every warp is done with V
+    if (j0 + 64 <= last) load_kv(1, j0 + 64);
+    asm volatile("cp.async.commit_group;");
+  }
+""")
+    return s
+
+
+def flash_prefill_v3_source(maxlen: int = 512) -> str:
+    """Causal prefill attention, two warp groups per block splitting the keys. v1/v2 run one block of 4
+    warps (one per SM partition) per 64 tokens: 96 blocks for a 512-token chunk, so most SMs hold one
+    warp per partition and the tensor core idles through each warp's softmax. Here a block has 8
+    warps: warps w and w + 4 own the same 16 query rows; group 0 takes key tiles 0, 64, 128, ... and
+    group 1 tiles 32, 96, ... (32 keys each, own K/V buffers, named barriers per group, K and V as
+    separate cp.async groups as in v2). At the end group 1 hands its (o, m, l) to group 0 through
+    shared memory, which merges, normalizes and stores. Masked scores are -inf (not v1's -1e30): a
+    group can meet a tile that is entirely in the future of a row before it has seen any key for it.
+    Heaviest blocks first, as v2. Grid (NH, ceil(P / 64)), 256 threads, same arguments as v1."""
+    RS = 128 + 8
+    smem = max(64 * RS * 2, 2 * 2 * 32 * RS * 2)
+    assert 64 * 128 * 4 + 2 * 64 * 4 <= smem
+    return f"""
+#include <cuda_bf16.h>
+#define HD 128
+#define MAXLEN {maxlen}
+#define RS {RS}
+#define NEG_INF __int_as_float(0xff800000)
+__device__ __forceinline__ unsigned pack_bf2(float lo, float hi) {{
+  __nv_bfloat162 v = __floats2bfloat162_rn(lo, hi);
+  return *reinterpret_cast<unsigned*>(&v);
+}}
+__device__ __forceinline__ void cp16(void* dst, const void* src) {{
+  unsigned d = (unsigned)__cvta_generic_to_shared(dst);
+  asm volatile("cp.async.cg.shared.global [%0], [%1], 16;" :: "r"(d), "l"(src));
+}}
+__device__ __forceinline__ void gbar(int gi) {{ asm volatile("bar.sync %0, 128;" :: "r"(1 + gi)); }}
+extern "C" __global__ void __launch_bounds__(256) k(
+    const __nv_bfloat16* __restrict__ qkv, const float* __restrict__ cosT, const float* __restrict__ sinT,
+    const long long* __restrict__ posp, const __nv_bfloat16* __restrict__ kc, const __nv_bfloat16* __restrict__ vc,
+    __nv_bfloat16* __restrict__ out, int NH, int NKV, float scale, int P)
+{{
+  __shared__ __align__(16) __nv_bfloat16 sm[{smem // 2}];
+  const int h = blockIdx.x, kvh = h / (NH / NKV);
+  const int warp = threadIdx.x >> 5, lane = threadIdx.x & 31, g = lane >> 2, t = lane & 3;
+  const int qw = warp & 3, gi = warp >> 2, gt = threadIdx.x & 127;
+  const int b0 = (gridDim.y - 1 - blockIdx.y) * 64;
+  const int pos0 = (int)posp[0];
+  const int NQ = (NH + 2 * NKV) * HD;
+  for (int i = threadIdx.x; i < 64 * 64; i += 256) {{
+    int r = i / 64, d = i % 64, b = min(b0 + r, P - 1), pos = pos0 + b;
+    float cs = cosT[pos * 64 + d], sn = sinT[pos * 64 + d];
+    float qa = __bfloat162float(qkv[(size_t)b * NQ + h * HD + d]), qb = __bfloat162float(qkv[(size_t)b * NQ + h * HD + d + 64]);
+    sm[r * RS + d] = __float2bfloat16_rn(qa * cs - qb * sn);
+    sm[r * RS + d + 64] = __float2bfloat16_rn(qb * cs + qa * sn);
+  }}
+  __syncthreads();
+  unsigned qa_[8][4];
+  #pragma unroll
+  for (int ks = 0; ks < 8; ++ks) {{
+    unsigned addr = (unsigned)__cvta_generic_to_shared(&sm[(qw * 16 + (lane & 7) + 8 * ((lane >> 3) & 1)) * RS + ks * 16 + 8 * (lane >> 4)]);
+    asm volatile("ldmatrix.sync.aligned.m8n8.x4.shared.b16 {{%0,%1,%2,%3}}, [%4];"
+                 : "=r"(qa_[ks][0]), "=r"(qa_[ks][1]), "=r"(qa_[ks][2]), "=r"(qa_[ks][3]) : "r"(addr));
+  }}
+  __syncthreads();
+  __nv_bfloat16* Ks = sm + gi * (2 * 32 * RS);
+  __nv_bfloat16* Vs = Ks + 32 * RS;
+  const __nv_bfloat16* kb = kc + (size_t)kvh * MAXLEN * HD;
+  const __nv_bfloat16* vb = vc + (size_t)kvh * MAXLEN * HD;
+  const float sl2 = scale * 1.4426950408889634f;
+  const int rowA = pos0 + b0 + qw * 16 + g, rowB = rowA + 8;
+  const int last = pos0 + min(b0 + 64, P) - 1;
+  const int wlast = pos0 + min(b0 + qw * 16 + 15, P - 1);
+  auto load = [&](int which, int jb) {{
+    const __nv_bfloat16* src = which ? vb : kb;
+    __nv_bfloat16* dst = which ? Vs : Ks;
+    for (int i = gt; i < 32 * 16; i += 128) {{
+      int r = i / 16, c = i % 16, j = min(jb + r, last);
+      cp16(&dst[r * RS + c * 8], src + (size_t)j * HD + c * 8);
+    }}
+  }};
+  float o[16][4];
+  #pragma unroll
+  for (int n = 0; n < 16; ++n) o[n][0] = o[n][1] = o[n][2] = o[n][3] = 0.f;
+  float mA = -1e30f, mB = -1e30f, lA = 0.f, lB = 0.f;
+  const int jfirst = gi * 32;
+  if (jfirst <= last) load(0, jfirst);
+  asm volatile("cp.async.commit_group;");
+  if (jfirst <= last) load(1, jfirst);
+  asm volatile("cp.async.commit_group;");
+  #pragma unroll 1
+  for (int j0 = jfirst; j0 <= last; j0 += 64) {{
+    asm volatile("cp.async.wait_group 1;");
+    gbar(gi);
+    const bool act = j0 <= wlast;
+    float s[4][4];
+    if (act) {{
+      #pragma unroll
+      for (int n = 0; n < 4; ++n) s[n][0] = s[n][1] = s[n][2] = s[n][3] = 0.f;
+      #pragma unroll
+      for (int n = 0; n < 4; ++n)
+        #pragma unroll
+        for (int kp = 0; kp < 4; ++kp) {{
+          unsigned bk[4];
+          unsigned addr = (unsigned)__cvta_generic_to_shared(&Ks[(n * 8 + (lane & 7)) * RS + kp * 32 + 8 * (lane >> 3)]);
+          asm volatile("ldmatrix.sync.aligned.m8n8.x4.shared.b16 {{%0,%1,%2,%3}}, [%4];"
+                       : "=r"(bk[0]), "=r"(bk[1]), "=r"(bk[2]), "=r"(bk[3]) : "r"(addr));
+          #pragma unroll
+          for (int h2 = 0; h2 < 2; ++h2) {{
+            const int ks = 2 * kp + h2;
+            asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.bf16.bf16.f32 {{%0,%1,%2,%3}}, {{%4,%5,%6,%7}}, {{%8,%9}}, {{%0,%1,%2,%3}};"
+                         : "+f"(s[n][0]), "+f"(s[n][1]), "+f"(s[n][2]), "+f"(s[n][3])
+                         : "r"(qa_[ks][0]), "r"(qa_[ks][1]), "r"(qa_[ks][2]), "r"(qa_[ks][3]), "r"(bk[2 * h2]), "r"(bk[2 * h2 + 1]));
+          }}
+        }}
+    }}
+    gbar(gi);                                                   // the group is done with K
+    if (j0 + 64 <= last) load(0, j0 + 64);
+    asm volatile("cp.async.commit_group;");
+    if (act) {{
+      float xA = mA, xB = mB;
+      #pragma unroll
+      for (int n = 0; n < 4; ++n) {{
+        const int c0 = j0 + n * 8 + 2 * t;
+        s[n][0] = c0 <= rowA ? s[n][0] * sl2 : NEG_INF; s[n][1] = c0 + 1 <= rowA ? s[n][1] * sl2 : NEG_INF;
+        s[n][2] = c0 <= rowB ? s[n][2] * sl2 : NEG_INF; s[n][3] = c0 + 1 <= rowB ? s[n][3] * sl2 : NEG_INF;
+        xA = fmaxf(xA, fmaxf(s[n][0], s[n][1])); xB = fmaxf(xB, fmaxf(s[n][2], s[n][3]));
+      }}
+      #pragma unroll
+      for (int o_ = 1; o_ <= 2; o_ <<= 1) {{
+        xA = fmaxf(xA, __shfl_xor_sync(0xffffffffu, xA, o_)); xB = fmaxf(xB, __shfl_xor_sync(0xffffffffu, xB, o_));
+      }}
+      const float aA = exp2f(mA - xA), aB = exp2f(mB - xB);
+      mA = xA; mB = xB;
+      float sA = 0.f, sB = 0.f;
+      #pragma unroll
+      for (int n = 0; n < 4; ++n) {{
+        s[n][0] = exp2f(s[n][0] - mA); s[n][1] = exp2f(s[n][1] - mA);
+        s[n][2] = exp2f(s[n][2] - mB); s[n][3] = exp2f(s[n][3] - mB);
+        sA += s[n][0] + s[n][1]; sB += s[n][2] + s[n][3];
+      }}
+      lA = lA * aA + sA; lB = lB * aB + sB;
+      #pragma unroll
+      for (int n = 0; n < 16; ++n) {{ o[n][0] *= aA; o[n][1] *= aA; o[n][2] *= aB; o[n][3] *= aB; }}
+    }}
+    asm volatile("cp.async.wait_group 1;");
+    gbar(gi);
+    if (act) {{
+      #pragma unroll
+      for (int kk = 0; kk < 2; ++kk) {{
+        unsigned pa[4] = {{pack_bf2(s[2 * kk][0], s[2 * kk][1]), pack_bf2(s[2 * kk][2], s[2 * kk][3]),
+                          pack_bf2(s[2 * kk + 1][0], s[2 * kk + 1][1]), pack_bf2(s[2 * kk + 1][2], s[2 * kk + 1][3])}};
+        #pragma unroll
+        for (int dn = 0; dn < 16; dn += 2) {{
+          unsigned bv[4];
+          unsigned addr = (unsigned)__cvta_generic_to_shared(&Vs[(kk * 16 + (lane & 7) + 8 * ((lane >> 3) & 1)) * RS + dn * 8 + 8 * (lane >> 4)]);
+          asm volatile("ldmatrix.sync.aligned.m8n8.x4.trans.shared.b16 {{%0,%1,%2,%3}}, [%4];"
+                       : "=r"(bv[0]), "=r"(bv[1]), "=r"(bv[2]), "=r"(bv[3]) : "r"(addr));
+          #pragma unroll
+          for (int e = 0; e < 2; ++e)
+            asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.bf16.bf16.f32 {{%0,%1,%2,%3}}, {{%4,%5,%6,%7}}, {{%8,%9}}, {{%0,%1,%2,%3}};"
+                         : "+f"(o[dn + e][0]), "+f"(o[dn + e][1]), "+f"(o[dn + e][2]), "+f"(o[dn + e][3])
+                         : "r"(pa[0]), "r"(pa[1]), "r"(pa[2]), "r"(pa[3]), "r"(bv[2 * e]), "r"(bv[2 * e + 1]));
+        }}
+      }}
+    }}
+    gbar(gi);                                                   // the group is done with V
+    if (j0 + 64 <= last) load(1, j0 + 64);
+    asm volatile("cp.async.commit_group;");
+  }}
+  asm volatile("cp.async.wait_group 0;");
+  #pragma unroll
+  for (int o_ = 1; o_ <= 2; o_ <<= 1) {{ lA += __shfl_xor_sync(0xffffffffu, lA, o_); lB += __shfl_xor_sync(0xffffffffu, lB, o_); }}
+  __syncthreads();                                              // both groups done with their buffers
+  float* ob = reinterpret_cast<float*>(sm);                     // group 1: o [64][128], then m [64], l [64]
+  float* mb = ob + 64 * 128;
+  float* lb = mb + 64;
+  const int rA = qw * 16 + g, rB = rA + 8;
+  if (gi == 1) {{
+    #pragma unroll
+    for (int n = 0; n < 16; ++n) {{
+      *reinterpret_cast<float2*>(&ob[rA * 128 + n * 8 + 2 * t]) = make_float2(o[n][0], o[n][1]);
+      *reinterpret_cast<float2*>(&ob[rB * 128 + n * 8 + 2 * t]) = make_float2(o[n][2], o[n][3]);
+    }}
+    if (t == 0) {{ mb[rA] = mA; mb[rB] = mB; lb[rA] = lA; lb[rB] = lB; }}
+  }}
+  __syncthreads();
+  if (gi == 1) return;
+  const float m1A = mb[rA], m1B = mb[rB];
+  const float MA = fmaxf(mA, m1A), MB = fmaxf(mB, m1B);
+  const float a0A = exp2f(mA - MA), a1A = exp2f(m1A - MA), a0B = exp2f(mB - MB), a1B = exp2f(m1B - MB);
+  const float iA = 1.f / (lA * a0A + lb[rA] * a1A), iB = 1.f / (lB * a0B + lb[rB] * a1B);
+  const int bA = b0 + rA, bB = b0 + rB;
+  #pragma unroll
+  for (int n = 0; n < 16; ++n) {{
+    const int d = n * 8 + 2 * t;
+    const float2 pA = *reinterpret_cast<const float2*>(&ob[rA * 128 + d]);
+    const float2 pB = *reinterpret_cast<const float2*>(&ob[rB * 128 + d]);
+    if (bA < P) *reinterpret_cast<__nv_bfloat162*>(&out[(size_t)bA * NH * HD + h * HD + d]) =
+        __floats2bfloat162_rn((o[n][0] * a0A + pA.x * a1A) * iA, (o[n][1] * a0A + pA.y * a1A) * iA);
+    if (bB < P) *reinterpret_cast<__nv_bfloat162*>(&out[(size_t)bB * NH * HD + h * HD + d]) =
+        __floats2bfloat162_rn((o[n][2] * a0B + pB.x * a1B) * iB, (o[n][3] * a0B + pB.y * a1B) * iB);
+  }}
+}}
+"""

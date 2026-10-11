@@ -1,0 +1,38 @@
+utilization.gpu [%], memory.used [MiB], clocks.current.sm [MHz], power.draw [W]
+1 %, 692 MiB, 1905 MHz, 120.27 W
+pid, process_name
+8412, C:\Windows\SystemApps\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\CrossDeviceResume.exe
+7972, C:\Windows\explorer.exe
+9616, C:\Windows\SystemApps\Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy\StartMenuExperienceHost.exe
+14504, C:\Program Files\WindowsApps\Microsoft.YourPhone_1.26072.257.0_x64__8wekyb3d8bbwe\PhoneExperienceHost.exe
+14224, C:\Program Files\Riot Vanguard\vgtray.exe
+15976, C:\Windows\SystemApps\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\TextInputHost.exe
+6788, C:\Program Files (x86)\Steam\bin\cef\cef.win64\steamwebhelper.exe
+17228, C:\Users\LukeB\AppData\Local\Discord\app-1.0.9260\Discord.exe
+21476, C:\Users\LukeB\AppData\Local\slack\app-4.52.178\slack.exe
+4000, C:\Users\LukeB\AppData\Local\slack\app-4.52.178\slack.exe
+12076, C:\Program Files\WindowsApps\BREEAITECHPTE.LTD.BreeXLSXEditor_1.0.8.0_x64__z5nd0wyapdvva\DocChatClient\DocChatClient.exe
+21732, C:\Program Files\WindowsApps\Microsoft.WindowsTerminal_1.24.12741.0_x64__8wekyb3d8bbwe\WindowsTerminal.exe
+23840, C:\Windows\SystemApps\ShellExperienceHost_cw5n1h2txyewy\ShellExperienceHost.exe
+27632, C:\Windows\ImmersiveControlPanel\SystemSettings.exe
+3376, C:\Windows\System32\ApplicationFrameHost.exe
+12116, C:\Windows\System32\ShellHost.exe
+23904, C:\Program Files\WindowsApps\Microsoft.ScreenSketch_11.2608.41.0_x64__8wekyb3d8bbwe\SnippingTool\SnippingTool.exe
+18112, C:\Program Files\WindowsApps\Microsoft.Windows.Photos_2026.11090.22001.0_x64__8wekyb3d8bbwe\Photos.exe
+37568, C:\Program Files\WindowsApps\Microsoft.MicrosoftOfficeHub_19.2610.35011.0_x64__8wekyb3d8bbwe\M365Copilot.exe
+27064, C:\Program Files (x86)\Microsoft\EdgeWebView\Application\154.0.4258.62\msedgewebview2.exe
+31840, C:\Program Files\WindowsApps\Microsoft.Windows.Photos_2026.11090.22001.0_x64__8wekyb3d8bbwe\Photos.exe
+19376, C:\Program Files\WindowsApps\OpenAI.Codex_26.1007.2314.0_x64__2p2nqsd0c76g0\app\ChatGPT.exe
+34564, C:\Users\LukeB\AppData\Local\OpenAI\Codex\runtimes\cua_node\cfb32733c877621e\bin\node_modules\@oai\sky\bin\windows\swift\x64\codex-computer-use-swift.exe
+6348, C:\Program Files\WindowsApps\OpenAI.Codex_26.1007.2314.0_x64__2p2nqsd0c76g0\app\ChatGPT.exe
+36748, C:\Program Files\WindowsApps\Claude_2.31226.1.0_x64__pzs8sxrjxfjjc\app\claude.exe
+36456, C:\Program Files\WindowsApps\Claude_2.31226.1.0_x64__pzs8sxrjxfjjc\app\claude.exe
+29848, C:\Program Files (x86)\Microsoft\EdgeWebView\Application\154.0.4258.62\msedgewebview2.exe
+19548, [Insufficient Permissions]
+42084, C:\Windows\SystemApps\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\SearchHost.exe
+22816, C:\Program Files (x86)\Microsoft\EdgeWebView\Application\154.0.4258.62\msedgewebview2.exe
+12688, C:\Program Files\WindowsApps\MSTeams_26246.1604.5133.838_x64__8wekyb3d8bbwe\ms-teams.exe
+34376, C:\Program Files\Google\Chrome\Application\chrome.exe
+1332, C:\Program Files\Google\Chrome\Application\chrome.exe
+40692, C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+4, [Insufficient Permissions]

@@ -1,0 +1,6 @@
+B=  1:    471.1 tok/s  (2.122 ms/step)  rows identical: True  matches single-sequence decode for 74/128 tokens
+B=  2:    939.5 tok/s  (2.129 ms/step)  rows identical: True  matches single-sequence decode for 74/128 tokens
+B=  4:   1841.1 tok/s  (2.173 ms/step)  rows identical: True  matches single-sequence decode for 74/128 tokens
+B=  8:   3455.7 tok/s  (2.315 ms/step)  rows identical: True  matches single-sequence decode for 74/128 tokens
+B= 16:   5673.5 tok/s  (2.820 ms/step)  rows identical: True  matches single-sequence decode for 73/128 tokens
+B= 32:   7207.7 tok/s  (4.440 ms/step)  rows identical: True  matches single-sequence decode for 73/128 tokens

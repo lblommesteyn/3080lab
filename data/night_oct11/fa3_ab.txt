@@ -1,0 +1,16 @@
+r1 P=512 fa=1: i8     chunk= 512 P=512:    26034 tok/s (19.67 ms min, 19.70 median) | K err 6.3e-03 V err 7.3e-02 | last logits err 2.1e-02, argmax same: True
+r1 P=512 fa=3: i8     chunk= 512 P=512:    26647 tok/s (19.21 ms min, 19.24 median) | K err 6.3e-03 V err 7.3e-02 | last logits err 1.9e-02, argmax same: True
+r1 P=2048 fa=1: i8     chunk= 512 P=2048:    24021 tok/s (85.26 ms min, 86.17 median) | K err 9.4e-03 V err 6.2e-02 | last logits err 1.6e-02, argmax same: True
+r1 P=2048 fa=3: i8     chunk= 512 P=2048:    24531 tok/s (83.48 ms min, 84.59 median) | K err 9.4e-03 V err 6.2e-02 | last logits err 2.1e-02, argmax same: True
+r2 P=512 fa=1: i8     chunk= 512 P=512:    26042 tok/s (19.66 ms min, 19.68 median) | K err 6.3e-03 V err 7.3e-02 | last logits err 2.1e-02, argmax same: True
+r2 P=512 fa=3: i8     chunk= 512 P=512:    26552 tok/s (19.28 ms min, 19.40 median) | K err 6.3e-03 V err 7.3e-02 | last logits err 1.9e-02, argmax same: True
+r2 P=2048 fa=1: i8     chunk= 512 P=2048:    24080 tok/s (85.05 ms min, 86.34 median) | K err 9.4e-03 V err 6.2e-02 | last logits err 1.6e-02, argmax same: True
+r2 P=2048 fa=3: i8     chunk= 512 P=2048:    24584 tok/s (83.31 ms min, 84.89 median) | K err 9.4e-03 V err 6.2e-02 | last logits err 2.1e-02, argmax same: True
+r3 P=512 fa=1: i8     chunk= 512 P=512:    26021 tok/s (19.68 ms min, 19.70 median) | K err 6.3e-03 V err 7.3e-02 | last logits err 2.1e-02, argmax same: True
+r3 P=512 fa=3: i8     chunk= 512 P=512:    26437 tok/s (19.37 ms min, 19.41 median) | K err 6.3e-03 V err 7.3e-02 | last logits err 1.9e-02, argmax same: True
+r3 P=2048 fa=1: i8     chunk= 512 P=2048:    23994 tok/s (85.35 ms min, 86.15 median) | K err 9.4e-03 V err 6.2e-02 | last logits err 1.6e-02, argmax same: True
+r3 P=2048 fa=3: i8     chunk= 512 P=2048:    24492 tok/s (83.62 ms min, 84.72 median) | K err 9.4e-03 V err 6.2e-02 | last logits err 2.1e-02, argmax same: True
+r4 P=512 fa=1: i8     chunk= 512 P=512:    26126 tok/s (19.60 ms min, 19.68 median) | K err 6.3e-03 V err 7.3e-02 | last logits err 2.1e-02, argmax same: True
+r4 P=512 fa=3: i8     chunk= 512 P=512:    26467 tok/s (19.35 ms min, 19.40 median) | K err 6.3e-03 V err 7.3e-02 | last logits err 1.9e-02, argmax same: True
+r4 P=2048 fa=1: i8     chunk= 512 P=2048:    23982 tok/s (85.40 ms min, 86.41 median) | K err 9.4e-03 V err 6.2e-02 | last logits err 1.6e-02, argmax same: True
+r4 P=2048 fa=3: i8     chunk= 512 P=2048:    24562 tok/s (83.38 ms min, 84.61 median) | K err 9.4e-03 V err 6.2e-02 | last logits err 2.1e-02, argmax same: True

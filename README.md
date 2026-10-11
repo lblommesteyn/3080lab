@@ -381,6 +381,8 @@ llama.cpp's Q4_0 weights: 446 -> 463 tok/s, 1.36x llama.cpp (340.5).**
 | + Q6_K-exact lm_head (191 MB, llama.cpp's own format and bytes; checked vs float64, 9e-8) | 492 |
 | + gate/up split-K 2, single-pass RMSNorm | **509 (1.50x llama.cpp's 340.5)** |
 
+**Re-measured Oct 11 with the desktop idle** (Night run section): llama.cpp 368.7 tok/s, ours 509.6, so **1.38x**.
+
 Refuted: folding RMSNorm into the residual GEMVs with a last-block-done tail
 (396 tok/s): the fenced, serialized tail costs ~8.7 us per site against 2.25 us
 for a separate kernel in the graph. Also refuted: prefetching the next GEMVs'
@@ -631,6 +633,8 @@ config at B = 32 it matches for 84 tokens again, at 4607 tok/s.
 | llama.cpp b11485 | 336 | 964 | 1420 | 2424 | 3566 |
 | ratio, best | 1.39 | **1.89** | **2.41** | **2.30** | **1.99** |
 
+**Re-measured Oct 11 with the desktop idle** (Night run section): 1.50 / 1.88 / 2.41 / 2.27 / 1.97x at B = 2-32.
+
 B = 2: 930 tok/s against llama.cpp's 614 (1.51x). B = 1 through this path: 468 tok/s; the
 single-sequence decode (509) is still better there.
 
@@ -711,6 +715,7 @@ logits against token-by-token prefill through the validated decode step; perplex
 Prompts longer than 512 run in chunks of 512 against a `maxlen`-sized KV cache (`maxlen=` argument,
 default max(512, P)); the last-token argmax matches the token-by-token reference at 1024 and 2048.
 llama.cpp's pp512 measured 15,910 +- 1,718 in the later session, so the 512 ratio is between 1.21 and 1.35.
+**Re-measured Oct 11 with the desktop idle** (Night run section): 1.64 / 1.50 / 1.40 / 1.35 / 1.33x at P = 128-2048; with the new down tile 1.41x at 512 and 1.36x at 2048; with v3 attention too **1.44x and 1.39x**.
 
 Where the 55 ms of the cuBLAS path went at P = 512 (ablation): matmuls 27 ms (at the fp16 x fp16 ->
 fp32 tensor-core peak), attention 13 ms, dequantization 5 ms, torch epilogues and the rest 10 ms.
@@ -828,7 +833,111 @@ tiles; 11 never-run tiles chosen across the predicted range, predictions written
 held-out tile (128 x 32, 16 warps), so the model still under-charges low occupancy, the very
 effect ("16 warps beat 8") it was built to explain. Its best find, a 128 x 32 / 16-warp down tile
 (predicted 172.1 us, measured 172.4 vs 192 for the default), did not resolve end to end under
-desktop contention (two of three runs each way) and is not the default.
+desktop contention (two of three runs each way) and is not the default. **Update (Oct 11):** with
+the desktop idle it won all 8 interleaved end-to-end pairs (+2.4% at P = 512, +2.6% at 2048) and is
+now the default; see the next section.
+
+### Occupancy sweep: the bias was the copy path (`scripts/occupancy_sweep.py`, Oct 11)
+
+To separate occupancy from everything else that differs between tiles, the sweep runs the SAME
+compiled kernel at 1, 2, 3 blocks per SM: occupancy is lowered by launching with unused dynamic
+shared memory, the grid is one wave of exactly b blocks per SM, and per-stage cycles are the slope
+over K times the SM clock read by NVML during the timing (the clock moves with occupancy: 1935 MHz
+copying only, 1655-1890 with the tensor cores busy). Six tiles x {full, compute only, copies only}
+x every reachable occupancy, 41 points (`data/occupancy_sweep.json`), against
+`scripts/occupancy_model.py`:
+
+- **Compute only is right at one block** (measured / simulated 0.98-1.15) and 11-20% slow from two
+  blocks up (one exception: the 64 x 64 tile at 2 blocks, 0.97), for 4- and 8-warp blocks alike:
+  an inter-block cost the simulator does not have,
+  not a latency-hiding one.
+- **Copies only are where the model was wrong**: the GEMM's copies run at ~0.7 lanes per cycle per
+  SM (1.34-1.65 cycles per lane at 2-3 blocks), not the 1.0 that `l2_cpasync` measured with a
+  plain copy loop. A per-SM limit on copy lanes in flight (Little's law: in flight / latency) fits
+  this better than a slower port: with at most 500 lanes in flight and the 570-cycle latency,
+  multi-block copy-only points land at 0.88-1.13 and full kernels at 0.99-1.15
+  (`lab/gemm_model.py: CP_INFLIGHT`). Still wrong: one block with a 3-stage ring runs 25-39%
+  slower than simulated (one block and its barrier per stage cannot keep copies and math going
+  at once); one block with a 2-stage ring copies faster than the cap allows.
+
+Scored on all 88 GEMM timings (11 in-sample tiles, the 11 held-out ones; `scripts/gemm_model_variants.py`):
+
+| copy model | median error, in sample | held out | within 20% | Spearman qkv / o / gu / down |
+|---|---|---|---|---|
+| v1: 1 lane / cycle, no cap | 15.5% | 10.9% | 60/88 | 0.66 / 0.58 / 0.49 / 0.68 |
+| 0.75 lanes / cycle | 12.3% | 6.8% | 66/88 | 0.74 / 0.32 / 0.48 / 0.59 |
+| **cap 500 lanes in flight, latency 570** | **9.8%** | **6.4%** | **71/88** | 0.74 / 0.42 / 0.47 / 0.71 |
+
+The variant was chosen on these same 88 points, so the "held out" column is no longer a blind test
+(the sweep, not the 88, suggested the mechanism). Absolute error drops by a third; ranking does
+not improve, because the remaining errors (the inter-block compute cost, one-block rings) are as
+large as the differences between the good tiles. The model is now a fair estimator of a tile's
+time and still not a reliable judge between two tiles within ~10% of each other.
+
+### Night run, Oct 11: idle desktop, everything re-measured (`data/night_oct11/`, `scripts/night_summary.py`)
+
+GPU at start: 1% utilization, 692 MiB used, no compute processes (desktop apps left open but idle).
+Three interleaved rounds of ours and llama.cpp b11485 on the same GGUF; best of everything on both
+sides (llama.cpp: best of 15 `llama-bench` repetitions per round for prefill, 10 for decode, best
+`llama-batched-bench` round; ours: minimum of 21 graph replays per run, best run). Our runs agree to
+within 1% round to round; llama.cpp's best round mean is within 2-4% of its best sample.
+
+| | ours | llama.cpp | ratio |
+|---|---:|---:|---:|
+| decode B = 1 (`qwen_gguf.py` vs `llama-bench -n 256`, best of -fa 0 / 1) | 509.6 | 368.7 | **1.38x** |
+| batched decode B = 2 / 4 / 8 / 16 / 32 (`qwen_batched_decode.py` vs `llama-batched-bench` S_TG) | 943 / 1851 / 3467 / 5674 / 7216 | 630 / 982 / 1437 / 2499 / 3664 | **1.50 / 1.88 / 2.41 / 2.27 / 1.97x** |
+| prefill P = 128 / 256 / 512 / 1024 / 2048 (`qwen_prefill.py modes=i8` vs `llama-bench -fa 1`) | 17,949 / 22,794 / 25,868 / 25,063 / 23,515 | 10,921 / 15,173 / 18,528 / 18,503 / 17,637 | **1.64 / 1.50 / 1.40 / 1.35 / 1.33x** |
+
+llama.cpp decodes faster on an idle desktop too (368.7 vs the 340.5 measured in September), so the
+B = 1 decode lead is 1.38x, not 1.50x. Prefill gained more on our side (25.9K at 512 against the
+21-25K measured under contention), so its lead grows. Prefill above is with the old down tile;
+the new default adds 2.4-2.6% (next).
+
+**Down tile A/B** (P = 512 and 2048, 4 rounds, default and candidate interleaved, min of 21 each):
+128 x 32 with 16 warps per SM (`tile_down=4,2,2,2,4,2,1`) won all 8 pairs, 19.65-19.67 ms vs
+20.07-20.19 at 512 and 85.31-85.47 vs 86.85-87.66 at 2048, with the same K/V and logit errors and the
+same argmax. It is the default now: **26,032 tok/s at P = 512, 23,981 at 2048** (1.41x and 1.36x).
+
+**Where long prompts lose** (ablations: `skip=fa`, `skip=kvw`, `skip=gemm`, round 2):
+
+| P | total | attention | K/V write | everything else per token |
+|---|---:|---:|---:|---:|
+| 512 | 19.67 ms | 1.22 ms (6%) | 0.32 ms | 36.0 us |
+| 1024 | 40.23 ms | 3.18 ms (8%) | 0.67 ms | 36.2 us |
+| 2048 | 84.97 ms | 10.48 ms (12%) | 1.01 ms | 36.4 us |
+
+Without attention the cost per token is flat, so the drop from 26K to 24K tok/s is attention, whose
+work grows with the context. At P = 2048 it already runs at 34 TFLOPS (361 GFLOP), about 55% of the
+62 TFLOPS bf16-into-fp32 peak at the power-capped clock: at most ~4 ms (5%) to win.
+
+**Prefill attention v3** (`flash_prefill_v3_source`, `scripts/flash_bench.py`). v1 runs one block of
+4 warps per head and 64 tokens: 96 blocks for a 512-token chunk, so most SMs hold one warp per
+partition, and the tensor core idles through every warp's softmax (one warp per partition saturates
+it only while it issues MMAs back to back). v2 only overlapped the K/V loads (K and V as separate
+cp.async groups) and scheduled the longest causal blocks first: 3.5-7% per chunk. v3 gives each block
+8 warps in two groups that own the same 16-row query slices and split the keys (group 0 takes key
+tiles 0, 64, 128, ..., group 1 tiles 32, 96, ...; own K/V buffers, named barriers per group); group 1
+hands its (o, m, l) to group 0 through shared memory at the end. Two warps per partition, no extra
+global traffic, no combine kernel, 166 registers instead of 226. One trap: masked scores must be
+-inf, not v1's -1e30, because a group can meet a tile entirely in a row's future before it has seen
+any key for that row (exp2(-1e30 - (-1e30)) = 1 would count it).
+
+| chunk of 512 at position | v1 | v2 | v3 | v3 TFLOPS |
+|---|---:|---:|---:|---:|
+| 0 | 42.5 us | 40.7 | **27.9** | 28.9 |
+| 512 | 81.5 | 75.9 | **64.3** | 37.6 |
+| 1024 | 120.6 | 114.4 | **101.4** | 39.7 |
+| 1536 | 161.0 | 152.7 | **138.5** | 40.7 |
+
+Same error against an fp32 reference as v1 (1.5-3.1e-3). End to end (4 rounds interleaved with v1,
+`fa=1` selects it): all 8 pairs won, 19.21-19.37 ms vs 19.60-19.68 at P = 512 and 83.31-83.62 vs
+85.05-85.40 at 2048, same K/V errors and argmax. Perplexity on README text moves by +0.01 to +0.10%
+(i8 at 2048: 23.591 to 23.613; the P values are rounded to bf16 against each group's own running
+max), the size of the int8-vs-fp16 difference itself. It is the default.
+
+**Prefill now: 26,647 tok/s at P = 512 (1.44x llama.cpp's best 18,528) and 24,584 at 2048 (1.39x
+its 17,637).** Attention at P = 2048 is ~8.6 ms of 83.3; at 41 TFLOPS against the ~62 peak the most
+left there is ~3 ms.
 
 ### Phase 8: our own block scheduler (`lab/resched.py`, `lab/verify.py`, `pair_latency`, `mufu_latency`, `resched_rand`)
 

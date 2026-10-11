@@ -1,0 +1,282 @@
+[
+ {
+  "tile": "A",
+  "abl": "",
+  "blocks_sm": 1,
+  "warps_sm": 4,
+  "sim_cyc": 797.2
+ },
+ {
+  "tile": "A",
+  "abl": "",
+  "blocks_sm": 2,
+  "warps_sm": 8,
+  "sim_cyc": 1247.0
+ },
+ {
+  "tile": "A",
+  "abl": "",
+  "blocks_sm": 3,
+  "warps_sm": 12,
+  "sim_cyc": 1778.0
+ },
+ {
+  "tile": "A",
+  "abl": "noload",
+  "blocks_sm": 1,
+  "warps_sm": 4,
+  "sim_cyc": 678.7
+ },
+ {
+  "tile": "A",
+  "abl": "noload",
+  "blocks_sm": 2,
+  "warps_sm": 8,
+  "sim_cyc": 1008.3
+ },
+ {
+  "tile": "A",
+  "abl": "noload",
+  "blocks_sm": 3,
+  "warps_sm": 12,
+  "sim_cyc": 1338.9
+ },
+ {
+  "tile": "A",
+  "abl": "nocompute",
+  "blocks_sm": 1,
+  "warps_sm": 4,
+  "sim_cyc": 689.7
+ },
+ {
+  "tile": "A",
+  "abl": "nocompute",
+  "blocks_sm": 2,
+  "warps_sm": 8,
+  "sim_cyc": 1173.2
+ },
+ {
+  "tile": "A",
+  "abl": "nocompute",
+  "blocks_sm": 3,
+  "warps_sm": 12,
+  "sim_cyc": 1703.1
+ },
+ {
+  "tile": "D",
+  "abl": "",
+  "blocks_sm": 1,
+  "warps_sm": 8,
+  "sim_cyc": 2319.7
+ },
+ {
+  "tile": "D",
+  "abl": "",
+  "blocks_sm": 2,
+  "warps_sm": 16,
+  "sim_cyc": 3852.4
+ },
+ {
+  "tile": "D",
+  "abl": "noload",
+  "blocks_sm": 1,
+  "warps_sm": 8,
+  "sim_cyc": 1972.5
+ },
+ {
+  "tile": "D",
+  "abl": "noload",
+  "blocks_sm": 2,
+  "warps_sm": 16,
+  "sim_cyc": 3538.4
+ },
+ {
+  "tile": "D",
+  "abl": "nocompute",
+  "blocks_sm": 1,
+  "warps_sm": 8,
+  "sim_cyc": 2093.6
+ },
+ {
+  "tile": "D",
+  "abl": "nocompute",
+  "blocks_sm": 2,
+  "warps_sm": 16,
+  "sim_cyc": 2743.2
+ },
+ {
+  "tile": "B",
+  "abl": "",
+  "blocks_sm": 1,
+  "warps_sm": 8,
+  "sim_cyc": 1318.5
+ },
+ {
+  "tile": "B",
+  "abl": "",
+  "blocks_sm": 2,
+  "warps_sm": 16,
+  "sim_cyc": 2222.7
+ },
+ {
+  "tile": "B",
+  "abl": "noload",
+  "blocks_sm": 1,
+  "warps_sm": 8,
+  "sim_cyc": 1087.0
+ },
+ {
+  "tile": "B",
+  "abl": "noload",
+  "blocks_sm": 2,
+  "warps_sm": 16,
+  "sim_cyc": 1818.7
+ },
+ {
+  "tile": "B",
+  "abl": "nocompute",
+  "blocks_sm": 1,
+  "warps_sm": 8,
+  "sim_cyc": 797.6
+ },
+ {
+  "tile": "B",
+  "abl": "nocompute",
+  "blocks_sm": 2,
+  "warps_sm": 16,
+  "sim_cyc": 1475.6
+ },
+ {
+  "tile": "E",
+  "abl": "",
+  "blocks_sm": 1,
+  "warps_sm": 4,
+  "sim_cyc": 1218.6
+ },
+ {
+  "tile": "E",
+  "abl": "",
+  "blocks_sm": 2,
+  "warps_sm": 8,
+  "sim_cyc": 2032.0
+ },
+ {
+  "tile": "E",
+  "abl": "noload",
+  "blocks_sm": 1,
+  "warps_sm": 4,
+  "sim_cyc": 1008.0
+ },
+ {
+  "tile": "E",
+  "abl": "noload",
+  "blocks_sm": 2,
+  "warps_sm": 8,
+  "sim_cyc": 1605.7
+ },
+ {
+  "tile": "E",
+  "abl": "nocompute",
+  "blocks_sm": 1,
+  "warps_sm": 4,
+  "sim_cyc": 796.5
+ },
+ {
+  "tile": "E",
+  "abl": "nocompute",
+  "blocks_sm": 2,
+  "warps_sm": 8,
+  "sim_cyc": 1474.5
+ },
+ {
+  "tile": "H",
+  "abl": "",
+  "blocks_sm": 1,
+  "warps_sm": 4,
+  "sim_cyc": 1858.5
+ },
+ {
+  "tile": "H",
+  "abl": "",
+  "blocks_sm": 2,
+  "warps_sm": 8,
+  "sim_cyc": 2236.7
+ },
+ {
+  "tile": "H",
+  "abl": "noload",
+  "blocks_sm": 1,
+  "warps_sm": 4,
+  "sim_cyc": 1046.5
+ },
+ {
+  "tile": "H",
+  "abl": "noload",
+  "blocks_sm": 2,
+  "warps_sm": 8,
+  "sim_cyc": 1800.5
+ },
+ {
+  "tile": "H",
+  "abl": "nocompute",
+  "blocks_sm": 1,
+  "warps_sm": 4,
+  "sim_cyc": 1785.7
+ },
+ {
+  "tile": "H",
+  "abl": "nocompute",
+  "blocks_sm": 2,
+  "warps_sm": 8,
+  "sim_cyc": 2154.4
+ },
+ {
+  "tile": "T",
+  "abl": "",
+  "blocks_sm": 1,
+  "warps_sm": 8,
+  "sim_cyc": 1788.6
+ },
+ {
+  "tile": "T",
+  "abl": "",
+  "blocks_sm": 2,
+  "warps_sm": 16,
+  "sim_cyc": 2088.9
+ },
+ {
+  "tile": "T",
+  "abl": "noload",
+  "blocks_sm": 1,
+  "warps_sm": 8,
+  "sim_cyc": 1126.6
+ },
+ {
+  "tile": "T",
+  "abl": "noload",
+  "blocks_sm": 2,
+  "warps_sm": 16,
+  "sim_cyc": 1928.1
+ },
+ {
+  "tile": "T",
+  "abl": "nocompute",
+  "blocks_sm": 1,
+  "warps_sm": 8,
+  "sim_cyc": 1700.5
+ },
+ {
+  "tile": "T",
+  "abl": "nocompute",
+  "blocks_sm": 2,
+  "warps_sm": 16,
+  "sim_cyc": 2004.9
+ },
+ {
+  "tile": "T",
+  "abl": "nocompute",
+  "blocks_sm": 3,
+  "warps_sm": 24,
+  "sim_cyc": 2932.9
+ }
+]

@@ -1,0 +1,8 @@
+P=512 maxlen=2048 regs v1:226 v2:219 v3:166
+pos0=    0:  v1    42.5 us ( 19.0 TFLOPS, err 2.4e-03)  v2    40.7 us ( 19.8 TFLOPS, err 2.4e-03)  v3    27.9 us ( 28.9 TFLOPS, err 2.4e-03)
+pos0=  512:  v1    81.5 us ( 29.7 TFLOPS, err 3.1e-03)  v2    75.9 us ( 31.8 TFLOPS, err 3.1e-03)  v3    64.3 us ( 37.6 TFLOPS, err 3.1e-03)
+pos0= 1024:  v1   120.6 us ( 33.4 TFLOPS, err 2.4e-03)  v2   114.4 us ( 35.2 TFLOPS, err 2.4e-03)  v3   101.4 us ( 39.7 TFLOPS, err 2.4e-03)
+pos0= 1536:  v1   161.0 us ( 35.0 TFLOPS, err 1.5e-03)  v2   152.7 us ( 36.9 TFLOPS, err 1.5e-03)  v3   138.5 us ( 40.7 TFLOPS, err 1.5e-03)
+P=128 maxlen=2048 regs v1:226 v2:219 v3:166
+pos0=    0:  v1    14.5 us (  3.5 TFLOPS, err 2.4e-03)  v2    14.2 us (  3.5 TFLOPS, err 2.4e-03)  v3    12.3 us (  4.1 TFLOPS, err 2.4e-03)
+pos0= 1920:  v1   118.1 us ( 13.2 TFLOPS, err 2.0e-03)  v2   108.8 us ( 14.3 TFLOPS, err 2.0e-03)  v3    80.4 us ( 19.4 TFLOPS, err 2.0e-03)

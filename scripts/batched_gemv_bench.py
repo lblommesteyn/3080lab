@@ -34,7 +34,7 @@ class Kern:
         self.keep = []
 
     def launch(self, grid, block, args, gy=1):
-        a = [x if isinstance(x, (ctypes.c_uint64, ctypes.c_int32)) else ctypes.c_uint64(x) for x in args]
+        a = [x if isinstance(x, (ctypes.c_uint64, ctypes.c_int32, ctypes.c_float)) else ctypes.c_uint64(x) for x in args]
         p = (ctypes.c_void_p * len(a))(*[ctypes.addressof(z) for z in a])
         self.keep.append((a, p))
         st_ = cu.CUstream(torch.cuda.current_stream().cuda_stream)

@@ -54,11 +54,17 @@ extern "C" __global__ void k(const unsigned* __restrict__ W, const __half* __res
 # v2 configs per chunk bucket (from the decode sweeps; B = chunk)
 V2CFG = D.CONFIG2
 FA = "fa=0" not in sys.argv
+# flash attention version: fa=1 the first (one 4-warp block per head and 64 tokens), default v3 (two warp
+# groups split the keys: lab/qwen_batched.flash_prefill_v3_source, 14-34% faster per chunk, flash_bench.py)
+FA_V1 = "fa=1" in sys.argv
 I8CFG = (2, 2, 2, 4, 4, 3)       # gemm_q4i8 (WM, WN, MT, NT, KB, MINB), scripts/prefill_gemm_bench.py sweep
 MS = "ms=0" not in sys.argv      # i8 GEMM: multistage, weights through shared memory (gemm_q4i8_ms_source)
 # per GEMM (WM, WN, MT, NT, KB, NSTG, MINB), prefill_gemm_bench.py sweeps at P = 512: 128-row tiles cut the
-# re-reads of X for the wide matrices; o and down (N = 1536) need the 64-row tile to fill 68 SMs
-I8MS = {"qkv": (4, 2, 2, 4, 4, 2, 2), "o": (2, 2, 2, 4, 2, 3, 3), "gu": (4, 2, 2, 4, 4, 2, 2), "down": (2, 2, 2, 4, 2, 3, 3)}
+# re-reads of X for the wide matrices; o (N = 1536) needs the 64-row tile to fill 68 SMs; down: 128 x 32
+# with 16 warps / SM (lab/gemm_model.py's pick; e2e A/B Oct 11, idle GPU: 8/8 pairs, +2.4-2.6%)
+I8MS = {"qkv": (4, 2, 2, 4, 4, 2, 2), "o": (2, 2, 2, 4, 2, 3, 3), "gu": (4, 2, 2, 4, 4, 2, 2), "down": (4, 2, 2, 2, 4, 2, 1)}
+# timing ablation only (wrong results): skip=fa,kvw,gemm leaves out attention, the K/V write, the GEMMs
+SKIP = set(next((a[5:].split(",") for a in sys.argv[1:] if a.startswith("skip=")), []))
 for _a in sys.argv[1:]:              # tile_<gemm>=WM,WN,MT,NT,KB,NSTG,MINB overrides one GEMM's tile
     if _a.startswith("tile_"):
         _k, _v = _a[5:].split("=")
@@ -90,7 +96,7 @@ class Prefill:
         self.k_attn = Kern(batchify(attn, off))
         self.fa = FA                                    # tensor-core causal attention instead of ATTN4 per token
         if FA:
-            self.k_fa = Kern(QB.flash_prefill_source(4, Q.MAX_LEN))
+            self.k_fa = Kern(QB.flash_prefill_source(4, Q.MAX_LEN) if FA_V1 else QB.flash_prefill_v3_source(Q.MAX_LEN))
         if mode == "v2":
             bucket = 8 if P <= 8 else 16 if P <= 16 else 32
             assert P <= 32
@@ -143,6 +149,8 @@ class Prefill:
                              ctypes.c_int32(K), self.ws.data_ptr(), self.cnt.data_ptr()])
 
     def gemm8(self, i, name, X, Y, aux, N, K):
+        if "gemm" in SKIP:
+            return
         P = self.P
         nb = P * K // 32
         self.k_q.launch((nb + 7) // 8, 256, [X.data_ptr(), self.xq.data_ptr(), self.xd.data_ptr(), self.xs.data_ptr(),
@@ -172,9 +180,12 @@ class Prefill:
                 self.qkv.copy_(self.gemm("qkv", L, self.x, self.nq, H) + L["qkv_b"])
             args = [self.qkv.data_ptr(), m.cos.data_ptr(), m.sin.data_ptr(), self.pos.data_ptr(), self.kc[i].data_ptr(),
                     self.vc[i].data_ptr(), self.att.data_ptr(), ctypes.c_int32(m.nh), ctypes.c_int32(m.nkv), scale]
-            self.k_kvw.launch((m.nh, P), 512, args)
-            if self.fa:
-                self.k_fa.launch((m.nh, (P + 63) // 64), 128, args[:6] + [self.att.data_ptr(), ctypes.c_int32(m.nh),
+            if "kvw" not in SKIP:
+                self.k_kvw.launch((m.nh, P), 512, args)
+            if "fa" in SKIP:
+                pass
+            elif self.fa:
+                self.k_fa.launch((m.nh, (P + 63) // 64), 128 if FA_V1 else 256, args[:6] + [self.att.data_ptr(), ctypes.c_int32(m.nh),
                                                                            ctypes.c_int32(m.nkv), scale, ctypes.c_int32(P)])
             else:
                 self.k_attn.launch((m.nh, P), 512, args)

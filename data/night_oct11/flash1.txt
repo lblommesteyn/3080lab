@@ -1,0 +1,5 @@
+P=512 maxlen=2048 regs v1:226 v2:219 v1w2:226 v2w2:219
+pos0=    0:  v1    42.2 us ( 19.1 TFLOPS, err 2.4e-03)  v2    40.8 us ( 19.7 TFLOPS, err 2.4e-03)  v1w2    65.1 us ( 12.4 TFLOPS, err 2.4e-03)  v2w2    40.8 us ( 19.7 TFLOPS, err 2.4e-03)
+pos0=  512:  v1    81.8 us ( 29.5 TFLOPS, err 3.1e-03)  v2    76.3 us ( 31.7 TFLOPS, err 3.1e-03)  v1w2   138.2 us ( 17.5 TFLOPS, err 3.1e-03)  v2w2    96.1 us ( 25.1 TFLOPS, err 3.1e-03)
+pos0= 1024:  v1   120.3 us ( 33.5 TFLOPS, err 2.4e-03)  v2   113.7 us ( 35.4 TFLOPS, err 2.4e-03)  v1w2   207.2 us ( 19.4 TFLOPS, err 2.4e-03)  v2w2   150.3 us ( 26.8 TFLOPS, err 2.4e-03)
+pos0= 1536:  v1   159.2 us ( 35.4 TFLOPS, err 1.5e-03)  v2   153.5 us ( 36.7 TFLOPS, err 1.5e-03)  v1w2   283.8 us ( 19.9 TFLOPS, err 1.5e-03)  v2w2   207.2 us ( 27.2 TFLOPS, err 1.5e-03)

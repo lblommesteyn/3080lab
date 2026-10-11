@@ -1,0 +1,30 @@
+r1 P=512 skip=none: i8     chunk= 512 P=512:    25512 tok/s (20.07 ms min, 20.50 median) |
+r1 P=512 skip=fa: i8     chunk= 512 P=512:    27707 tok/s (18.48 ms min, 18.61 median) |
+r1 P=512 skip=kvw: i8     chunk= 512 P=512:    26640 tok/s (19.22 ms min, 19.38 median) |
+r1 P=512 skip=gemm: i8     chunk= 512 P=512:   215983 tok/s (2.37 ms min, 2.38 median) | K
+r1 P=512 skip=fa,kvw: i8     chunk= 512 P=512:    28515 tok/s (17.96 ms min, 18.06 median) |
+r1 P=1024 skip=none: i8     chunk= 512 P=1024:    25388 tok/s (40.33 ms min, 40.77 median) 
+r1 P=1024 skip=fa: i8     chunk= 512 P=1024:    27746 tok/s (36.91 ms min, 37.39 median) 
+r1 P=1024 skip=kvw: i8     chunk= 512 P=1024:    25940 tok/s (39.48 ms min, 39.79 median) 
+r1 P=1024 skip=gemm: i8     chunk= 512 P=1024:   175500 tok/s (5.83 ms min, 5.85 median) | 
+r1 P=1024 skip=fa,kvw: i8     chunk= 512 P=1024:    28457 tok/s (35.98 ms min, 36.65 median) 
+r1 P=2048 skip=none: i8     chunk= 512 P=2048:    23981 tok/s (85.40 ms min, 86.34 median) 
+r1 P=2048 skip=fa: i8     chunk= 512 P=2048:    27561 tok/s (74.31 ms min, 75.36 median) 
+r1 P=2048 skip=kvw: i8     chunk= 512 P=2048:    24433 tok/s (83.82 ms min, 85.06 median) 
+r1 P=2048 skip=gemm: i8     chunk= 512 P=2048:   128394 tok/s (15.95 ms min, 15.97 median) 
+r1 P=2048 skip=fa,kvw: i8     chunk= 512 P=2048:    28269 tok/s (72.45 ms min, 73.67 median) 
+r2 P=512 skip=none: i8     chunk= 512 P=512:    26023 tok/s (19.67 ms min, 19.69 median) |
+r2 P=512 skip=fa: i8     chunk= 512 P=512:    27755 tok/s (18.45 ms min, 18.61 median) |
+r2 P=512 skip=kvw: i8     chunk= 512 P=512:    26454 tok/s (19.35 ms min, 19.40 median) |
+r2 P=512 skip=gemm: i8     chunk= 512 P=512:   217297 tok/s (2.36 ms min, 2.36 median) | K
+r2 P=512 skip=fa,kvw: i8     chunk= 512 P=512:    28391 tok/s (18.03 ms min, 18.08 median) |
+r2 P=1024 skip=none: i8     chunk= 512 P=1024:    25452 tok/s (40.23 ms min, 40.81 median) 
+r2 P=1024 skip=fa: i8     chunk= 512 P=1024:    27638 tok/s (37.05 ms min, 37.51 median) 
+r2 P=1024 skip=kvw: i8     chunk= 512 P=1024:    25888 tok/s (39.56 ms min, 39.85 median) 
+r2 P=1024 skip=gemm: i8     chunk= 512 P=1024:   177305 tok/s (5.78 ms min, 5.80 median) | 
+r2 P=1024 skip=fa,kvw: i8     chunk= 512 P=1024:    28472 tok/s (35.96 ms min, 36.46 median) 
+r2 P=2048 skip=none: i8     chunk= 512 P=2048:    24103 tok/s (84.97 ms min, 86.12 median) 
+r2 P=2048 skip=fa: i8     chunk= 512 P=2048:    27493 tok/s (74.49 ms min, 75.44 median) 
+r2 P=2048 skip=kvw: i8     chunk= 512 P=2048:    24392 tok/s (83.96 ms min, 84.76 median) 
+r2 P=2048 skip=gemm: i8     chunk= 512 P=2048:   128403 tok/s (15.95 ms min, 15.98 median) 
+r2 P=2048 skip=fa,kvw: i8     chunk= 512 P=2048:    28248 tok/s (72.50 ms min, 73.44 median) 

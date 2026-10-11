@@ -15,7 +15,10 @@ that model does not have, and those are exactly the things a tile/occupancy choi
     that is the familiar ~2.1 TB/s, but it is an SM-side limit, so it does not depend on what the
     other SMs do. A stage's group completes at DRAM latency (its weights are a first touch; the 8
     blocks sharing them merge in L2: `l2_cpasync` stream/F8). LDGDEPBAR closes a group and
-    DEPBAR.LE SB0, n waits until at most n groups are outstanding (counted, in order);
+    DEPBAR.LE SB0, n waits until at most n groups are outstanding (counted, in order). In the GEMM
+    itself the copies run slower than in l2_cpasync, ~0.7 lanes / cycle at any occupancy
+    (`scripts/occupancy_sweep.py`): modelled as at most CP_INFLIGHT = 500 lanes in flight per SM,
+    each held from issue to completion (Little's law: 500 / ~700 cycles);
   * per stage, the lanes a block copies come from the tile shape (not from the predicated SASS:
     which lanes are active is a runtime property).
 
@@ -27,6 +30,7 @@ traffic (fp32 read-modify-write for a residual epilogue: 8 B per output) is a DR
 """
 from __future__ import annotations
 
+import heapq
 import math
 import re
 from dataclasses import dataclass, field
@@ -40,6 +44,8 @@ F_CLK_GHZ = 1.74                  # sustained int8 GEMM is power-capped (NVML: S
                                   # light kernels run at 1.95). Cycle terms scale with it, DRAM terms do not.
 L2_LAT = 238                      # chase_global, L2-resident
 CP_LANES_PER_CYC = 1.0            # l2_cpasync: 2.11 TB/s at 16 B / lane = 0.995 lanes / cycle / SM
+CP_INFLIGHT = 500                 # copy lanes in flight per SM: occupancy_sweep (the GEMM's copies run at
+                                  # ~0.7 lanes / cycle in place, not the 1.0 of l2_cpasync); None = unlimited
 SMEM_LAT = 23
 SMEM_BPC = 128                    # bytes / cycle, min 2 cycles per request
 IMMA_COST, IMMA_LAT = 16, 24
@@ -143,9 +149,29 @@ def simulate_sm(body: list, *, nblocks: int, wpb: int, stage_lanes: float, prolo
             "port": port_of_v1(op),
             "stall": x.stall or STALL0_CYCLES,
         })
-    cyc_per_ldgsts = stage_lanes / CP_LANES_PER_CYC / (wpb * n_ldgsts)
+    lanes_per_ldgsts = stage_lanes / (wpb * n_ldgsts)
     warps = [W(b, (b * wpb + w) % 4) for b in range(nblocks) for w in range(wpb)]
     l2_free = 0.0
+    inflight, held = [], 0.0            # heap of (completion, lanes) of the SM's copies in flight
+
+    def copy(t0: float, n: float) -> float:
+        """n copy lanes issued at or after t0: one lane per cycle through the copy port, and (with
+        CP_INFLIGHT) only after enough earlier copies completed. Returns their completion time."""
+        nonlocal l2_free, held
+        start = max(t0, l2_free)
+        if CP_INFLIGHT:
+            while inflight and inflight[0][0] <= start:
+                held -= heapq.heappop(inflight)[1]
+            while inflight and held + n > CP_INFLIGHT:
+                d, k = heapq.heappop(inflight)
+                held -= k
+                start = max(start, d)
+        l2_free = start + n / CP_LANES_PER_CYC
+        fin = l2_free + copy_lat
+        if CP_INFLIGHT:
+            heapq.heappush(inflight, (fin, n))
+            held += n
+        return fin
     smem_free = 0.0
     tensor_free = [0.0] * 4
     part_free = [dict() for _ in range(4)]
@@ -156,9 +182,7 @@ def simulate_sm(body: list, *, nblocks: int, wpb: int, stage_lanes: float, prolo
         for g in range(prologue_groups):
             done = 0.0
             for w in bw:
-                start = max(0.0, l2_free)
-                l2_free = start + stage_lanes / CP_LANES_PER_CYC / wpb
-                done = max(done, l2_free + copy_lat)
+                done = max(done, copy(0.0, stage_lanes / wpb))
             for w in bw:
                 w.groups.append(done)
     alive = list(warps)
@@ -200,9 +224,7 @@ def simulate_sm(body: list, *, nblocks: int, wpb: int, stage_lanes: float, prolo
                     else:   # LDSM without scoreboard is impossible; be safe: interlock its dest
                         pass
                 elif x["ldgsts"]:
-                    start = max(t, l2_free)
-                    l2_free = start + cyc_per_ldgsts
-                    w.open_grp = max(w.open_grp, l2_free + copy_lat)
+                    w.open_grp = max(w.open_grp, copy(t, lanes_per_ldgsts))
                     smem_free = max(smem_free, t) + 2          # the smem write of the copy
                 elif x["commit"]:
                     w.groups.append(max(w.open_grp, t))
