@@ -1,0 +1,6 @@
+ours(gguf)   510.8 tok/s  1.958 ms/token
+ours(gguf)   510.1 tok/s  1.960 ms/token
+ours(gguf)   503.1 tok/s  1.988 ms/token
+OURS : GPUs are good at matrix multiplication because they are designed to perform parallel computations, which allows them to process large amounts of data simultaneously. This makes them highly efficient at performing matrix operations, such as matrix multiplication, which is a fundamental operation in many scientific and engineering applications. Additionally, GPUs have specialized hardware that is op
+LLAMA: GPUs are good at matrix multiplication because they have many parallel processing cores that can perform matrix operations simultaneously, making them highly efficient for large-scale computations. Additionally, GPUs are optimized for parallel processing, allowing them to quickly perform matrix operations on large datasets. Finally, GPUs have specialized hardware designed for matrix operations, su
+identical words before first divergence: 8 (of 56)

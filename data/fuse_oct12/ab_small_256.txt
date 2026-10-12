@@ -1,0 +1,10 @@
+fuse=0                         vs first: K 0 V 0 h 0
+fuse=rms                       vs first: K 0.281 V 0.375 h 2.75
+fuse=rms,swiglu                vs first: K 0.281 V 0.375 h 2.75
+fuse=rms,swiglu,attn           vs first: K 0.281 V 0.375 h 2.75
+fuse=rms,swiglu,attn,kv        vs first: K 0.281 V 0.375 h 2.75
+fuse=0                         min  10.791  p10  11.079  median  11.618 ms    23724 tok/s (min)  p10 vs first +0.0%
+fuse=rms                       min  10.655  p10  10.799  median  11.308 ms    24025 tok/s (min)  p10 vs first -2.5%
+fuse=rms,swiglu                min   9.674  p10   9.921  median  10.357 ms    26463 tok/s (min)  p10 vs first -10.4%
+fuse=rms,swiglu,attn           min   9.742  p10   9.825  median  10.292 ms    26277 tok/s (min)  p10 vs first -11.3%
+fuse=rms,swiglu,attn,kv        min   9.458  p10   9.598  median  10.053 ms    27066 tok/s (min)  p10 vs first -13.4%

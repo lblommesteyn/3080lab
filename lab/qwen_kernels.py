@@ -243,6 +243,44 @@ extern "C" __global__ void __launch_bounds__(1024) k(const float* __restrict__ l
 """
 
 
+# FINISH over many blocks: FINISH reads 152K logits with one block (16 us, one SM's load rate). Here
+# each block takes a contiguous slice, writes its (max, lowest index) to part[], and the last block
+# to arrive (threadfence + counter, as a split-K reduction) combines them, writes tok, advances pos
+# and resets the counter for the next step. Same tie rule as FINISH. Grid FIN_BLOCKS x 256.
+FINISH_MB = r"""
+extern "C" __global__ void __launch_bounds__(256) k(const float* __restrict__ logits, int V, long long* tok, long long* pos,
+                                                  float* partv, int* parti, unsigned* cnt)
+{
+  __shared__ float bv[8]; __shared__ int bi[8]; __shared__ bool last;
+  const int per = (V + gridDim.x - 1) / gridDim.x, i0 = blockIdx.x * per, i1 = min(V, i0 + per);
+  float v = -1e30f; int idx = 0x7fffffff;
+  for (int i = i0 + threadIdx.x; i < i1; i += 256) { float x = logits[i]; if (x > v) { v = x; idx = i; } }
+  #define RED_(v, idx) for (int o = 16; o; o >>= 1) {     float ov = __shfl_xor_sync(0xffffffffu, v, o); int oi = __shfl_xor_sync(0xffffffffu, idx, o);     if (ov > v || (ov == v && oi < idx)) { v = ov; idx = oi; } }
+  RED_(v, idx)
+  if ((threadIdx.x & 31) == 0) { bv[threadIdx.x >> 5] = v; bi[threadIdx.x >> 5] = idx; }
+  __syncthreads();
+  if (threadIdx.x < 32) {
+    v = threadIdx.x < 8 ? bv[threadIdx.x] : -1e30f; idx = threadIdx.x < 8 ? bi[threadIdx.x] : 0x7fffffff;
+    RED_(v, idx)
+    if (threadIdx.x == 0) {
+      partv[blockIdx.x] = v; parti[blockIdx.x] = idx;
+      __threadfence();
+      last = atomicAdd(cnt, 1u) == gridDim.x - 1;
+    }
+  }
+  __syncthreads();
+  if (!last || threadIdx.x >= 32) return;
+  __threadfence();
+  v = -1e30f; idx = 0x7fffffff;
+  for (int b = threadIdx.x; b < gridDim.x; b += 32) {
+    float x = ((volatile float*)partv)[b]; int j = ((volatile int*)parti)[b];
+    if (x > v || (x == v && j < idx)) { v = x; idx = j; }
+  }
+  RED_(v, idx)
+  if (threadIdx.x == 0) { tok[0] = idx; pos[0] += 1; *cnt = 0u; }
+}
+"""
+
 EMBED_F32 = r"""
 extern "C" __global__ void k(const float* __restrict__ E, const long long* tok, float* __restrict__ h, int H)
 {

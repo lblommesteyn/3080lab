@@ -137,7 +137,12 @@ class FusedQwen:
             self.gemv("down", L["down"], self.xm, self.h, 0, H, self.inter)
         self.rms(self.norm, self.x)
         self.gemv("head", self.head, self.x, self.logits, 0, self.V, H)
-        self.k_fin.launch(1, 1024, [self.logits.data_ptr(), ctypes.c_int32(self.V), self.tok.data_ptr(), self.pos.data_ptr()])
+        if getattr(self, "fin_blocks", 0):     # FINISH_MB (qwen_gguf.py)
+            nb = self.fin_blocks
+            self.k_fin.launch(nb, 256, [self.logits.data_ptr(), ctypes.c_int32(self.V), self.tok.data_ptr(), self.pos.data_ptr(),
+                                        self.fin_part.data_ptr(), self.fin_part.data_ptr() + 4 * nb, self.fin_cnt.data_ptr()])
+        else:
+            self.k_fin.launch(1, 1024, [self.logits.data_ptr(), ctypes.c_int32(self.V), self.tok.data_ptr(), self.pos.data_ptr()])
 
 
 def run_fused(ids):

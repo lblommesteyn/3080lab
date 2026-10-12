@@ -4,6 +4,20 @@ An empirical microarchitecture lab for one RTX 3080 (GA102, sm_86).
 Goal: measure the machine well enough to predict kernel runtime from SASS,
 then schedule better than ptxas, then make Qwen faster.
 
+## Current results: Qwen2.5-1.5B, llama.cpp's own Q4_0 GGUF, same RTX 3080
+
+| workload | ours | llama.cpp b11485 | ratio | measured | section |
+|---|---:|---:|---:|---|---|
+| decode, 1 sequence (tok/s) | 509.6 | 368.7 | **1.38x** | Oct 11, idle desktop | Night run, Oct 11 |
+| batched decode, 2 / 4 / 8 / 16 / 32 sequences (tok/s) | 943 / 1851 / 3467 / 5674 / 7216 | 630 / 982 / 1437 / 2499 / 3664 | **1.50 / 1.88 / 2.41 / 2.27 / 1.97x** | Oct 11, idle desktop | Night run, Oct 11 |
+| prefill, 512-token prompt (tok/s) | 31,164 | 18,528 | **1.68x** | ours Oct 12 (busy desktop, min of 200), llama.cpp Oct 11 idle | Fused small ops |
+| prefill, 2048-token prompt (tok/s) | 27,973 | 17,637 | **1.59x** | same | Fused small ops |
+
+Both sides best of repeated runs (`scripts/night_summary.py`). Correctness: last-token argmax
+matches a token-by-token reference; perplexity on README text within 0.1% of an fp16 cuBLAS path.
+The sections below are a lab notebook in the order the work happened; later sections supersede
+earlier numbers.
+
 ## Quick start
 
 ```
@@ -978,6 +992,46 @@ scale can differ in the last bit. Against the token-by-token reference: same K/V
 **Prefill now: 31,164 tok/s at P = 512 (1.68x llama.cpp's idle-desktop best 18,528) and 27,973 at
 2048 (1.59x its 17,637).** The GEMMs are now 92% of the kernel time at P = 512 (gate_up alone 51%);
 what is left outside them is attention and two 6-8 us norms per layer.
+
+Short prompts too (in-process A/B, one chunk): **-11.6% at P = 128 (21,842 tok/s), -13.4% at 256
+(27,066)**; the last-token argmax matches the reference at 128, 256 and 1024. (Separate-process runs
+had shown the fused build 2x slower at 128 and 256: desktop noise, which is why `prefill_ab.py` exists.)
+
+**Is the prefill GEMM issue-bound? No.** The gate_up main loop issues 609 instructions per 32 IMMA
+(19 issue cycles per IMMA against 16 tensor cycles; 384 of them are the per-block fp32 rescale) but
+runs at ~42 cycles per IMMA per partition. The model's copy count says why: per stage an SM copies
+2 x 1,280 16-byte lanes (X 704, weights 576 per block) for 512 IMMA, ~3,660 cycles at the in-place
+0.7 lanes / cycle against ~2,050 tensor cycles. Pre-expanding weights to int8 would cut ~11% of the
+instructions and double the weight lanes, so it is not worth building. Would plain loads beat
+cp.async for X? `scripts/ldg_vs_cpasync.py` (same L2-resident addresses, 1-3 blocks per SM):
+`ld.global.cg.v4` moves **1.0 lanes / cycle / SM** with or without the `st.shared`, flat with
+occupancy; cp.async 1.3-2.1 (noisy, above `l2_cpasync`'s 1.0). The L2 -> SM path is not faster
+through registers, so the lever left is fewer copied bytes per IMMA (bigger tiles), which the tile
+sweeps already searched.
+
+### Decode B = 1: where the 1.95 ms goes (Oct 12, `scripts/decode_kernel_profile.py`, `scripts/decode_ab.py`)
+
+Each role's 28 launches (distinct weights, so DRAM-cold as in a real step) captured and timed
+alone, position 128:
+
+| role | per step | per launch | weight bytes | effective GB/s |
+|---|---:|---:|---:|---:|
+| gate_up GEMV | 680 us (35%) | 24.3 us | 15.5 MB | 638 |
+| down GEMV | 395 us (20%) | 14.1 us | 7.7 MB | 549 |
+| LM head (Q6_K) | 289 us (15%) | | 191 MB | 662 |
+| attention | 155 us (8%) | 5.5 us | | |
+| qkv GEMV | 136 us (7%) | 4.8 us | 1.8 MB | 365 |
+| o GEMV | 115 us (6%) | 4.1 us | 1.3 MB | 324 |
+| 2 RMSNorms | 105 us (5%) | 1.8-1.9 us | | |
+| argmax (FINISH, one block), embed | 32 us | | | |
+
+928 MB of weights per token in 1.95 ms is 63% of the ~760 GB/s peak. In-process A/B (300 rounds,
+shuffled): a 64-block argmax with a last-block combine (`FINISH_MB`) is -0.3 to -0.4% (identical
+logits; now the default, `--fin1` for the old one); more split-K warps lose everywhere (down, o, qkv
+x4: +1.4 to +1.9%; gate_up x4: +19.7%; down x1: +0.3%), so the current splits stand. What is left
+outside the big GEMVs (norms, attention, small-GEMV tails, ~0.5 ms) is the per-kernel fixed cost that
+round 3 already attacked: folding the norm into the GEMVs, L2 prefetch and a persistent megakernel
+all measured slower.
 
 ### Phase 8: our own block scheduler (`lab/resched.py`, `lab/verify.py`, `pair_latency`, `mufu_latency`, `resched_rand`)
 

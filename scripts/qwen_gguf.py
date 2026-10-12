@@ -35,6 +35,10 @@ GGUF_PATH = Path.home() / (".cache/huggingface/hub/models--Qwen--Qwen2.5-1.5B-In
                            "91cad51170dc346986eccefdc2dd33a9da36ead9/qwen2.5-1.5b-instruct-q4_0.gguf")
 LLAMA = Q.ROOT / "vendor" / "llamacpp"
 SPLIT = {"qkv": 2, "o": 2, "gu": 2 if "--gu-s1" not in sys.argv else 1, "down": 2, "head": 1}
+for _a in sys.argv[1:]:          # split_<name>=S overrides one GEMV's split-K warps (sweeps)
+    if _a.startswith("split_"):
+        SPLIT[_a[6:].split("=")[0]] = int(_a.split("=")[1])
+FIN_BLOCKS = next((int(_a[4:]) for _a in sys.argv[1:] if _a.startswith("fin=")), 64)
 
 
 def q4_rows(g: GGUF, name: str):
@@ -132,6 +136,12 @@ class GGUFQwen(F.FusedQwen):
                 attn, self.pf_mb = "ATTN4PF", float(a.split("=")[1])
         self.k_attn, self.k_fin = F.Kern(getattr(KS, attn) % {"maxlen": Q.MAX_LEN}), F.Kern(KS.FINISH)
         self.attn_threads = 512 if attn in ("ATTN4", "ATTN4PF") else 128
+        # argmax over the logits in FIN_BLOCKS blocks (FINISH_MB) instead of one; --fin1 for FINISH
+        self.fin_blocks = 0 if "--fin1" in sys.argv else FIN_BLOCKS
+        if self.fin_blocks:
+            self.k_fin = F.Kern(KS.FINISH_MB)
+            self.fin_part = torch.zeros(2 * self.fin_blocks, dtype=torch.int32, device=dev)
+            self.fin_cnt = torch.zeros(1, dtype=torch.int32, device=dev)
 
 
 _BASE_GEMV = F.FusedQwen.gemv   # captured before main() rebinds F.FusedQwen

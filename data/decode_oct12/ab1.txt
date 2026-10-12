@@ -1,0 +1,16 @@
+fin=0                        tok 89141  max |logits - first| 0 (max |logit| 10.9)
+fin=64                       tok 89141  max |logits - first| 0 (max |logit| 10.9)
+fin=128                      tok 89141  max |logits - first| 0 (max |logit| 10.9)
+fin=64 split_down=4          tok 89141  max |logits - first| 0.00918 (max |logit| 10.9)
+fin=64 split_o=4             tok 89141  max |logits - first| 0 (max |logit| 10.9)
+fin=64 split_qkv=4           tok 89141  max |logits - first| 0 (max |logit| 10.9)
+fin=64 split_gu=4            tok 89141  max |logits - first| 0.00875 (max |logit| 10.9)
+fin=64 split_down=1          tok 89141  max |logits - first| 0.00103 (max |logit| 10.9)
+fin=0                        min  1900.5  p10  1916.9  median  1928.2 us   526.2 tok/s (min)  p10 vs first +0.0%
+fin=64                       min  1898.5  p10  1911.8  median  1922.0 us   526.7 tok/s (min)  p10 vs first -0.3%
+fin=128                      min  1896.4  p10  1908.7  median  1919.9 us   527.3 tok/s (min)  p10 vs first -0.4%
+fin=64 split_down=4          min  1939.5  p10  1952.8  median  1963.8 us   515.6 tok/s (min)  p10 vs first +1.9%
+fin=64 split_o=4             min  1931.3  p10  1944.4  median  1953.8 us   517.8 tok/s (min)  p10 vs first +1.4%
+fin=64 split_qkv=4           min  1937.4  p10  1952.8  median  1965.1 us   516.2 tok/s (min)  p10 vs first +1.9%
+fin=64 split_gu=4            min  2279.4  p10  2294.8  median  2308.1 us   438.7 tok/s (min)  p10 vs first +19.7%
+fin=64 split_down=1          min  1907.7  p10  1922.0  median  1933.0 us   524.2 tok/s (min)  p10 vs first +0.3%

@@ -1,0 +1,5 @@
+P=128 fuse=0: i8     chunk= 128 P=128:    18648 tok/s (6.86 ms min, 7.03 median) | K err 6.3e-03 V err 8.8e-02 | last logits err 2.2e-02, argmax same: True
+P=128 fuse=rms,swiglu,attn,kv: i8     chunk= 128 P=128:     8098 tok/s (15.81 ms min, 16.95 median) | K err 6.3e-03 V err 8.8e-02 | last logits err 1.9e-02, argmax same: True
+P=256 fuse=0: i8     chunk= 256 P=256:    22466 tok/s (11.40 ms min, 12.81 median) | K err 6.3e-03 V err 7.8e-02 | last logits err 2.5e-02, argmax same: True
+P=256 fuse=rms,swiglu,attn,kv: i8     chunk= 256 P=256:    10469 tok/s (24.45 ms min, 29.96 median) | K err 6.3e-03 V err 7.8e-02 | last logits err 2.0e-02, argmax same: True
+i8     chunk= 512 P=1024:    23264 tok/s (44.02 ms min, 45.59 median) | K err 6.3e-03 V err 6.9e-02 | last logits err 7.9e-02, argmax same: True

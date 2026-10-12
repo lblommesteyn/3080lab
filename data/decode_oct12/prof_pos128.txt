@@ -1,0 +1,13 @@
+pos=128: step 1951.3 us (512.5 tok/s), 200 launches
+  embed  x 1     15.7 us  ( 15.74 per launch)    0.8% of step
+  rms1   x28     51.0 us  (  1.82 per launch)    2.6% of step
+  qkv    x28    135.6 us  (  4.84 per launch)    6.9% of step
+  attn   x28    155.2 us  (  5.54 per launch)    8.0% of step
+  o      x28    114.9 us  (  4.10 per launch)    5.9% of step
+  rms2   x28     53.9 us  (  1.92 per launch)    2.8% of step
+  gu     x28    679.7 us  ( 24.27 per launch)   34.8% of step
+  down   x28    395.1 us  ( 14.11 per launch)   20.2% of step
+  rmsf   x 1      8.4 us  (  8.40 per launch)    0.4% of step
+  head   x 1    289.2 us  (289.16 per launch)   14.8% of step
+  fin    x 1     16.4 us  ( 16.38 per launch)    0.8% of step
+  sum of roles 1915.0 us; step - sum +36.4 us
