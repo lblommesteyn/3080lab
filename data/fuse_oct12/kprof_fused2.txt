@@ -1,0 +1,10 @@
+P=512 pos0=0: 7 launches per layer
+  embed        12.6 us  x layers   0.013 ms    0.1%
+  rmsq1        12.7 us  x layers   0.356 ms    2.0%
+  qkv          49.3 us  x layers   1.382 ms    7.9%
+  attn         32.8 us  x layers   0.919 ms    5.2%
+  o            41.5 us  x layers   1.161 ms    6.6%
+  rmsq2        11.5 us  x layers   0.321 ms    1.8%
+  gu          310.7 us  x layers   8.700 ms   49.5%
+  down        169.2 us  x layers   4.738 ms   26.9%
+  sum 17.589 ms (kernels alone, back to back in the graph: compare the e2e min)

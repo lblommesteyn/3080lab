@@ -1,0 +1,2 @@
+utilization.gpu [%], memory.used [MiB], clocks.current.sm [MHz]
+5 %, 927 MiB, 1905 MHz

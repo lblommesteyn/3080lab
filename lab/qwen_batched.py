@@ -1039,6 +1039,55 @@ extern "C" __global__ void k(const __nv_bfloat16* __restrict__ X, signed char* _
 """
 
 
+def rmsnorm_q8_source(H: int) -> str:
+    """RMSNorm (as RMSNORM_F32W_1P) and QUANT_Q8 in one pass: one block of H / 8 threads per token (grid
+    (1, P)), 8 consecutive values per thread, so each 32-value block sits in one quad (2-step
+    reductions) and goes out as one 8-byte store per thread. The normalized row is rounded to bf16
+    before quantizing, as rms -> bf16 x -> QUANT_Q8 does (the sum of squares is added in a different
+    order, so the scale can differ in the last bit). Args: h, w, Xq, Xd, Xs, H, eps."""
+    assert H % 256 == 0
+    T = H // 8
+    return f"""
+#include <cuda_bf16.h>
+extern "C" __global__ void __launch_bounds__({T}) k(const float* __restrict__ h, const float* __restrict__ w,
+    signed char* __restrict__ Xq, float* __restrict__ Xd, int* __restrict__ Xs, int H_, float eps)
+{{
+  __shared__ float part[{T // 32}];
+  const int tok = blockIdx.y, lane = threadIdx.x & 31, i0 = 8 * threadIdx.x;
+  const float4* hp = reinterpret_cast<const float4*>(h + (size_t)tok * {H} + i0);
+  const float4* wp = reinterpret_cast<const float4*>(w + i0);
+  const float4 h0 = hp[0], h1 = hp[1], w0 = wp[0], w1 = wp[1];
+  const float v[8] = {{h0.x, h0.y, h0.z, h0.w, h1.x, h1.y, h1.z, h1.w}}, ww[8] = {{w0.x, w0.y, w0.z, w0.w, w1.x, w1.y, w1.z, w1.w}};
+  float ss = 0.f;
+  #pragma unroll
+  for (int u = 0; u < 8; ++u) ss += v[u] * v[u];
+  for (int o = 16; o; o >>= 1) ss += __shfl_xor_sync(0xffffffffu, ss, o);
+  if (lane == 0) part[threadIdx.x >> 5] = ss;
+  __syncthreads();
+  float t = 0.f;
+  #pragma unroll
+  for (int j = 0; j < {T // 32}; ++j) t += part[j];
+  const float r = rsqrtf(t / {H} + eps);
+  float x[8], amax = 0.f;
+  #pragma unroll
+  for (int u = 0; u < 8; ++u) {{ x[u] = __bfloat162float(__float2bfloat16_rn(v[u] * r * ww[u])); amax = fmaxf(amax, fabsf(x[u])); }}
+  for (int o = 1; o <= 2; o <<= 1) amax = fmaxf(amax, __shfl_xor_sync(0xffffffffu, amax, o));
+  const float d = amax / 127.f;
+  int q[8], sq = 0;
+  #pragma unroll
+  for (int u = 0; u < 8; ++u) {{ q[u] = d > 0.f ? __float2int_rn(x[u] / d) : 0; sq += q[u]; }}
+  uint2 pk;
+  pk.x = (q[0] & 255) | ((q[1] & 255) << 8) | ((q[2] & 255) << 16) | ((unsigned)(q[3] & 255) << 24);
+  pk.y = (q[4] & 255) | ((q[5] & 255) << 8) | ((q[6] & 255) << 16) | ((unsigned)(q[7] & 255) << 24);
+  *reinterpret_cast<uint2*>(Xq + (size_t)tok * {H} + i0) = pk;
+  for (int o = 1; o <= 2; o <<= 1) sq += __shfl_xor_sync(0xffffffffu, sq, o);
+  if ((lane & 3) == 0) {{
+    const size_t pr = (size_t)(tok >> 1) * {H // 32} + i0 / 32;
+    Xd[pr * 2 + (tok & 1)] = d; Xs[pr * 4 + (tok & 1)] = Xs[pr * 4 + 2 + (tok & 1)] = 0x4B400000 - 8 * sq;
+  }}
+}}
+"""
+
 def gemm_q4i8_source(WM: int, WN: int, MT: int, NT: int, epi: str = "store", KB: int = 4, MINB: int = 1,
                      WDEP: bool = False) -> str:
     """Prefill GEMM Y[P, N] = X[P, K] W[N, K]^T on int8 tensor cores (mma m16n8k32 u8 x s8 -> s32),
@@ -1259,7 +1308,96 @@ def gemm_q4i8_ms_source(WM: int, WN: int, MT: int, NT: int, epi: str = "store", 
     assert smem <= 48 * 1024, f"static shared memory {smem} > 48 KB"
     assert KB % 2 == 0 and NSTG >= 2
     nthr = 32 * WM * WN
-    body = _mma_epi(epi).replace("red[rr + 1][b]", "RED(rr + 1, bl)")
+    if epi.startswith("biasf_kv"):
+        # biasf, and the K/V-write pass fused: rows [QR, QR + KR) are K heads, [QR + KR, QR + 2 KR) V heads
+        # (HD = 128 rows each, one per block: BM == 128). K is RoPE'd from the bf16-rounded biased
+        # values (partner row d +- 64 in the same block) and both go to the cache at posp[token], as
+        # ATTN4's K/V write. Extra args: cosT, sinT, posp, kc, vc (this layer's [NKV, maxlen, HD]), maxlen.
+        QR, KR = map(int, epi.split(":")[1:])
+        assert BM == 128 and QR % 128 == 0 and KR % 128 == 0
+        assert nthr % BM == 0 and BN % (8 * (nthr // BM)) == 0
+        TS = nthr // BM                                  # tokens per pass; a thread's row rr is fixed
+        loop = f"""  const int rr = threadIdx.x % BM, r = row0 + rr;
+  const float* bias = (const float*)AUX;
+  const float br = bias[r];
+  if (row0 < {QR} || row0 >= {QR + KR}) {{             // Q and V heads (block-uniform)
+    const int hv = (row0 - {QR + KR}) / 128;
+    for (int bl = threadIdx.x / BM; bl < BN; bl += {TS}) {{
+      const int b = n0 + bl;
+      if (b >= P) break;
+      const float a = __bfloat162float(__float2bfloat16_rn(RED(rr, bl) + br));
+      ((__nv_bfloat16*)Y)[(size_t)b * N + r] = __float2bfloat16_rn(a);
+      if (row0 >= {QR}) vc[((size_t)hv * maxlen + (int)posp[b]) * 128 + rr] = __float2bfloat16_rn(a);
+    }}
+  }} else {{                                           // K heads: RoPE with the partner row d +- 64
+    const int hk = (row0 - {QR}) / 128, dd = rr & 63, rp = rr ^ 64;
+    const float bp = bias[row0 + rp];
+    for (int bl0 = threadIdx.x / BM; bl0 < BN; bl0 += {8 * TS}) {{
+      int pos[8]; float cs[8], sn[8];
+      #pragma unroll
+      for (int u = 0; u < 8; ++u) {{
+        const int b = n0 + bl0 + {TS} * u;
+        pos[u] = b < P ? (int)posp[b] : 0;
+      }}
+      #pragma unroll
+      for (int u = 0; u < 8; ++u) {{ cs[u] = __ldg(cosT + pos[u] * 64 + dd); sn[u] = __ldg(sinT + pos[u] * 64 + dd); }}
+      #pragma unroll
+      for (int u = 0; u < 8; ++u) {{
+        const int bl = bl0 + {TS} * u, b = n0 + bl;
+        if (b < P) {{
+          const float a = __bfloat162float(__float2bfloat16_rn(RED(rr, bl) + br));
+          const float pb = __bfloat162float(__float2bfloat16_rn(RED(rp, bl) + bp));
+          ((__nv_bfloat16*)Y)[(size_t)b * N + r] = __float2bfloat16_rn(a);
+          kc[((size_t)hk * maxlen + pos[u]) * 128 + rr] = __float2bfloat16_rn(rr < 64 ? a * cs[u] - pb * sn[u] : a * cs[u] + pb * sn[u]);
+        }}
+      }}
+    }}
+  }}"""
+        extra = (", const float* __restrict__ cosT, const float* __restrict__ sinT, const long long* __restrict__ posp,"
+                 " __nv_bfloat16* __restrict__ kc, __nv_bfloat16* __restrict__ vc, int maxlen")
+    elif epi == "swiglu_q8":
+        # SwiGLU, then QUANT_Q8 of the result in registers: Y = Xq, AUX = Xd, extra arg Xs2 = Xs of the
+        # [P, N / 2] output (the down GEMM's input; must not alias this GEMM's input buffers). Output o
+        # comes from rows 2o (gate), 2o + 1 (up); rounded to bf16 first, so bit-identical to
+        # swiglu -> QUANT_Q8.
+        assert BM % 64 == 0
+        assert ((BM // 64) * BN) % (nthr // 8) == 0
+        loop = f"""  // 8 lanes per (token, 32 outputs), 4 consecutive outputs per lane: 3-step reductions in the 8-lane group
+  const int ln = lane & 7;
+  const unsigned gm = 0xffu << (lane & 24);
+  for (int task = warp * 4 + (lane >> 3); task < (BM / 64) * BN; task += {nthr // 8}) {{
+    const int grp = task % (BM / 64), bl = task / (BM / 64), b = n0 + bl;
+    if (b < P) {{
+      const int K2 = N / 2, o = row0 / 2 + 32 * grp + 4 * ln;
+      float x[4], amax = 0.f;
+      #pragma unroll
+      for (int k = 0; k < 4; ++k) {{
+        const int rr = 64 * grp + 8 * ln + 2 * k;
+        const float a = RED(rr, bl), u = RED(rr + 1, bl);
+        x[k] = __bfloat162float(__float2bfloat16_rn(a / (1.f + __expf(-a)) * u));
+        amax = fmaxf(amax, fabsf(x[k]));
+      }}
+      for (int o_ = 4; o_; o_ >>= 1) amax = fmaxf(amax, __shfl_xor_sync(gm, amax, o_));
+      const float d = amax / 127.f;
+      int q[4], sq = 0;
+      #pragma unroll
+      for (int k = 0; k < 4; ++k) {{ q[k] = d > 0.f ? __float2int_rn(x[k] / d) : 0; sq += q[k]; }}
+      *reinterpret_cast<char4*>((signed char*)Y + (size_t)b * K2 + o) = make_char4((signed char)q[0], (signed char)q[1], (signed char)q[2], (signed char)q[3]);
+      for (int o_ = 4; o_; o_ >>= 1) sq += __shfl_xor_sync(gm, sq, o_);
+      const size_t pr = (size_t)(b >> 1) * (K2 / 32) + o / 32;
+      if (ln == 0) {{ ((float*)AUX)[pr * 2 + (b & 1)] = d; Xs2[pr * 4 + (b & 1)] = Xs2[pr * 4 + 2 + (b & 1)] = 0x4B400000 - 8 * sq; }}
+    }}
+  }}"""
+        extra = ", int* __restrict__ Xs2"
+    else:
+        body = _mma_epi(epi).replace("red[rr + 1][b]", "RED(rr + 1, bl)")
+        loop = f"""  for (int i = threadIdx.x; i < BM * BN; i += nthr) {{
+    const int rr = i % BM, bl = i / BM, b = n0 + bl, r = row0 + rr;
+    if (b >= P) continue;
+    float a = RED(rr, bl);
+    {body}
+  }}"""
+        extra = ""
     return f"""
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
@@ -1278,7 +1416,7 @@ __device__ __forceinline__ void cp16(void* dst, const void* src, bool valid) {{
 }}
 extern "C" __global__ void __launch_bounds__({nthr}, {MINB}) k(
     const uint4* __restrict__ W, const uint2* __restrict__ S, const signed char* __restrict__ Xq,
-    const float* __restrict__ Xd, const int* __restrict__ Xs, void* Y, const void* AUX, int N, int K, int P)
+    const float* __restrict__ Xd, const int* __restrict__ Xs, void* Y, const void* AUX, int N, int K, int P{extra})
 {{
   __shared__ __align__(16) unsigned char sm[{smem}];
   const int warp = threadIdx.x >> 5, lane = threadIdx.x & 31, g = lane >> 2, t = lane & 3;
@@ -1413,12 +1551,7 @@ extern "C" __global__ void __launch_bounds__({nthr}, {MINB}) k(
       RED(rr + 8, cc) = c[m][n][2]; RED(rr + 8, cc + 1) = c[m][n][3];
     }}
   __syncthreads();
-  for (int i = threadIdx.x; i < BM * BN; i += nthr) {{
-    const int rr = i % BM, bl = i / BM, b = n0 + bl, r = row0 + rr;
-    if (b >= P) continue;
-    float a = RED(rr, bl);
-    {body}
-  }}
+{loop}
 }}
 """
 
@@ -1654,7 +1787,7 @@ def flash_prefill_v2_source(WQ: int = 4, maxlen: int = 512) -> str:
     return s
 
 
-def flash_prefill_v3_source(maxlen: int = 512) -> str:
+def flash_prefill_v3_source(maxlen: int = 512, q8: bool = False) -> str:
     """Causal prefill attention, two warp groups per block splitting the keys. v1/v2 run one block of 4
     warps (one per SM partition) per 64 tokens: 96 blocks for a 512-token chunk, so most SMs hold one
     warp per partition and the tensor core idles through each warp's softmax. Here a block has 8
@@ -1663,11 +1796,63 @@ def flash_prefill_v3_source(maxlen: int = 512) -> str:
     separate cp.async groups as in v2). At the end group 1 hands its (o, m, l) to group 0 through
     shared memory, which merges, normalizes and stores. Masked scores are -inf (not v1's -1e30): a
     group can meet a tile that is entirely in the future of a row before it has seen any key for it.
-    Heaviest blocks first, as v2. Grid (NH, ceil(P / 64)), 256 threads, same arguments as v1."""
+    Heaviest blocks first, as v2. Grid (NH, ceil(P / 64)), 256 threads, same arguments as v1.
+    q8: out is the O GEMM's int8 input (Xq [P, NH HD]) and two more arguments follow P: Xd, Xs (QUANT_Q8
+    layout). Each 32-dim block of a row sits in one quad (4 threads x 8 values), quantized there from
+    the bf16-rounded output: bit-identical to bf16 out -> QUANT_Q8."""
     RS = 128 + 8
     smem = max(64 * RS * 2, 2 * 2 * 32 * RS * 2)
     assert 64 * 128 * 4 + 2 * 64 * 4 <= smem
-    return f"""
+    if q8:
+        store = """  const int KBT = NH * HD / 32;
+  #pragma unroll
+  for (int j = 0; j < 4; ++j) {
+    float yA[8], yB[8], xA = 0.f, xB = 0.f;
+    #pragma unroll
+    for (int nn = 0; nn < 4; ++nn) {
+      const int d = (4 * j + nn) * 8 + 2 * t;
+      const float2 pA = *reinterpret_cast<const float2*>(&ob[rA * 128 + d]);
+      const float2 pB = *reinterpret_cast<const float2*>(&ob[rB * 128 + d]);
+      yA[2 * nn] = __bfloat162float(__float2bfloat16_rn((o[4 * j + nn][0] * a0A + pA.x * a1A) * iA));
+      yA[2 * nn + 1] = __bfloat162float(__float2bfloat16_rn((o[4 * j + nn][1] * a0A + pA.y * a1A) * iA));
+      yB[2 * nn] = __bfloat162float(__float2bfloat16_rn((o[4 * j + nn][2] * a0B + pB.x * a1B) * iB));
+      yB[2 * nn + 1] = __bfloat162float(__float2bfloat16_rn((o[4 * j + nn][3] * a0B + pB.y * a1B) * iB));
+      xA = fmaxf(xA, fmaxf(fabsf(yA[2 * nn]), fabsf(yA[2 * nn + 1])));
+      xB = fmaxf(xB, fmaxf(fabsf(yB[2 * nn]), fabsf(yB[2 * nn + 1])));
+    }
+    for (int o_ = 1; o_ <= 2; o_ <<= 1) {
+      xA = fmaxf(xA, __shfl_xor_sync(0xffffffffu, xA, o_)); xB = fmaxf(xB, __shfl_xor_sync(0xffffffffu, xB, o_));
+    }
+    const float dA = xA / 127.f, dB = xB / 127.f;
+    int sA = 0, sB = 0;
+    #pragma unroll
+    for (int nn = 0; nn < 4; ++nn) {
+      const int d = (4 * j + nn) * 8 + 2 * t;
+      const int qa0 = dA > 0.f ? __float2int_rn(yA[2 * nn] / dA) : 0, qa1 = dA > 0.f ? __float2int_rn(yA[2 * nn + 1] / dA) : 0;
+      const int qb0 = dB > 0.f ? __float2int_rn(yB[2 * nn] / dB) : 0, qb1 = dB > 0.f ? __float2int_rn(yB[2 * nn + 1] / dB) : 0;
+      sA += qa0 + qa1; sB += qb0 + qb1;
+      if (bA < P) *reinterpret_cast<char2*>(&out[(size_t)bA * NH * HD + h * HD + d]) = make_char2((signed char)qa0, (signed char)qa1);
+      if (bB < P) *reinterpret_cast<char2*>(&out[(size_t)bB * NH * HD + h * HD + d]) = make_char2((signed char)qb0, (signed char)qb1);
+    }
+    for (int o_ = 1; o_ <= 2; o_ <<= 1) { sA += __shfl_xor_sync(0xffffffffu, sA, o_); sB += __shfl_xor_sync(0xffffffffu, sB, o_); }
+    if (t == 0) {
+      const int kb = h * (HD / 32) + j;
+      if (bA < P) { const size_t pr = (size_t)(bA >> 1) * KBT + kb; Xd[pr * 2 + (bA & 1)] = dA; Xs[pr * 4 + (bA & 1)] = Xs[pr * 4 + 2 + (bA & 1)] = 0x4B400000 - 8 * sA; }
+      if (bB < P) { const size_t pr = (size_t)(bB >> 1) * KBT + kb; Xd[pr * 2 + (bB & 1)] = dB; Xs[pr * 4 + (bB & 1)] = Xs[pr * 4 + 2 + (bB & 1)] = 0x4B400000 - 8 * sB; }
+    }
+  }"""
+    else:
+        store = """  #pragma unroll
+  for (int n = 0; n < 16; ++n) {
+    const int d = n * 8 + 2 * t;
+    const float2 pA = *reinterpret_cast<const float2*>(&ob[rA * 128 + d]);
+    const float2 pB = *reinterpret_cast<const float2*>(&ob[rB * 128 + d]);
+    if (bA < P) *reinterpret_cast<__nv_bfloat162*>(&out[(size_t)bA * NH * HD + h * HD + d]) =
+        __floats2bfloat162_rn((o[n][0] * a0A + pA.x * a1A) * iA, (o[n][1] * a0A + pA.y * a1A) * iA);
+    if (bB < P) *reinterpret_cast<__nv_bfloat162*>(&out[(size_t)bB * NH * HD + h * HD + d]) =
+        __floats2bfloat162_rn((o[n][2] * a0B + pB.x * a1B) * iB, (o[n][3] * a0B + pB.y * a1B) * iB);
+  }"""
+    src = f"""
 #include <cuda_bf16.h>
 #define HD 128
 #define MAXLEN {maxlen}
@@ -1838,15 +2023,10 @@ extern "C" __global__ void __launch_bounds__(256) k(
   const float a0A = exp2f(mA - MA), a1A = exp2f(m1A - MA), a0B = exp2f(mB - MB), a1B = exp2f(m1B - MB);
   const float iA = 1.f / (lA * a0A + lb[rA] * a1A), iB = 1.f / (lB * a0B + lb[rB] * a1B);
   const int bA = b0 + rA, bB = b0 + rB;
-  #pragma unroll
-  for (int n = 0; n < 16; ++n) {{
-    const int d = n * 8 + 2 * t;
-    const float2 pA = *reinterpret_cast<const float2*>(&ob[rA * 128 + d]);
-    const float2 pB = *reinterpret_cast<const float2*>(&ob[rB * 128 + d]);
-    if (bA < P) *reinterpret_cast<__nv_bfloat162*>(&out[(size_t)bA * NH * HD + h * HD + d]) =
-        __floats2bfloat162_rn((o[n][0] * a0A + pA.x * a1A) * iA, (o[n][1] * a0A + pA.y * a1A) * iA);
-    if (bB < P) *reinterpret_cast<__nv_bfloat162*>(&out[(size_t)bB * NH * HD + h * HD + d]) =
-        __floats2bfloat162_rn((o[n][2] * a0B + pB.x * a1B) * iB, (o[n][3] * a0B + pB.y * a1B) * iB);
-  }}
+{store}
 }}
 """
+    if q8:
+        src = src.replace("__nv_bfloat16* __restrict__ out, int NH, int NKV, float scale, int P)",
+                          "signed char* __restrict__ out, int NH, int NKV, float scale, int P, float* __restrict__ Xd, int* __restrict__ Xs)")
+    return src

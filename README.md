@@ -715,7 +715,7 @@ logits against token-by-token prefill through the validated decode step; perplex
 Prompts longer than 512 run in chunks of 512 against a `maxlen`-sized KV cache (`maxlen=` argument,
 default max(512, P)); the last-token argmax matches the token-by-token reference at 1024 and 2048.
 llama.cpp's pp512 measured 15,910 +- 1,718 in the later session, so the 512 ratio is between 1.21 and 1.35.
-**Re-measured Oct 11 with the desktop idle** (Night run section): 1.64 / 1.50 / 1.40 / 1.35 / 1.33x at P = 128-2048; with the new down tile 1.41x at 512 and 1.36x at 2048; with v3 attention too **1.44x and 1.39x**.
+**Re-measured Oct 11 with the desktop idle** (Night run section): 1.64 / 1.50 / 1.40 / 1.35 / 1.33x at P = 128-2048; with the new down tile 1.41x at 512 and 1.36x at 2048; with v3 attention too **1.44x and 1.39x**; with the fused quantize passes (Oct 12) **1.68x and 1.59x**.
 
 Where the 55 ms of the cuBLAS path went at P = 512 (ablation): matmuls 27 ms (at the fp16 x fp16 ->
 fp32 tensor-core peak), attention 13 ms, dequantization 5 ms, torch epilogues and the rest 10 ms.
@@ -906,7 +906,8 @@ same argmax. It is the default now: **26,032 tok/s at P = 512, 23,981 at 2048** 
 | 1024 | 40.23 ms | 3.18 ms (8%) | 0.67 ms | 36.2 us |
 | 2048 | 84.97 ms | 10.48 ms (12%) | 1.01 ms | 36.4 us |
 
-Without attention the cost per token is flat, so the drop from 26K to 24K tok/s is attention, whose
+(The GEMM column here includes the four int8 quantize passes, which `skip=gemm` also skips: see
+"Fused small ops" below.) Without attention the cost per token is flat, so the drop from 26K to 24K tok/s is attention, whose
 work grows with the context. At P = 2048 it already runs at 34 TFLOPS (361 GFLOP), about 55% of the
 62 TFLOPS bf16-into-fp32 peak at the power-capped clock: at most ~4 ms (5%) to win.
 
@@ -938,6 +939,45 @@ max), the size of the int8-vs-fp16 difference itself. It is the default.
 **Prefill now: 26,647 tok/s at P = 512 (1.44x llama.cpp's best 18,528) and 24,584 at 2048 (1.39x
 its 17,637).** Attention at P = 2048 is ~8.6 ms of 83.3; at 41 TFLOPS against the ~62 peak the most
 left there is ~3 ms.
+
+### Fused small ops: the int8 quantize passes were 12% of prefill (Oct 12, `data/fuse_oct12/`)
+
+The `skip=gemm` ablation above also skipped the quantize kernels (they run inside `gemm8`), so it hid
+them. Timing every kernel of one layer alone in a CUDA graph (`scripts/prefill_kernel_profile.py`,
+P = 512, x 28 layers): the four QUANT_Q8 passes that turn each GEMM's bf16 input into per-32 int8
+took **2.44 ms of 19.7 (12%)**, the one before `down` (512 x 8960 values) 1.52 ms by itself, and the
+K/V-write pass another 0.43 ms. Each of them is now done by the kernel that produces its input
+(`fuse=` flag, default all four, `fuse=0` the old path):
+
+| fusion | replaces | how |
+|---|---|---|
+| `rms` | RMSNorm, bf16 x, QUANT_Q8 | `rmsnorm_q8_source`: H / 8 threads per token, 8 values each, so a 32-value block is one quad; 5.9-7.9 us vs 5.8 + 10-12 |
+| `swiglu` | bf16 xm (P x 8960), QUANT_Q8 | gate_up epilogue `swiglu_q8`: 8 lanes per (token, 32 outputs), writes `down`'s int8 input to a second buffer set; gate_up 310.8 us vs 314.2 |
+| `attn` | bf16 attention output, QUANT_Q8 | attention v3 `q8=True`: each 32-dim block of a row already sits in one quad; 32.4 us vs 27.3 + 10.4 |
+| `kv` | K/V-write pass (RoPE on K, cache store) | QKV epilogue `biasf_kv`: a block is one 128-row head, so K's RoPE partner row d +- 64 is in the same tile; 41.5 us vs 39.8 + 15.3 |
+
+Two of these were slow on the first try, both from the epilogue's latency in a GEMM that runs in
+about one wave: one warp per 32 SwiGLU outputs (5-step shuffles, 16 rounds per warp) cost gate_up
++31 us, and the K-head blocks of the QKV GEMM re-loaded bias and cos/sin after every store (they may
+alias), +9.5 us. Four outputs per lane and hoisted, batched loads fixed both.
+
+In-process A/B (`scripts/prefill_ab.py`: both configs captured in one process, graphs replayed round
+robin in shuffled order, so desktop load hits both alike; it was not idle):
+
+| P | `fuse=0` min / p10 | fused min / p10 | p10 change | fused tok/s (min) |
+|---|---:|---:|---:|---:|
+| 512 | 19.25 / 19.43 ms | 16.43 / 16.56 ms | **-14.8%** | **31,164** |
+| 2048 | 84.69 / 85.25 ms | 73.21 / 73.96 ms | **-13.2%** | **27,973** |
+
+The `swiglu`, `attn` and `kv` fusions compute the same bits as the passes they replace (K/V cache and
+hidden state identical to `fuse=0`); the new RMSNorm adds the sum of squares in another order, so the
+scale can differ in the last bit. Against the token-by-token reference: same K/V errors (6.3e-3,
+7.3e-2), last-token logits 2.2e-2 vs 1.9e-2, same argmax. Perplexity on README text (i8):
+26.955 vs 26.968 at P = 512, 23.596 vs 23.613 at 2048 (fp16 cuBLAS 26.920 / 23.594).
+
+**Prefill now: 31,164 tok/s at P = 512 (1.68x llama.cpp's idle-desktop best 18,528) and 27,973 at
+2048 (1.59x its 17,637).** The GEMMs are now 92% of the kernel time at P = 512 (gate_up alone 51%);
+what is left outside them is attention and two 6-8 us norms per layer.
 
 ### Phase 8: our own block scheduler (`lab/resched.py`, `lab/verify.py`, `pair_latency`, `mufu_latency`, `resched_rand`)
 

@@ -1,0 +1,1 @@
+i8     chunk= 512 P=512:    11407 tok/s (44.88 ms min, 54.88 median) | K err 6.3e-03 V err 7.3e-02 | last logits err 1.9e-02, argmax same: True

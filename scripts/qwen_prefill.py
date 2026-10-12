@@ -4,7 +4,8 @@
 
 Per layer: RMSNorm, QKV, a K/V-write pass for all chunk tokens, causal attention (one block per head
 and token, the decode attention kernel with a token index from blockIdx.y on a shared KV cache),
-O + residual, RMSNorm, gate_up + SwiGLU, down + residual. GEMMs:
+O + residual, RMSNorm, gate_up + SwiGLU, down + residual (i8 mode: the quantize passes and the K/V write
+fused into their producers, see FUSE). GEMMs:
   v2      lab/qwen_batched.gemv_v2_source with B = chunk (chunk <= 32)
   cublas  each layer's Q4_0 weights dequantized to fp16 into a scratch buffer, then torch.matmul
   i8      lab/qwen_batched.gemm_q4i8_source: int8 tensor cores on Q4_0 x per-32 int8 activations
@@ -63,6 +64,12 @@ MS = "ms=0" not in sys.argv      # i8 GEMM: multistage, weights through shared m
 # re-reads of X for the wide matrices; o (N = 1536) needs the 64-row tile to fill 68 SMs; down: 128 x 32
 # with 16 warps / SM (lab/gemm_model.py's pick; e2e A/B Oct 11, idle GPU: 8/8 pairs, +2.4-2.6%)
 I8MS = {"qkv": (4, 2, 2, 4, 4, 2, 2), "o": (2, 2, 2, 4, 2, 3, 3), "gu": (4, 2, 2, 4, 4, 2, 2), "down": (4, 2, 2, 2, 4, 2, 1)}
+# fused small ops (i8 mode), fuse=0 for the unfused path: rms = RMSNorm + int8 quantization in one kernel,
+# swiglu = the gate_up GEMM's epilogue writes the down GEMM's int8 input (no bf16 xm, no quantize pass),
+# attn = attention v3 writes the O GEMM's int8 input, kv = the QKV GEMM's epilogue writes the K/V cache
+# (RoPE on K) instead of a separate K/V-write pass
+FUSE = set(next((a[5:].split(",") for a in sys.argv[1:] if a.startswith("fuse=")),
+                ["rms", "swiglu", "attn", "kv"])) - {"0"}
 # timing ablation only (wrong results): skip=fa,kvw,gemm leaves out attention, the K/V write, the GEMMs
 SKIP = set(next((a[5:].split(",") for a in sys.argv[1:] if a.startswith("skip=")), []))
 for _a in sys.argv[1:]:              # tile_<gemm>=WM,WN,MT,NT,KB,NSTG,MINB overrides one GEMM's tile
@@ -96,7 +103,8 @@ class Prefill:
         self.k_attn = Kern(batchify(attn, off))
         self.fa = FA                                    # tensor-core causal attention instead of ATTN4 per token
         if FA:
-            self.k_fa = Kern(QB.flash_prefill_source(4, Q.MAX_LEN) if FA_V1 else QB.flash_prefill_v3_source(Q.MAX_LEN))
+            self.fa_q8 = mode == "i8" and "attn" in FUSE and not FA_V1
+            self.k_fa = Kern(QB.flash_prefill_source(4, Q.MAX_LEN) if FA_V1 else QB.flash_prefill_v3_source(Q.MAX_LEN, self.fa_q8))
         if mode == "v2":
             bucket = 8 if P <= 8 else 16 if P <= 16 else 32
             assert P <= 32
@@ -110,6 +118,12 @@ class Prefill:
         elif mode == "i8":
             self.g, self.tile = {}, {}
             for name, epi in (("qkv", "biasf"), ("o", "resid"), ("gu", "swiglu"), ("down", "resid")):
+                if name == "gu" and "swiglu" in FUSE:
+                    assert MS
+                    epi = "swiglu_q8"
+                if name == "qkv" and "kv" in FUSE:
+                    assert MS
+                    epi = f"biasf_kv:{nh * hd}:{nkv * hd}"
                 if MS:
                     WM, WN, MT, NT, KB, NSTG, MINB = I8MS[name]
                     src = QB.gemm_q4i8_ms_source(WM, WN, MT, NT, epi, KB, NSTG, MINB)
@@ -119,12 +133,17 @@ class Prefill:
                 self.g[name] = Kern(src)
                 self.tile[name] = (16 * MT * WM, 8 * NT * WN, 32 * WM * WN)       # BM, BN, threads
             self.k_q = Kern(QB.QUANT_Q8)
+            self.k_rmsq = Kern(QB.rmsnorm_q8_source(H))
             if not hasattr(m, "packed_i8"):
                 m.packed_i8 = [{name: QB.pack_q4_i8(*L[name]) for name in ("qkv", "o", "gu", "down")} for L in m.L]
             kmax = max(H, m.inter)
             self.xq = torch.zeros(P, kmax, dtype=torch.int8, device=dev)
             self.xd = torch.zeros(kmax // 32, P, device=dev)
             self.xs = torch.zeros(kmax // 32, 2 * P, dtype=torch.int32, device=dev)   # C quads per token pair
+            # second set: the down GEMM's input, written by the gate_up epilogue while gate_up reads the first
+            self.qb = [(self.xq, self.xd, self.xs),
+                       (torch.zeros(P, m.inter, dtype=torch.int8, device=dev), torch.zeros(m.inter // 32, P, device=dev),
+                        torch.zeros(m.inter // 32, 2 * P, dtype=torch.int32, device=dev))]
         else:
             self.k_deq = Kern(DEQ)
             self.w16 = torch.empty(2 * m.inter * H, dtype=torch.float16, device=dev)   # largest layer matrix
@@ -148,22 +167,31 @@ class Prefill:
                             [W.data_ptr(), S.data_ptr(), X.data_ptr(), Y.data_ptr(), aux, ctypes.c_int32(N),
                              ctypes.c_int32(K), self.ws.data_ptr(), self.cnt.data_ptr()])
 
-    def gemm8(self, i, name, X, Y, aux, N, K):
+    def gemm8(self, i, name, X, Y, aux, N, K, qin=0, extra=()):
+        """X None: the int8 input is already in buffer set qb[qin] (fused into the producer)."""
         if "gemm" in SKIP:
             return
         P = self.P
         nb = P * K // 32
-        self.k_q.launch((nb + 7) // 8, 256, [X.data_ptr(), self.xq.data_ptr(), self.xd.data_ptr(), self.xs.data_ptr(),
-                                             ctypes.c_int32(P), ctypes.c_int32(K)])
+        if X is not None:
+                self.k_q.launch((nb + 7) // 8, 256, [X.data_ptr(), *(t.data_ptr() for t in self.qb[qin]),
+                                                 ctypes.c_int32(P), ctypes.c_int32(K)])
         W, S = self.m.packed_i8[i][name]
         BM, BN, nthr = self.tile[name]
         self.g[name].launch(((P + BN - 1) // BN, N // BM), nthr,
-                            [W.data_ptr(), S.data_ptr(), self.xq.data_ptr(), self.xd.data_ptr(), self.xs.data_ptr(),
-                             Y.data_ptr(), aux, ctypes.c_int32(N), ctypes.c_int32(K), ctypes.c_int32(P)])
+                            [W.data_ptr(), S.data_ptr(), *(t.data_ptr() for t in self.qb[qin]),
+                             Y.data_ptr(), aux, ctypes.c_int32(N), ctypes.c_int32(K), ctypes.c_int32(P), *extra])
 
     def rms(self, w):
+        """RMSNorm of h into x (bf16), or with fuse=rms in i8 mode straight into the GEMM's int8 input;
+        -> the X argument of the next gemm8."""
+        if self.mode == "i8" and "rms" in FUSE:
+            self.k_rmsq.launch((1, self.P), self.m.H // 8, [self.h.data_ptr(), w.data_ptr(), self.xq.data_ptr(), self.xd.data_ptr(),
+                                                  self.xs.data_ptr(), ctypes.c_int32(self.m.H), ctypes.c_float(self.m.eps)])
+            return None
         self.k_rms.launch((1, self.P), 512, [self.h.data_ptr(), w.data_ptr(), self.x.data_ptr(),
                                              ctypes.c_int32(self.m.H), ctypes.c_float(self.m.eps)])
+        return self.x
 
     def chunk(self):
         """One pass over P tokens at positions self.pos (filled by the caller)."""
@@ -171,34 +199,44 @@ class Prefill:
         self.k_emb.launch((4, P), 512, [m.embed.data_ptr(), self.tok.data_ptr(), self.h.data_ptr(), ctypes.c_int32(H)])
         scale = ctypes.c_float(1.0 / math.sqrt(m.hd))
         for i, L in enumerate(m.L):
-            self.rms(L["ln1"])
+            x = self.rms(L["ln1"])
+            kv_fused = self.mode == "i8" and "kv" in FUSE
             if self.mode == "i8":
-                self.gemm8(i, "qkv", self.x, self.qkv, L["qkv_b"].data_ptr(), self.nq, H)
+                self.gemm8(i, "qkv", x, self.qkv, L["qkv_b"].data_ptr(), self.nq, H,
+                           extra=(m.cos.data_ptr(), m.sin.data_ptr(), self.pos.data_ptr(), self.kc[i].data_ptr(),
+                                  self.vc[i].data_ptr(), ctypes.c_int32(Q.MAX_LEN)) if kv_fused else ())
             elif self.mode == "v2":
                 self.gemv(i, "qkv", self.x, self.qkv, L["qkv_b"].data_ptr(), self.nq, H)
             else:
                 self.qkv.copy_(self.gemm("qkv", L, self.x, self.nq, H) + L["qkv_b"])
             args = [self.qkv.data_ptr(), m.cos.data_ptr(), m.sin.data_ptr(), self.pos.data_ptr(), self.kc[i].data_ptr(),
                     self.vc[i].data_ptr(), self.att.data_ptr(), ctypes.c_int32(m.nh), ctypes.c_int32(m.nkv), scale]
-            if "kvw" not in SKIP:
+            if "kvw" not in SKIP and not kv_fused:
                 self.k_kvw.launch((m.nh, P), 512, args)
             if "fa" in SKIP:
                 pass
             elif self.fa:
-                self.k_fa.launch((m.nh, (P + 63) // 64), 128 if FA_V1 else 256, args[:6] + [self.att.data_ptr(), ctypes.c_int32(m.nh),
-                                                                           ctypes.c_int32(m.nkv), scale, ctypes.c_int32(P)])
+                xq, xd, xs = self.qb[0] if self.fa_q8 else (self.att, None, None)
+                self.k_fa.launch((m.nh, (P + 63) // 64), 128 if FA_V1 else 256,
+                                 args[:6] + [xq.data_ptr(), ctypes.c_int32(m.nh), ctypes.c_int32(m.nkv), scale, ctypes.c_int32(P)]
+                                 + ([xd.data_ptr(), xs.data_ptr()] if self.fa_q8 else []))
             else:
                 self.k_attn.launch((m.nh, P), 512, args)
             if self.mode == "i8":
-                self.gemm8(i, "o", self.att, self.h, 0, H, m.nh * m.hd)
+                self.gemm8(i, "o", None if self.fa and self.fa_q8 else self.att, self.h, 0, H, m.nh * m.hd)
             elif self.mode == "v2":
                 self.gemv(i, "o", self.att, self.h, 0, H, m.nh * m.hd)
             else:
                 self.h += self.gemm("o", L, self.att, H, m.nh * m.hd)
-            self.rms(L["ln2"])
+            x = self.rms(L["ln2"])
             if self.mode == "i8":
-                self.gemm8(i, "gu", self.x, self.xm, 0, 2 * m.inter, H)
-                self.gemm8(i, "down", self.xm, self.h, 0, H, m.inter)
+                if "swiglu" in FUSE:
+                    xq2, xd2, xs2 = self.qb[1]
+                    self.gemm8(i, "gu", x, xq2, xd2.data_ptr(), 2 * m.inter, H, extra=(xs2.data_ptr(),))
+                    self.gemm8(i, "down", None, self.h, 0, H, m.inter, qin=1)
+                else:
+                    self.gemm8(i, "gu", x, self.xm, 0, 2 * m.inter, H)
+                    self.gemm8(i, "down", self.xm, self.h, 0, H, m.inter)
             elif self.mode == "v2":
                 self.gemv(i, "gu", self.x, self.xm, 0, 2 * m.inter, H)
                 self.gemv(i, "down", self.xm, self.h, 0, H, m.inter)

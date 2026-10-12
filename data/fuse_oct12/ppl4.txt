@@ -1,0 +1,12 @@
+ppl P=512 fuse=0
+cublas P=512: mean NLL 3.2929, perplexity 26.920
+i8     P=512: mean NLL 3.2946, perplexity 26.968
+ppl P=512 fuse=rms,swiglu,attn,kv
+cublas P=512: mean NLL 3.2929, perplexity 26.920
+i8     P=512: mean NLL 3.2942, perplexity 26.955
+ppl P=2048 fuse=0
+cublas P=2048: mean NLL 3.1610, perplexity 23.594
+i8     P=2048: mean NLL 3.1618, perplexity 23.613
+ppl P=2048 fuse=rms,swiglu,attn,kv
+cublas P=2048: mean NLL 3.1610, perplexity 23.594
+i8     P=2048: mean NLL 3.1611, perplexity 23.596
