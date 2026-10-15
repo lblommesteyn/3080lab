@@ -1,0 +1,36 @@
+utilization.gpu [%], memory.used [MiB], clocks.current.sm [MHz], power.draw [W]
+13 %, 2213 MiB, 210 MHz, 47.48 W
+pid, process_name
+1944, [Insufficient Permissions]
+2888, C:\Windows\System32\ShellHost.exe
+2936, C:\Windows\SystemApps\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\CrossDeviceResume.exe
+1200, C:\Windows\explorer.exe
+9720, C:\Windows\SystemApps\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\SearchHost.exe
+9692, C:\Windows\SystemApps\Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy\StartMenuExperienceHost.exe
+12828, C:\Program Files (x86)\Microsoft\EdgeWebView\Application\155.0.4283.45\msedgewebview2.exe
+13680, C:\Program Files\WindowsApps\Microsoft.YourPhone_1.26082.121.0_x64__8wekyb3d8bbwe\PhoneExperienceHost.exe
+1936, C:\Program Files\Riot Vanguard\vgtray.exe
+9416, C:\Windows\SystemApps\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\TextInputHost.exe
+15104, C:\Users\LukeB\AppData\Local\Discord\app-1.0.9261\Discord.exe
+16508, C:\Program Files (x86)\Steam\bin\cef\cef.win64\steamwebhelper.exe
+18048, C:\Program Files (x86)\Microsoft\EdgeWebView\Application\155.0.4283.45\msedgewebview2.exe
+19168, C:\Program Files\WindowsApps\MSTeams_26260.1701.5139.3736_x64__8wekyb3d8bbwe\ms-teams.exe
+20208, C:\Users\LukeB\AppData\Local\slack\app-4.52.178\slack.exe
+21008, C:\Program Files (x86)\Microsoft\Copilot\Application\mscopilot.exe
+20492, C:\Users\LukeB\AppData\Local\slack\app-4.52.178\slack.exe
+22504, C:\Program Files\WindowsApps\BREEAITECHPTE.LTD.BreeXLSXEditor_1.0.8.0_x64__z5nd0wyapdvva\DocChatClient\DocChatClient.exe
+21700, C:\Program Files\WindowsApps\SpotifyAB.SpotifyMusic_1.304.258.0_x64__zpdnekdrzrea0\Spotify.exe
+23584, C:\Program Files\WindowsApps\OpenAI.Codex_26.1007.9446.0_x64__2p2nqsd0c76g0\app\ChatGPT.exe
+24528, C:\Windows\SystemApps\ShellExperienceHost_cw5n1h2txyewy\ShellExperienceHost.exe
+24980, C:\Users\LukeB\AppData\Local\OpenAI\Codex\runtimes\cua_node\a9ba6825a525118c\bin\node_modules\@oai\sky\bin\windows\swift\x64\codex-computer-use-swift.exe
+13760, [Insufficient Permissions]
+27920, C:\Windows\System32\ApplicationFrameHost.exe
+23056, C:\Windows\ImmersiveControlPanel\SystemSettings.exe
+26764, C:\Program Files\WindowsApps\Microsoft.WindowsTerminal_1.24.12741.0_x64__8wekyb3d8bbwe\WindowsTerminal.exe
+4, [Insufficient Permissions]
+2324, C:\Program Files\WindowsApps\Microsoft.MicrosoftOfficeHub_19.2610.35011.0_x64__8wekyb3d8bbwe\M365Copilot.exe
+4556, C:\Program Files (x86)\Microsoft\EdgeWebView\Application\155.0.4283.45\msedgewebview2.exe
+32112, C:\Users\LukeB\AppData\Local\Programs\Python\Python312\python.exe
+11556, C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+10892, C:\Program Files\Google\Chrome\Application\chrome.exe
+21648, C:\Program Files\Google\Chrome\Application\chrome.exe

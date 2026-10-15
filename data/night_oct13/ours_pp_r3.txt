@@ -1,0 +1,5 @@
+i8     chunk= 128 P=128:    13309 tok/s (9.62 ms min, 10.02 median) | K err 6.3e-03 V err 8.8e-02 | last logits err 1.9e-02, argmax same: True
+i8     chunk= 256 P=256:    17729 tok/s (14.44 ms min, 15.63 median) | K err 6.3e-03 V err 7.8e-02 | last logits err 2.0e-02, argmax same: True
+i8     chunk= 512 P=512:    21852 tok/s (23.43 ms min, 23.73 median) | K err 6.3e-03 V err 7.3e-02 | last logits err 2.2e-02, argmax same: True
+i8     chunk= 512 P=1024:    22796 tok/s (44.92 ms min, 45.87 median) | K err 6.3e-03 V err 6.9e-02 | last logits err 7.9e-02, argmax same: True
+i8     chunk= 512 P=2048:    20884 tok/s (98.06 ms min, 99.17 median) | K err 9.4e-03 V err 6.2e-02 | last logits err 1.6e-02, argmax same: True

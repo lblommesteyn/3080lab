@@ -8,10 +8,9 @@ then schedule better than ptxas, then make Qwen faster.
 
 | workload | ours | llama.cpp b11485 | ratio | measured | section |
 |---|---:|---:|---:|---|---|
-| decode, 1 sequence (tok/s) | 509.6 | 368.7 | **1.38x** | Oct 11, idle desktop | Night run, Oct 11 |
-| batched decode, 2 / 4 / 8 / 16 / 32 sequences (tok/s) | 943 / 1851 / 3467 / 5674 / 7216 | 630 / 982 / 1437 / 2499 / 3664 | **1.50 / 1.88 / 2.41 / 2.27 / 1.97x** | Oct 11, idle desktop | Night run, Oct 11 |
-| prefill, 512-token prompt (tok/s) | 31,164 | 18,528 | **1.68x** | ours Oct 12 (busy desktop, min of 200), llama.cpp Oct 11 idle | Fused small ops |
-| prefill, 2048-token prompt (tok/s) | 27,973 | 17,637 | **1.59x** | same | Fused small ops |
+| decode, 1 sequence (tok/s) | 514.0 | 365.8 | **1.41x** | Oct 14 | Night run, Oct 13 |
+| batched decode, 2 / 4 / 8 / 16 / 32 sequences (tok/s) | 950 / 1792 / 3395 / 5578 / 7135 | 625 / 972 / 1416 / 2489 / 3597 | **1.52 / 1.84 / 2.40 / 2.24 / 1.98x** | Oct 14 | Night run, Oct 13 |
+| prefill, 128 / 512 / 2048-token prompt (tok/s) | 21,888 / 30,767 / 28,114 | 10,937 / 18,502 / 17,639 | **2.00 / 1.66 / 1.59x** | Oct 14 | Night run, Oct 13 |
 
 Both sides best of repeated runs (`scripts/night_summary.py`). Correctness: last-token argmax
 matches a token-by-token reference; perplexity on README text within 0.1% of an fp16 cuBLAS path.
@@ -1032,6 +1031,25 @@ x4: +1.4 to +1.9%; gate_up x4: +19.7%; down x1: +0.3%), so the current splits st
 outside the big GEMVs (norms, attention, small-GEMV tails, ~0.5 ms) is the per-kernel fixed cost that
 round 3 already attacked: folding the norm into the GEMVs, L2 prefetch and a persistent megakernel
 all measured slower.
+
+### Night run, Oct 13: everything re-measured after the Oct 12 fusions (`data/night_oct13/`)
+
+Same script and settings as the Oct 11 night run (`scripts/night_summary.py dir=data/night_oct13`).
+It queued behind other GPU jobs and ran in the afternoon of Oct 14 (17:11-17:29), not overnight.
+GPU at start: 13% utilization, 2,213 MiB used, SM clock 210 MHz (idle P-state), only desktop apps.
+Something did load the machine part way through: our prefill was 25-40% slower in rounds 2 and 3
+than in round 1, while round 1 matches the in-process A/B of Oct 12 to within 1.3%. The best-of rule
+keeps round 1 for both sides; llama.cpp's numbers are within 1% of Oct 11 either way.
+
+| | ours | llama.cpp | ratio |
+|---|---:|---:|---:|
+| decode B = 1 (`qwen_gguf.py` vs `llama-bench -n 256`, best of -fa 0 / 1) | 514.0 | 365.8 | **1.41x** |
+| batched decode B = 2 / 4 / 8 / 16 / 32 (`qwen_batched_decode.py` vs `llama-batched-bench` S_TG) | 950 / 1792 / 3395 / 5578 / 7135 | 625 / 972 / 1416 / 2489 / 3597 | **1.52 / 1.84 / 2.40 / 2.24 / 1.98x** |
+| prefill P = 128 / 256 / 512 / 1024 / 2048 (`qwen_prefill.py modes=i8` vs `llama-bench -fa 1`) | 21,888 / 26,755 / 30,767 / 29,840 / 28,114 | 10,937 / 15,141 / 18,502 / 18,607 / 17,639 | **2.00 / 1.77 / 1.66 / 1.60 / 1.59x** |
+
+Prefill is up 19-22% on our side since Oct 11 (the new down tile, attention v3 and the fused quantize
+passes), so the lead at P = 128 is now 2x. Decode and batched decode did not change on our side (the
+Oct 12 decode changes were worth 0.3-0.4%) and are within 1-2% of Oct 11 on both.
 
 ### Phase 8: our own block scheduler (`lab/resched.py`, `lab/verify.py`, `pair_latency`, `mufu_latency`, `resched_rand`)
 

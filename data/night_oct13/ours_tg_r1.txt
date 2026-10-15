@@ -1,0 +1,3 @@
+ours(gguf)   487.0 tok/s  2.054 ms/token
+ours(gguf)   487.3 tok/s  2.052 ms/token
+ours(gguf)   499.6 tok/s  2.001 ms/token
