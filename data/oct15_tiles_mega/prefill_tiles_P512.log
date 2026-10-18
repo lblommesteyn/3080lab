@@ -1,0 +1,14 @@
+fuse=rms,swiglu,attn,kv        vs first: K 0 V 0 h 0
+tile_gu=8,2,2,4,4,2,1          vs first: K 0 V 0 h 0
+tile_gu=8,2,2,4,4,3,1          vs first: K 0 V 0 h 0
+tile_gu=8,2,2,4,2,3,1          vs first: K 0 V 0 h 0
+tile_gu=8,2,2,4,2,4,1          vs first: K 0 V 0 h 0
+tile_gu=4,4,2,4,2,3,1          vs first: K 0 V 0 h 0
+tile_qkv=4,4,2,4,2,3,1         vs first: K 0 V 0 h 0
+fuse=rms,swiglu,attn,kv        min  16.625  p10  16.989  median  17.179 ms    30798 tok/s (min)  p10 vs first +0.0%
+tile_gu=8,2,2,4,4,2,1          min  17.937  p10  18.105  median  18.363 ms    28544 tok/s (min)  p10 vs first +6.6%
+tile_gu=8,2,2,4,4,3,1          min  17.837  p10  18.208  median  18.464 ms    28704 tok/s (min)  p10 vs first +7.2%
+tile_gu=8,2,2,4,2,3,1          min  19.317  p10  19.547  median  19.871 ms    26506 tok/s (min)  p10 vs first +15.1%
+tile_gu=8,2,2,4,2,4,1          min  19.312  p10  19.419  median  19.741 ms    26513 tok/s (min)  p10 vs first +14.3%
+tile_gu=4,4,2,4,2,3,1          min  19.489  p10  19.739  median  20.037 ms    26272 tok/s (min)  p10 vs first +16.2%
+tile_qkv=4,4,2,4,2,3,1         min  16.920  p10  17.164  median  17.404 ms    30261 tok/s (min)  p10 vs first +1.0%

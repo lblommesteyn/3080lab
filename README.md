@@ -1032,6 +1032,43 @@ outside the big GEMVs (norms, attention, small-GEMV tails, ~0.5 ms) is the per-k
 round 3 already attacked: folding the norm into the GEMVs, L2 prefetch and a persistent megakernel
 all measured slower.
 
+### Two negative results, Oct 15: a decode megakernel and bigger prefill tiles (`data/oct15_tiles_mega/`)
+
+**Decode megakernel** (`lab/qwen_mega.py`, `scripts/qwen_mega.py`). One persistent kernel for the whole
+decode step: 68 blocks, one per SM, each with a producer warp that streams that block's slice of the
+weights (703 MiB in total, balanced to within 0.1% per block) through a shared-memory ring with
+`cp.async` and mbarriers, while consumer warps do the int4 GEMV units, attention and the norms, with
+a grid barrier between ops. The aim was to remove the gaps between the ~200 kernels of the CUDA
+graph. It compiles to 148 registers with no spills and runs without timeouts, but it is not correct
+yet (it picks token 1 where the reference picks 89141), and even so it is slower than the graph:
+
+| pos = 128, 200 rounds | p10 (us) | tok/s |
+|---|---:|---:|
+| CUDA graph, 200 kernels (current) | 1,910.8 | 523.3 |
+| megakernel | 2,238.5 | 446.7 (17% slower) |
+
+Since it is 17% behind before the correctness bug is found, it is parked. Two ring bugs found on the
+way, for anyone reusing the pattern: a consumer warp must not release a chunk it skipped before that
+chunk is full (its empty-barrier arrive lands in the slot's previous phase and the producer
+overwrites live data), and it must wait and release one chunk at a time (waiting for all skipped
+chunks first deadlocks once a skip is longer than the ring).
+
+**Bigger prefill tiles** (`scripts/prefill_ab.py P=512`). Tiles whose shared memory goes over 48 KB
+now use dynamic shared memory, which allowed 256-row and 128 x 128 GEMM tiles to cut L2-to-SM copies.
+All outputs are bit-identical to the default, and all are slower:
+
+| config | min (ms) | tok/s | vs default |
+|---|---:|---:|---:|
+| default | 16.625 | 30,798 | |
+| `tile_qkv=4,4,2,4,2,3,1` | 16.920 | 30,261 | -1.7% |
+| `tile_gu=8,2,2,4,4,3,1` | 17.837 | 28,704 | -6.8% |
+| `tile_gu=8,2,2,4,4,2,1` | 17.937 | 28,544 | -7.3% |
+| `tile_gu=8,2,2,4,2,4,1` | 19.312 | 26,513 | -13.9% |
+| `tile_gu=8,2,2,4,2,3,1` | 19.317 | 26,506 | -13.9% |
+| `tile_gu=4,4,2,4,2,3,1` | 19.489 | 26,272 | -14.7% |
+
+The defaults stay. Neither result changes the numbers in the results table.
+
 ### Night run, Oct 13: everything re-measured after the Oct 12 fusions (`data/night_oct13/`)
 
 Same script and settings as the Oct 11 night run (`scripts/night_summary.py dir=data/night_oct13`).

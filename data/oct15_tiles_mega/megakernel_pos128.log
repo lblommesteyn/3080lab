@@ -1,0 +1,7 @@
+streams: 703.0 MiB over 68 blocks, per block 10.326-10.345 MiB (max/mean 1.0009)
+megakernel: {'registers': 148, 'stack_bytes': 0, 'spill_stores': 0, 'spill_loads': 0, 'static_smem': 0} smem 100240 B
+eager: err [0, 0, 0, 0]  tok ref 89141 mega 1  max|logits diff| 18.01 (max|logit| 10.9)  max|h diff| 381.3 (max|h| 439)  sync [0, 0, 0, 0]
+repeat: tok 13  max|logits diff| 17.77  err [0, 0, 0, 0]
+graph (200 kernels)    min  1901.5  p10  1910.8  median  1938.4 us   523.3 tok/s (p10)  vs graph +0.0%
+megakernel             min  2218.0  p10  2238.5  median  2269.2 us   446.7 tok/s (p10)  vs graph +17.1%
+err after timing [0, 0, 0, 0]
