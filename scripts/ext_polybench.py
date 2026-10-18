@@ -105,6 +105,7 @@ def extract():
             (DST / fname).write_text(src)
             manifest.append({"file": fname, "bench": d.name, "kernel": name, "grid": grid, "block": block, "n": n,
                              "scalars": scalars})
+    (DST / "manifest.json").write_text(json.dumps(manifest, indent=1))
     return manifest
 
 
