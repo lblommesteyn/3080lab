@@ -53,6 +53,10 @@ class Kern:
         b = toolchain.build(src)
         self.fn = check(cu.cuModuleGetFunction(check(cu.cuModuleLoadData(b.cubin)), b"k"))
         self.keep = []
+        # "// DYNSMEM n" first line (gemm_q4i8_ms_source over 48 KB): dynamic shared memory
+        self.smem = int(src.split("\n", 1)[0].split()[2]) if src.startswith("// DYNSMEM") else 0
+        if self.smem:
+            check(cu.cuFuncSetAttribute(self.fn, cu.CUfunction_attribute.CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, self.smem))
 
     def launch(self, grid, block, args):
         gx, gy = grid if isinstance(grid, tuple) else (grid, 1)
@@ -60,7 +64,7 @@ class Kern:
         p = (ctypes.c_void_p * len(a))(*[ctypes.addressof(z) for z in a])
         self.keep.append((a, p))
         st = cu.CUstream(torch.cuda.current_stream().cuda_stream)
-        check(cu.cuLaunchKernel(self.fn, gx, gy, 1, block, 1, 1, 0, st, ctypes.addressof(p), 0))
+        check(cu.cuLaunchKernel(self.fn, gx, gy, 1, block, 1, 1, self.smem, st, ctypes.addressof(p), 0))
 
 
 def batchify(src: str, lines: str) -> str:

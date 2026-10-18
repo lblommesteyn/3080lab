@@ -6,7 +6,8 @@ config (0 = bit-identical).
 
   pcslurm submit -- python scripts/prefill_ab.py P=512 rounds=200 cfg="fuse=0" cfg="fuse=rms" ...
 
-A cfg is a space-separated list of qwen_prefill flags that are read per Prefill (fuse=...).
+A cfg is a space-separated list of qwen_prefill flags that are read per Prefill (fuse=...,
+tile_<gemm>=WM,WN,MT,NT,KB,NSTG,MINB).
 """
 import random
 import sys
@@ -38,8 +39,14 @@ def main():
     ids = torch.randint(0, 150000, (P,), generator=g).tolist()
     ids_t = torch.tensor(ids, device="cuda")
     runs = []
+    i8ms = dict(QP.I8MS)
     for cfg in cfgs:
         QP.FUSE = parse_fuse(cfg)
+        QP.I8MS = dict(i8ms)
+        for x in cfg.split():
+            if x.startswith("tile_"):
+                k, v = x[5:].split("=")
+                QP.I8MS[k] = tuple(map(int, v.split(",")))
         pf = QP.Prefill(m, chunk, "i8")
 
         def run_all(pf=pf):

@@ -1305,7 +1305,10 @@ def gemm_q4i8_ms_source(WM: int, WN: int, MT: int, NT: int, epi: str = "store", 
     XB = BN * XS + BN * KB * 12                                    # X bytes per stage
     stage = XB + TW * 576
     smem = max(NSTG * stage, BM * (BN + 1) * 4)
-    assert smem <= 48 * 1024, f"static shared memory {smem} > 48 KB"
+    # over 48 KB (the 256-row and 128 x 128 tiles): dynamic shared memory; the "// DYNSMEM" line tells
+    # the launchers (qwen_fused.Kern, batched_gemv_bench.Kern) to raise the limit and pass the size
+    assert smem <= 99 * 1024, f"shared memory {smem} > 99 KB"
+    dyn = smem > 48 * 1024
     assert KB % 2 == 0 and NSTG >= 2
     nthr = 32 * WM * WN
     if epi.startswith("biasf_kv"):
@@ -1398,7 +1401,7 @@ def gemm_q4i8_ms_source(WM: int, WN: int, MT: int, NT: int, epi: str = "store", 
     {body}
   }}"""
         extra = ""
-    return f"""
+    return (f"// DYNSMEM {smem}\n" if dyn else "") + f"""
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 #define MT {MT}
@@ -1418,7 +1421,7 @@ extern "C" __global__ void __launch_bounds__({nthr}, {MINB}) k(
     const uint4* __restrict__ W, const uint2* __restrict__ S, const signed char* __restrict__ Xq,
     const float* __restrict__ Xd, const int* __restrict__ Xs, void* Y, const void* AUX, int N, int K, int P{extra})
 {{
-  __shared__ __align__(16) unsigned char sm[{smem}];
+  {"extern __shared__ __align__(16) unsigned char sm[];" if dyn else f"__shared__ __align__(16) unsigned char sm[{smem}];"}
   const int warp = threadIdx.x >> 5, lane = threadIdx.x & 31, g = lane >> 2, t = lane & 3;
   const int wm = warp % WM, wn = warp / WM;
   const int nthr = {nthr};

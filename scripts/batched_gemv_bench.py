@@ -32,13 +32,17 @@ class Kern:
         self.regs = toolchain.ptxas_resources(b.ptxas_log)["registers"]
         self.fn = check(cu.cuModuleGetFunction(check(cu.cuModuleLoadData(b.cubin)), b"k"))
         self.keep = []
+        # "// DYNSMEM n" first line (gemm_q4i8_ms_source over 48 KB): dynamic shared memory
+        self.smem = int(src.split("\n", 1)[0].split()[2]) if src.startswith("// DYNSMEM") else 0
+        if self.smem:
+            check(cu.cuFuncSetAttribute(self.fn, cu.CUfunction_attribute.CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, self.smem))
 
     def launch(self, grid, block, args, gy=1):
         a = [x if isinstance(x, (ctypes.c_uint64, ctypes.c_int32, ctypes.c_float)) else ctypes.c_uint64(x) for x in args]
         p = (ctypes.c_void_p * len(a))(*[ctypes.addressof(z) for z in a])
         self.keep.append((a, p))
         st_ = cu.CUstream(torch.cuda.current_stream().cuda_stream)
-        check(cu.cuLaunchKernel(self.fn, grid, gy, 1, block, 1, 1, 0, st_, ctypes.addressof(p), 0))
+        check(cu.cuLaunchKernel(self.fn, grid, gy, 1, block, 1, 1, self.smem, st_, ctypes.addressof(p), 0))
 
 
 def timeit(fn, reps=20):
