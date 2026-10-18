@@ -148,12 +148,19 @@ def pipe(op: str) -> str | None:
     return None
 
 
+PRED_BRANCH = 13
+
+
 def latency(i: sass.Instr, table: dict[str, int], consumer: sass.Instr | None = None) -> int:
     """Cycles from fixed-latency producer i until a dependent consumer may issue (no interlock).
     Measured (pair_latency): 4 within a pipe, 5 across the FMA/ALU pipes. Into SHFL pair_latency
     said 4, but FADD -> SHFL at 4 gave wrong reductions on the suite's spmv_csr and layernorm (Oct 18
     2026; ptxas always leaves 5), so SHFL counts as another pipe. Unmeasured producers: the smallest
     distance ptxas itself used, but never below 5 (consumer pipe unknown)."""
+    if consumer is not None and is_control(consumer):
+        # a predicate read by a branch/EXIT: ptxas never leaves less than 13 (183 of 240 pairs over
+        # the suite + PolyBench at exactly 13, none below); 12 broke spmv_csr (Oct 18 2026)
+        return PRED_BRANCH
     p = pipe(i.opcode)
     if p is not None:
         if consumer is None:
