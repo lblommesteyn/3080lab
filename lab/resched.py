@@ -19,6 +19,7 @@ Safety model (see README Phase 8):
 """
 from __future__ import annotations
 
+import dataclasses
 import random
 import re
 import struct
@@ -33,6 +34,13 @@ CONTROL = ("BRA", "BRX", "JMP", "JMX", "CALL", "RET", "EXIT", "BSSY", "BSYNC", "
 UNSAFE = ("ST", "ATOM", "RED", "MEMBAR", "CCTL", "LDGSTS", "DEPBAR", "S2R", "CS2R", "ERRBAR", "FENCE",
           "VOTE", "MATCH", "B2R", "R2B", "LDGDEPBAR", "ARRIVES", "SUATOM", "SURED", "SUST", "LEPC")
 REUSE_SLOTS = {"a": 1, "b": 2, "c": 4}
+# with wide=True these may move: memory ops keep their order whenever either side writes memory
+WIDE_OK = ("ST", "STS", "STG", "STL", "ATOM", "ATOMS", "ATOMG", "RED", "S2R")
+_TIMER = re.compile(r"SR_(CLOCK|GLOBALTIMER)")
+
+
+def _writes_mem(i: sass.Instr) -> bool:
+    return _base(i.opcode).startswith(("ST", "ATOM", "RED", "SU"))
 VARUNIT = ("MUFU", "SHFL", "LD", "S2R", "I2F", "F2I", "F2F", "FRND", "POPC", "FLO", "BREV", "DFMA", "DADD",
            "DMUL", "HMMA", "IMMA", "DSETP")
 _PRED = re.compile(r"(?<!U)\bP([0-6])\b")
@@ -142,13 +150,15 @@ def pipe(op: str) -> str | None:
 
 def latency(i: sass.Instr, table: dict[str, int], consumer: sass.Instr | None = None) -> int:
     """Cycles from fixed-latency producer i until a dependent consumer may issue (no interlock).
-    Measured (pair_latency): 4 within a pipe, 5 across the FMA/ALU pipes, 4 into SHFL. Unmeasured
-    producers: the smallest distance ptxas itself used, but never below 5 (consumer pipe unknown)."""
+    Measured (pair_latency): 4 within a pipe, 5 across the FMA/ALU pipes. Into SHFL pair_latency
+    said 4, but FADD -> SHFL at 4 gave wrong reductions on the suite's spmv_csr and layernorm (Oct 18
+    2026; ptxas always leaves 5), so SHFL counts as another pipe. Unmeasured producers: the smallest
+    distance ptxas itself used, but never below 5 (consumer pipe unknown)."""
     p = pipe(i.opcode)
     if p is not None:
         if consumer is None:
             return 5
-        if consumer.opcode.startswith("SHFL") or pipe(consumer.opcode) == p:
+        if pipe(consumer.opcode) == p:
             return 4
         return 5
     if i.opcode in table:
@@ -166,6 +176,8 @@ def var_latency(i: sass.Instr) -> int:
 def _port(i: sass.Instr) -> tuple[str, int]:
     """Issue port and cycles it is held per warp instruction (model.py v1 tables, measured)."""
     port, cost, _, _ = port_of_v1(i.opcode)
+    if _memory(i):                     # ptxas spaces memory ops >= 4 cycles; 1 gave wrong results
+        cost = max(cost, 4)            # (suite transpose, Oct 18 2026; lab/verify.py MEM_GAP)
     return port, cost
 
 
@@ -192,7 +204,9 @@ def _fixed_producer(i: sass.Instr, r) -> bool:
 
 
 def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = "crit",
-                   rng: random.Random | None = None, reg_bars: dict | None = None):
+                   rng: random.Random | None = None, reg_bars: dict | None = None,
+                   bar_alloc: str = "first", keep_bars: bool = False, self_loop: bool = False,
+                   soft_war: bool = False, sticky_waits: bool = False, wide: bool = False):
     """Returns (order, stalls, waits): the new instruction order (indices into ins), each one's stall,
     and each one's extra wait mask. ins/res are the block's instructions and resources."""
     n = len(ins)
@@ -223,7 +237,10 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
                 if u == v:
                     continue
                 if is_var(ins[u]):
-                    preds[v].append((u, 2, "r" if ins[u].rbar != 7 else "w"))
+                    if ins[u].rbar == 7 and soft_war:          # checked after scheduling (rb_fixpoint)
+                        preds[v].append((u, 1, None))
+                    else:
+                        preds[v].append((u, 2, "r" if ins[u].rbar != 7 else "w"))
                 else:
                     preds[v].append((u, 1, None))
         for r in uv:
@@ -231,6 +248,13 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
         for r in dv:
             last_def[r] = v
             readers[r] = []
+    if wide:                                                 # memory order: any pair with a writer
+        for v in range(n):
+            if not _memory(ins[v]):
+                continue
+            for u in range(v):
+                if _memory(ins[u]) and (_writes_mem(ins[u]) or _writes_mem(ins[v])):
+                    preds[v].append((u, 1, None))
     # A variable-latency unit op with no write barrier (ptxas times it by distance, e.g. a dead MUFU
     # whose register is later overwritten) keeps at least ptxas's original cycle distance to every
     # later reader/writer of its destination and to the block end.
@@ -245,6 +269,19 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
                     preds[v].append((u, orig_t[v] - orig_t[u], None))
             if term is not None:
                 preds[term].append((u, orig_t[term] - orig_t[u], None))
+    # An op that keeps ptxas's barrier number (a read barrier always; a write barrier when the op is
+    # still in flight at the block exit, e.g. a load prefetched for the next trip of a loop) must not
+    # move above an instruction that waited on that number before it in ptxas's order: that wait
+    # would then also wait for this op (a counter), a false dependence costing the op's full latency.
+    if keep_bars:
+        pin0 = {u for u, kind in _pending(range(n), ins, {v: ins[v].wait for v in range(n)},
+                                          {v: ins[v].wbar for v in range(n)}) if kind == "w"}
+        for u in range(n):
+            bars = ([ins[u].rbar] if ins[u].rbar != 7 else []) + ([ins[u].wbar] if u in pin0 else [])
+            for b_ in bars:
+                for v in range(u):
+                    if ins[v].wait >> b_ & 1 and v != term:
+                        preds[u].append((v, 1, None))
     # the terminator waits for everything, and for every fixed-latency result (exit rule)
     if term is not None:
         for u in body:
@@ -258,11 +295,66 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
     for u in reversed(range(n)):
         own = var_latency(ins[u]) if ins[u].wbar != 7 else latency(ins[u], table)
         prio[u] = own + max((prio[v] for v in succ[u]), default=0)
+    if self_loop:
+        # a value defined here and read earlier in the block feeds the NEXT trip: the producer inherits
+        # its reader's priority (else a prefetch for the next trip has no in-block consumer, ranks
+        # lowest and sinks to the loop end, shrinking the prefetch distance ptxas built)
+        first_read: dict[str, int] = {}
+        defined: set = set()
+        for v in range(n):
+            for r in res[v][1]:
+                if r not in defined and r not in first_read:
+                    first_read[r] = v
+            defined |= res[v][0]
+        last_def = {}
+        for v in range(n):
+            for r in res[v][0]:
+                last_def[r] = v
+        floor = [0] * n
+        for r, u in last_def.items():
+            c = first_read.get(r)
+            if c is not None and c < u:
+                own = var_latency(ins[u]) if ins[u].wbar != 7 else latency(ins[u], table)
+                floor[u] = max(floor[u], own + prio[c])
+        for u in reversed(range(n)):
+            own = var_latency(ins[u]) if ins[u].wbar != 7 else latency(ins[u], table)
+            prio[u] = max(floor[u], own + max((prio[v] for v in succ[u]), default=0))
     issued: dict[int, int] = {}
     port_free: dict[str, int] = {}
     order: list[int] = []
     t = 0
     left = set(range(n))
+    sb = policy == "sb"
+    crit = policy in ("crit", "sb")
+    if sb:
+        # scoreboards as a scheduled resource: bpend[b] = expected completions of ops armed on b and
+        # not yet cleared by a wait on b (a wait blocks until ALL of them are done)
+        pin_sb = {u for u, kind in _pending(range(n), ins, {v: ins[v].wait for v in range(n)},
+                                            {v: ins[v].wbar for v in range(n)}) if kind == "w"}
+        rset = {x.rbar for x in ins if x.rbar != 7}
+        sb_cands = [c for c in range(6) if c not in rset] or list(range(6))
+        bpend = {b_: [] for b_ in range(6)}
+        sb_assign: dict[int, int] = {}
+
+        covered: set = set()
+
+        def wait_bars(v):
+            return {sb_assign[u] for u, _, kind in preds[v] if kind == "w" and (u, "w") not in covered} |                    {ins[u].rbar for u, _, kind in preds[v] if kind == "r" and (u, "r") not in covered}
+
+        def pick_bar(v, at):
+            if v in pin_sb:
+                return ins[v].wbar, 0
+            done = at + var_latency(ins[v])
+            mine = wait_bars(v)
+            best = None
+            for b_ in sb_cands:
+                if b_ == ins[v].rbar:
+                    continue
+                pend = [] if b_ in mine else bpend[b_]           # v's own wait clears b_ first
+                c = sum(max(0, done - d) for d in pend)
+                if best is None or (c, len(pend), b_) < best[0]:
+                    best = ((c, len(pend), b_), b_)
+            return best[1], best[0][0]
     while left:
         ready = []
         for v in left:
@@ -271,10 +363,18 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
             if all(u in issued for u, _, _ in preds[v]):
                 # crit picks the order by EXPECTED completion: a consumer of a scoreboarded result
                 # is not "ready" until the producer is likely done, or the warp just sits at the wait
-                earliest = max([issued[u] + (max(d, var_latency(ins[u])) if kind == "w" and policy == "crit" else d)
+                earliest = max([issued[u] + (max(d, var_latency(ins[u])) if kind == "w" and crit else d)
                                 for u, d, kind in preds[v]] + [t])
+                if sb:                                       # a wait lasts until its barrier drains
+                    for b_ in wait_bars(v):
+                        earliest = max([earliest] + bpend[b_])
                 ready.append((earliest, v))
         now = [v for e, v in ready if e <= t]
+        if sb and now:
+            # a scoreboarded op that would delay a pending wait (no barrier free of earlier,
+            # sooner-done ops) waits until something else cannot go
+            ok = [v for v in now if ins[v].wbar == 7 or pick_bar(v, t)[1] <= 64]
+            now = ok or now
         if policy == "identity":                         # strict program order: an audit, not a schedule
             nxt = min(left)
             now = [v for v in now if v == nxt]
@@ -285,7 +385,7 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
                 t = max(t + 1, min(e for e, _ in ready))
             continue
         free = [k for k in now if port_free.get(_port(ins[k])[0], 0) <= t]
-        if free and policy == "crit":
+        if free and crit:
             now = free                                    # don't stall a pipe that is still busy
         if policy == "random":
             v = rng.choice(now)
@@ -296,6 +396,21 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
         port, cost = _port(ins[v])
         issued[v] = max(t, port_free.get(port, 0))
         port_free[port] = issued[v] + cost
+        if sb:
+            wb = wait_bars(v)
+            for b_ in wb:
+                bpend[b_] = []
+            for u in order:
+                if sb_assign.get(u, 7) in wb:
+                    covered.update(((u, "w"), (u, "r")))
+                if ins[u].rbar in wb:
+                    covered.add((u, "r"))
+            if ins[v].wbar != 7:
+                b_, _ = pick_bar(v, issued[v])
+                sb_assign[v] = b_
+                bpend[b_].append(issued[v] + var_latency(ins[v]))
+            if ins[v].rbar != 7:
+                bpend[ins[v].rbar].append(issued[v] + 30)
         order.append(v)
         left.discard(v)
         t = issued[v] + 1
@@ -342,16 +457,36 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
     pinned = {u for u, kind in _pending(range(n), ins, {v: ins[v].wait for v in range(n)}, orig_w)
               if kind == "w"}
     cands = [b_ for b_ in range(6) if (armed | entry) >> b_ & 1] or list(range(6))
+    if soft_war:                                  # keep read-barrier indices for reads only
+        rset = {x.rbar for x in ins if x.rbar != 7}
+        cands = [c for c in cands if c not in rset] or [c for c in range(6) if c not in rset] or cands
     outstanding = {b_: set() for b_ in range(6)}
     new_w, waits = {}, {}
+    sticky = policy == "sb" or sticky_waits
+    resolved: set = set()
+    seen: list = []
+    if policy == "sb":
+        new_w = dict(sb_assign)
+    elif bar_alloc == "cost" and policy != "identity":
+        new_w = _alloc_barriers(order, ins, preds, issued, pinned, cands, entry)
     for v in order:
         m = entry if v == order[0] else 0
         for u, _, kind in preds[v]:
+            if sticky and (u, kind) in resolved:
+                continue                                    # an earlier wait already covered it
             if kind == "w":
                 m |= 1 << new_w[u]
             elif kind == "r":
                 m |= 1 << ins[u].rbar
         waits[v] = m
+        if sticky:
+            for u in seen:
+                for kind, b_ in (("w", new_w.get(u, 7)), ("r", ins[u].rbar)):
+                    if b_ != 7 and m >> b_ & 1:
+                        resolved.add((u, kind))
+                        if kind == "w":
+                            resolved.add((u, "r"))         # completion implies its reads happened
+            seen.append(v)
         for b_ in range(6):
             if m >> b_ & 1:
                 outstanding[b_].clear()
@@ -359,6 +494,9 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
             outstanding[ins[v].rbar].add(v)
         if ins[v].wbar == 7:
             new_w[v] = 7
+            continue
+        if v in new_w:                                      # cost allocator chose it already
+            outstanding[new_w[v]].add(v)
             continue
         if v in pinned or policy == "identity":
             b_ = ins[v].wbar
@@ -379,6 +517,106 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
         for v, kind in extra:
             waits[term] |= 1 << (new_w[v] if kind == "w" else ins[v].rbar)
     return order, stalls, waits, new_w
+
+
+def _alloc_barriers(order, ins, preds, issued, pinned, cands, entry) -> dict:
+    """Write barriers for the scoreboarded ops of a scheduled block, chosen to minimise false waits.
+
+    A scoreboard is a counter: a wait on barrier b blocks until EVERY op armed on b so far is done.
+    With more loads in flight than barriers, sharing is unavoidable, and the first-free rule can put
+    a late load on the barrier an early load's consumer waits on (the consumer then waits for the
+    late load: 5x more scoreboard stall on the R8U2 down GEMV). Here each op goes, in issue order,
+    to the barrier where it adds the least expected delay to the waits still pending on that barrier
+    (expected completion = issue + var_latency), and nothing when its completion is earlier."""
+    INF = 1 << 30
+    pos = {v: i for i, v in enumerate(order)}
+    wpos, rpos = {}, {}
+    for v in order:
+        for u, _, kind in preds[v]:
+            if kind == "w":
+                wpos[u] = min(wpos.get(u, INF), pos[v])
+            elif kind == "r":
+                rpos[u] = min(rpos.get(u, INF), pos[v])
+    occ = {b: [] for b in range(6)}                 # barrier -> [(arm_pos, done, wait_pos)]
+
+    def pending(b, p):
+        waits_b = [w for _, _, w in occ[b] if w < p]
+        return [o for o in occ[b] if o[0] < p and o[2] >= p and not any(o[0] < w < p for w in waits_b)]
+
+    new_w = {}
+    for v in order:
+        p = pos[v]
+        if ins[v].wbar != 7:
+            done = issued[v] + var_latency(ins[v])
+            if v in pinned:
+                b = ins[v].wbar
+            else:
+                best = None
+                for b_ in [c for c in cands if c != ins[v].rbar] or [c for c in range(6) if c != ins[v].rbar]:
+                    pend = pending(b_, p)
+                    cost = sum(max(0, done - d) for _, d, _ in pend)
+                    wv = wpos.get(v, INF)
+                    cost += sum(max(0, d - done) for a, d, w in pend if w > wv)
+                    key = (cost, len(pend), b_)
+                    if best is None or key < best[0]:
+                        best = (key, b_)
+                b = best[1]
+            new_w[v] = b
+            occ[b].append((p, done, wpos.get(v, INF)))
+        if ins[v].rbar != 7:
+            occ[ins[v].rbar].append((p, issued[v] + 30, rpos.get(v, INF)))
+    return new_w
+
+
+def _war_short(blk, res, order, stalls) -> set:
+    """Variable-latency ops without a read barrier whose source register is now overwritten sooner
+    (in issue cycles) than in ptxas's order. ptxas never overwrites such a source within 60 cycles
+    without a barrier (GEMV and random kernels), so its own distance is the only evidence of safety."""
+    t_new, t = {}, 0
+    for k, v in enumerate(order):
+        t_new[v] = t
+        t += stalls[k]
+    t_old, t = [], 0
+    for x in blk:
+        t_old.append(t)
+        t += x.stall or 32
+    short = set()
+    for u, x in enumerate(blk):
+        if not is_var(x) or x.rbar != 7 or res[u] is None:
+            continue
+        src = set(res[u][1])
+        for v in range(u + 1, len(blk)):
+            hit = res[v][0] & src
+            if hit:
+                if t_new[v] - t_new[u] < t_old[v] - t_old[u]:
+                    short.add(u)
+                    break
+                src -= hit
+            if not src:
+                break
+    return short
+
+
+def _rb_fixpoint(blk, res, table, policy, rng, reg_bars, bar_alloc, keep_bars, loop_blk, sticky=False):
+    """Schedule with WAR edges on barrier-less variable-latency ops relaxed; an op whose source is
+    then overwritten sooner than ptxas allowed gets a read barrier (ptxas's own read-barrier index
+    if the block has one, else a barrier the block never uses), and the block is rescheduled with
+    that op's WAR edges waiting on it. Up to 4 rounds; still short -> ValueError (keep the order)."""
+    used = {x.rbar for x in blk if x.rbar != 7}
+    unused = [b for b in range(6) if all(x.wbar != b and x.rbar != b and not x.wait >> b & 1 for x in blk)]
+    rb = (min(used) if used else unused[0] if unused else None)
+    cur = list(blk)
+    for _ in range(4):
+        sched = schedule_block(cur, res, table, policy, rng, reg_bars, bar_alloc, keep_bars, self_loop=loop_blk,
+                               soft_war=True, sticky_waits=sticky)
+        short = _war_short(cur, res, sched[0], sched[1])
+        if not short:
+            return cur, sched
+        if rb is None:
+            raise ValueError("WAR too short and no free read barrier")
+        cur = [dataclasses.replace(x, hi=patch.set_field(x.hi, "rbar", rb)) if k in short else x
+               for k, x in enumerate(cur)]
+    raise ValueError("WAR distances did not converge")
 
 
 def _pending(order, ins, waits, wbar) -> set:
@@ -405,8 +643,16 @@ def _write(elf: bytearray, sec, idx: int, lo: int, hi: int):
     struct.pack_into("<QQ", elf, sec.offset + 16 * idx, lo, hi)
 
 
-def _reuse_flags(prev: sass.Instr, nxt: sass.Instr, cache: dict, reuse_ops: set) -> int:
-    if prev.opcode not in reuse_ops or nxt.opcode not in reuse_ops or prev.yield_ == 0:
+def _form(i: sass.Instr) -> tuple:
+    """Opcode plus operand kinds (register or not): reuse encodings are valid per form, e.g. an FFMA
+    with an immediate third operand rejects reuse bits a register-register FFMA accepts."""
+    ops = re.sub(r"^@!?U?P[T0-9]+\s+", "", i.text.strip()).rstrip(" ;").split(None, 1)
+    toks = [t.strip() for t in ops[1].split(",")] if len(ops) > 1 else []
+    return (i.opcode, tuple("R" if re.match(r"^-?\|?R\d", t) else "X" for t in toks))
+
+
+def _reuse_flags(prev: sass.Instr, nxt: sass.Instr, cache: dict, reuse_ops: dict) -> int:
+    if _form(prev) not in reuse_ops or nxt.opcode not in {k[0] for k in reuse_ops} or prev.yield_ == 0:
         return 0
     a, b = opnd.operands(prev, cache), opnd.operands(nxt, cache)
     if a.wide or b.wide or not a.complete or not b.complete:
@@ -416,17 +662,26 @@ def _reuse_flags(prev: sass.Instr, nxt: sass.Instr, cache: dict, reuse_ops: set)
     for slot, reg in a.srcs:
         if reg != 255 and reg not in defs and (slot, reg) in b.srcs and slot in REUSE_SLOTS:
             flags |= REUSE_SLOTS[slot]
-    return flags
+    return flags & reuse_ops[_form(prev)]                  # only bits ptxas used on this form
 
 
 def reschedule(cubin: bytes, kernel: str = "k", policy: str = "crit", seed: int = 0,
-               only_loops: bool = False, validate: bool = True, reuse: bool = True) -> tuple[bytes, list]:
-    """Reschedule every safe basic block. Returns (cubin, log)."""
+               only_loops: bool = False, validate: bool = True, reuse: bool = True,
+               bar_alloc: str = "first", keep_bars: bool = False, loop_aware: bool = False,
+               read_bars: bool = False, sticky_waits: bool = False, wide: bool = False,
+               only_blocks: set | None = None) -> tuple[bytes, list]:
+    """Reschedule every safe basic block (only those starting at an index in only_blocks, if given;
+    scripts/suite_bisect.py). Returns (cubin, log)."""
+    if policy == "sb_wide":                     # alias: scoreboard-aware order, stores/atomics schedulable
+        policy, wide = "sb", True
     reuse_on = reuse
     cache = opnd.discover(cubin, kernel)
     ins = sass.parse(toolchain.disassemble(cubin))
     table = fixed_latency_table(ins, cache)
-    reuse_ops = {x.opcode for x in ins if x.reuse}
+    reuse_ops: dict = {}                               # form -> reuse bits ptxas set on it in this cubin
+    for x in ins:
+        if x.reuse:
+            reuse_ops[_form(x)] = reuse_ops.get(_form(x), 0) | x.reuse
     rng = random.Random(seed)
     reg_bars: dict[str, int] = {}                 # register -> mask of barriers any scoreboarded op uses for it
     for x in ins:
@@ -446,16 +701,29 @@ def reschedule(cubin: bytes, kernel: str = "k", policy: str = "crit", seed: int 
         for body in sass.loops(ins):
             loop_idx |= {ins.index(x) for x in body}
     log = []
+    self_loops = set()
+    for body in sass.loops(ins):
+        k0 = ins.index(body[0])
+        self_loops.add((k0, k0 + len(body)))
     for (s, e) in blocks(ins):
         blk = ins[s:e]
         res = [_resources(x, cache) for x in blk]
         unsafe = [x.text for x, r in zip(blk, res) if r is None or (_base(x.opcode).startswith(UNSAFE) and
-                                                                    not x.text.strip().endswith("SRZ"))]
-        movable = not unsafe and len(blk) >= 3 and (not only_loops or s in loop_idx)
+                                                                    not x.text.strip().endswith("SRZ") and
+                                                                    not (wide and _base(x.opcode) in WIDE_OK and
+                                                                         not _TIMER.search(x.text)))]
+        movable = (not unsafe and len(blk) >= 3 and (not only_loops or s in loop_idx)
+                   and (only_blocks is None or s in only_blocks))
         sched = None
         if movable:
+            loop_blk = loop_aware and any(a <= s and e <= z and (z - a) - (e - s) <= 2 for a, z in self_loops)
             try:
-                sched = schedule_block(blk, res, table, policy, rng, reg_bars)
+                if read_bars:
+                    blk, sched = _rb_fixpoint(blk, res, table, policy, rng, reg_bars, bar_alloc, keep_bars, loop_blk,
+                                              sticky_waits)
+                else:
+                    sched = schedule_block(blk, res, table, policy, rng, reg_bars, bar_alloc, keep_bars,
+                                           self_loop=loop_blk, sticky_waits=sticky_waits, wide=wide)
             except ValueError as err:
                 unsafe = [str(err)]
         if sched is None:
@@ -503,6 +771,7 @@ def reschedule(cubin: bytes, kernel: str = "k", policy: str = "crit", seed: int 
             hi = x.hi
             hi = patch.set_field(hi, "wait", waits[order[pos]])
             hi = patch.set_field(hi, "wbar", new_w[order[pos]])
+            hi = patch.set_field(hi, "rbar", x.rbar)              # _rb_fixpoint may have added one
             reuse = 0
             if reuse_on and pos + 1 < len(new):
                 reuse = _reuse_flags(x, new[pos + 1], cache, reuse_ops)
