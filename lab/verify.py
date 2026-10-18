@@ -154,4 +154,37 @@ def new_hazards(new_cubin: bytes, orig_cubin: bytes, kernel: str = "k") -> list:
         by = {x.offset: x for x in ni}
         bad.append(f"{kind}: {by[p].text!r} @{p:#x} -> {by[c].text!r} @{c:#x}"
                    + (f" after {dist} < {need} cycles" if dist is not None else ""))
+    # memory-pipe issue gap: ptxas never issues two memory ops closer than MEM_GAP cycles (1707
+    # adjacent pairs in the suite + PolyBench, all at stall 4); a rewrite that does gave wrong
+    # results on the suite's transpose (Oct 18 2026), so any gap below both MEM_GAP and the
+    # original's gap for the same pair is a hazard
+    og = mem_gaps(oi)
+    by = {x.offset: x for x in ni}
+    for (p, c), dist in mem_gaps(ni).items():
+        if dist >= MEM_GAP:
+            continue
+        o = og.get((mp.get(p), mp.get(c)))
+        if o is not None and dist >= o:
+            continue
+        bad.append(f"mem-gap: {by[p].text!r} @{p:#x} -> {by[c].text!r} @{c:#x} after {dist} < {MEM_GAP} cycles")
     return bad
+
+
+MEM_GAP = 4
+
+
+def mem_gaps(ins: list[sass.Instr]) -> dict:
+    """(offset, offset) -> stall-sum distance between consecutive memory ops of one basic block."""
+    from .resched import _memory
+    out, last, t = {}, None, 0
+    for x in ins:
+        if x.label:
+            last = None
+        if _memory(x):
+            if last is not None:
+                out[(last[0], x.offset)] = t - last[1]
+            last = (x.offset, t)
+        if is_control(x):
+            last = None
+        t += x.stall or 32
+    return out
