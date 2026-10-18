@@ -1,0 +1,412 @@
+{
+ "policy": "sb_wide",
+ "kernels": 40,
+ "changed": 40,
+ "static_fail": 0,
+ "differential_fail": 0,
+ "timed": 0,
+ "geomean_raw_rewrite": null,
+ "geomean_with_decision": 1.0,
+ "rows": [
+  {
+   "file": "2dconv__convolution2D_kernel.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "3dconv__convolution3D_kernel.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "adi__adi_kernel1.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "adi__adi_kernel2.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "adi__adi_kernel3.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "adi__adi_kernel4.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "adi__adi_kernel5.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "adi__adi_kernel6.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "atax__atax_kernel1.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "atax__atax_kernel2.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "bicg__bicg_kernel1.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "bicg__bicg_kernel2.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "corr__mean_kernel.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "corr__std_kernel.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "corr__reduce_kernel.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "corr__corr_kernel.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "covar__mean_kernel.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "covar__reduce_kernel.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "covar__covar_kernel.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "fdtd-2d__fdtd_step1_kernel.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "fdtd-2d__fdtd_step2_kernel.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "fdtd-2d__fdtd_step3_kernel.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "gemm__gemm_kernel.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "gemver__gemver_kernel1.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "gemver__gemver_kernel2.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "gemver__gemver_kernel3.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "gesummv__gesummv_kernel.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "gramschm__gramschmidt_kernel1.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "gramschm__gramschmidt_kernel2.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "gramschm__gramschmidt_kernel3.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "jacobi1d__runJacobiCUDA_kernel1.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "jacobi1d__runJacobiCUDA_kernel2.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "jacobi2d__runJacobiCUDA_kernel1.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "jacobi2d__runJacobiCUDA_kernel2.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "lu__lu_kernel1.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "lu__lu_kernel2.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "mvt__mvt_kernel1.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "mvt__mvt_kernel2.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "syr2k__syr2k_kernel.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  },
+  {
+   "file": "syrk__syrk_kernel.cu",
+   "decision": "rewrite passed CPU checks only (no differential test, no timing): use with care",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": null,
+   "speedup": null,
+   "changed": true
+  }
+ ]
+}
