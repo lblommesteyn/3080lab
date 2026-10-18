@@ -46,6 +46,8 @@ L2_LAT = 238                      # chase_global, L2-resident
 CP_LANES_PER_CYC = 1.0            # l2_cpasync: 2.11 TB/s at 16 B / lane = 0.995 lanes / cycle / SM
 CP_INFLIGHT = 500                 # copy lanes in flight per SM: occupancy_sweep (the GEMM's copies run at
                                   # ~0.7 lanes / cycle in place, not the 1.0 of l2_cpasync); None = unlimited
+CP_QUEUE = None                   # copy lanes that may wait for the copy port before an LDGSTS stalls its warp
+                                  # (MIO throttle); None = never stalls (the Oct 11 model)
 SMEM_LAT = 23
 SMEM_BPC = 128                    # bytes / cycle, min 2 cycles per request
 IMMA_COST, IMMA_LAT = 16, 24
@@ -172,6 +174,18 @@ def simulate_sm(body: list, *, nblocks: int, wpb: int, stage_lanes: float, prolo
             heapq.heappush(inflight, (fin, n))
             held += n
         return fin
+    def copy_start(t0: float, n: float) -> float:
+        """when n lanes issued at t0 would enter the copy port (copy() without its side effects)"""
+        start = max(t0, l2_free)
+        if CP_INFLIGHT:
+            h, fl = held, sorted(inflight)
+            while fl and fl[0][0] <= start:
+                h -= fl.pop(0)[1]
+            while fl and h + n > CP_INFLIGHT:
+                d, k = fl.pop(0)
+                h -= k
+                start = max(start, d)
+        return start
     smem_free = 0.0
     tensor_free = [0.0] * 4
     part_free = [dict() for _ in range(4)]
@@ -224,6 +238,8 @@ def simulate_sm(body: list, *, nblocks: int, wpb: int, stage_lanes: float, prolo
                     else:   # LDSM without scoreboard is impossible; be safe: interlock its dest
                         pass
                 elif x["ldgsts"]:
+                    if CP_QUEUE is not None and (copy_start(t, lanes_per_ldgsts) - t) * CP_LANES_PER_CYC > CP_QUEUE:
+                        continue
                     w.open_grp = max(w.open_grp, copy(t, lanes_per_ldgsts))
                     smem_free = max(smem_free, t) + 2          # the smem write of the copy
                 elif x["commit"]:
@@ -314,9 +330,11 @@ class Tile:
 def build(tile: Tile, epi: str = "resid"):
     from . import qwen_batched as QB
     from . import toolchain
-    b = toolchain.build(QB.gemm_q4i8_ms_source(tile.WM, tile.WN, tile.MT, tile.NT, epi, tile.KB, tile.NSTG,
-                                               tile.MINB, tile.ABL))
+    src = QB.gemm_q4i8_ms_source(tile.WM, tile.WN, tile.MT, tile.NT, epi, tile.KB, tile.NSTG, tile.MINB, tile.ABL)
+    b = toolchain.build(src)
     res = toolchain.ptxas_resources(b.ptxas_log)
+    if src.startswith("// DYNSMEM"):                 # over 48 KB: dynamic shared memory, size in the header
+        res["static_smem"] = int(src.split(maxsplit=3)[2])
     ins = sass.parse(b.sass)
     ring = [l for l in sass.loops(ins) if any(x.opcode.startswith("DEPBAR") for x in l)]   # not the epilogue loop
     return {"body": max(ring, key=len), "regs": res["registers"], "smem": res["static_smem"],
