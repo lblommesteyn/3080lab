@@ -167,6 +167,10 @@ def new_hazards(new_cubin: bytes, orig_cubin: bytes, kernel: str = "k") -> list:
         if o is not None and dist >= o:
             continue
         bad.append(f"mem-gap: {by[p].text!r} @{p:#x} -> {by[c].text!r} @{c:#x} after {dist} < {MEM_GAP} cycles")
+    from .resched import BAR_MEM
+    for (p, c), dist in bar_gaps(ni).items():
+        if dist < BAR_MEM:
+            bad.append(f"bar-gap: {by[p].text!r} @{p:#x} -> {by[c].text!r} @{c:#x} after {dist} < {BAR_MEM} cycles")
     return bad
 
 
@@ -187,4 +191,23 @@ def mem_gaps(ins: list[sass.Instr]) -> dict:
         if is_control(x):
             last = None
         t += x.stall or 32
+    return out
+
+
+def bar_gaps(ins: list[sass.Instr]) -> dict:
+    """(BAR offset, memory op offset) -> cycles from a barrier to the first memory op after it in
+    straight-line code."""
+    from .resched import _base, _memory
+    out = {}
+    for i, x in enumerate(ins):
+        if _base(x.opcode) != "BAR":
+            continue
+        t = x.stall or 32
+        for y in ins[i + 1:]:
+            if _memory(y):
+                out[(x.offset, y.offset)] = t
+                break
+            if y.label or is_control(y):
+                break
+            t += y.stall or 32
     return out

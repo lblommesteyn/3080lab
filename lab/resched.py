@@ -149,6 +149,9 @@ def pipe(op: str) -> str | None:
 
 
 PRED_BRANCH = 13
+# BAR.SYNC.DEFER_BLOCKING -> first memory op: ptxas never leaves less than 6 cycles (66 barriers over
+# the suite + PolyBench); 2 gave wrong results on the suite's layernorm (Oct 18 2026)
+BAR_MEM = 6
 
 
 def latency(i: sass.Instr, table: dict[str, int], consumer: sass.Instr | None = None) -> int:
@@ -213,9 +216,11 @@ def _fixed_producer(i: sass.Instr, r) -> bool:
 def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = "crit",
                    rng: random.Random | None = None, reg_bars: dict | None = None,
                    bar_alloc: str = "first", keep_bars: bool = False, self_loop: bool = False,
-                   soft_war: bool = False, sticky_waits: bool = False, wide: bool = False):
+                   soft_war: bool = False, sticky_waits: bool = False, wide: bool = False,
+                   mem_floor: int = 0):
     """Returns (order, stalls, waits): the new instruction order (indices into ins), each one's stall,
-    and each one's extra wait mask. ins/res are the block's instructions and resources."""
+    and each one's extra wait mask. ins/res are the block's instructions and resources. mem_floor:
+    no memory op issues before this cycle (a block entered from a barrier, see BAR_MEM)."""
     n = len(ins)
     term = n - 1 if is_control(ins[-1]) else None
     body = [k for k in range(n) if k != term]
@@ -372,6 +377,8 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
                 # is not "ready" until the producer is likely done, or the warp just sits at the wait
                 earliest = max([issued[u] + (max(d, var_latency(ins[u])) if kind == "w" and crit else d)
                                 for u, d, kind in preds[v]] + [t])
+                if mem_floor and _memory(ins[v]):
+                    earliest = max(earliest, mem_floor)
                 if sb:                                       # a wait lasts until its barrier drains
                     for b_ in wait_bars(v):
                         earliest = max([earliest] + bpend[b_])
@@ -425,6 +432,8 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
     issued, pf, prev = {}, {}, None
     for v in order:
         e = max([issued[u] + d for u, d, _ in preds[v]] + [issued[prev] + 1 if prev is not None else 0])
+        if mem_floor and _memory(ins[v]):
+            e = max(e, mem_floor)
         port, cost = _port(ins[v])
         issued[v] = max(e, pf.get(port, 0))
         pf[port] = issued[v] + cost
@@ -604,7 +613,8 @@ def _war_short(blk, res, order, stalls) -> set:
     return short
 
 
-def _rb_fixpoint(blk, res, table, policy, rng, reg_bars, bar_alloc, keep_bars, loop_blk, sticky=False):
+def _rb_fixpoint(blk, res, table, policy, rng, reg_bars, bar_alloc, keep_bars, loop_blk, sticky=False,
+                 mem_floor=0):
     """Schedule with WAR edges on barrier-less variable-latency ops relaxed; an op whose source is
     then overwritten sooner than ptxas allowed gets a read barrier (ptxas's own read-barrier index
     if the block has one, else a barrier the block never uses), and the block is rescheduled with
@@ -615,7 +625,7 @@ def _rb_fixpoint(blk, res, table, policy, rng, reg_bars, bar_alloc, keep_bars, l
     cur = list(blk)
     for _ in range(4):
         sched = schedule_block(cur, res, table, policy, rng, reg_bars, bar_alloc, keep_bars, self_loop=loop_blk,
-                               soft_war=True, sticky_waits=sticky)
+                               soft_war=True, sticky_waits=sticky, mem_floor=mem_floor)
         short = _war_short(cur, res, sched[0], sched[1])
         if not short:
             return cur, sched
@@ -724,13 +734,16 @@ def reschedule(cubin: bytes, kernel: str = "k", policy: str = "crit", seed: int 
         sched = None
         if movable:
             loop_blk = loop_aware and any(a <= s and e <= z and (z - a) - (e - s) <= 2 for a, z in self_loops)
+            prev = ins[s - 1] if s else None
+            floor = max(0, BAR_MEM - (prev.stall or 32)) if prev is not None and _base(prev.opcode) == "BAR" else 0
             try:
                 if read_bars:
                     blk, sched = _rb_fixpoint(blk, res, table, policy, rng, reg_bars, bar_alloc, keep_bars, loop_blk,
-                                              sticky_waits)
+                                              sticky_waits, mem_floor=floor)
                 else:
                     sched = schedule_block(blk, res, table, policy, rng, reg_bars, bar_alloc, keep_bars,
-                                           self_loop=loop_blk, sticky_waits=sticky_waits, wide=wide)
+                                           self_loop=loop_blk, sticky_waits=sticky_waits, wide=wide,
+                                           mem_floor=floor)
             except ValueError as err:
                 unsafe = [str(err)]
         if sched is None:
