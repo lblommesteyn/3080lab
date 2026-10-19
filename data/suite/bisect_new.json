@@ -1,0 +1,424 @@
+{
+ "layernorm/identity": [
+  [
+   "all",
+   "ok",
+   0,
+   ""
+  ],
+  [
+   "pad-only",
+   "ok",
+   0,
+   ""
+  ],
+  [
+   "blk@15",
+   "ok",
+   0,
+   "IADD3 R5, P1, R3, UR4, RZ"
+  ],
+  [
+   "blk@49",
+   "ok",
+   0,
+   "ISETP.GT.U32.AND P2, PT, R2, 0x1f, PT"
+  ],
+  [
+   "blk@56",
+   "ok",
+   0,
+   "SHFL.BFLY PT, R0, R13, 0x8, 0x1f"
+  ],
+  [
+   "blk@69",
+   "ok",
+   0,
+   "I2FP.F32.S32 R3, c[0x0][0x180]"
+  ],
+  [
+   "blk@75",
+   "ok",
+   0,
+   "FCHK P4, R0, R3"
+  ],
+  [
+   "blk@88",
+   "ok",
+   0,
+   "IADD3 R11, P4, R9, UR4, RZ"
+  ],
+  [
+   "blk@99",
+   "ok",
+   0,
+   "SHFL.BFLY PT, R9, R0, 0x10, 0x1f"
+  ],
+  [
+   "blk@120",
+   "ok",
+   0,
+   "SHFL.BFLY PT, R0, R13, 0x8, 0x1f"
+  ],
+  [
+   "blk@132",
+   "ok",
+   0,
+   "MUFU.RCP R0, R3"
+  ],
+  [
+   "blk@137",
+   "ok",
+   0,
+   "FCHK P1, R4, R3"
+  ],
+  [
+   "blk@142",
+   "ok",
+   0,
+   "MOV R0, R4"
+  ],
+  [
+   "blk@147",
+   "ok",
+   0,
+   "FADD R0, R0, 9.9999997473787516356e-06"
+  ],
+  [
+   "blk@174",
+   "ok",
+   0,
+   "IMAD.MOV.U32 R13, RZ, RZ, R0"
+  ],
+  [
+   "blk@180",
+   "ok",
+   0,
+   "MOV R14, 0x8"
+  ],
+  [
+   "blk@183",
+   "ok",
+   0,
+   "FADD R13, R13, R9"
+  ],
+  [
+   "blk@187",
+   "ok",
+   0,
+   "FADD R13, R13, R9"
+  ],
+  [
+   "blk@191",
+   "ok",
+   0,
+   "FADD R8, R13, R9"
+  ],
+  [
+   "blk@197",
+   "ok",
+   0,
+   "IMAD.MOV.U32 R14, RZ, RZ, 0x10"
+  ],
+  [
+   "blk@202",
+   "ok",
+   0,
+   "MOV R14, 0x8"
+  ],
+  [
+   "blk@205",
+   "ok",
+   0,
+   "FADD R13, R13, R9"
+  ],
+  [
+   "blk@209",
+   "ok",
+   0,
+   "FADD R13, R13, R9"
+  ],
+  [
+   "blk@213",
+   "ok",
+   0,
+   "FADD R13, R13, R9"
+  ],
+  [
+   "blk@219",
+   "ok",
+   0,
+   "SHF.R.U32.HI R11, RZ, 0x17, R3"
+  ],
+  [
+   "blk@247",
+   "ok",
+   0,
+   "ISETP.GE.AND P4, PT, R13, RZ, PT"
+  ],
+  [
+   "blk@254",
+   "ok",
+   0,
+   "LEA R14, R18, 0xc0800000, 0x17"
+  ],
+  [
+   "blk@279",
+   "ok",
+   0,
+   "ISETP.GE.AND P4, PT, R15, -0x18, PT"
+  ],
+  [
+   "blk@304",
+   "ok",
+   0,
+   "LOP3.LUT R13, R13, 0x80000000, RZ, 0xc0,"
+  ],
+  [
+   "blk@309",
+   "ok",
+   0,
+   "LOP3.LUT R0, R9, 0x80000000, R0, 0x48, !"
+  ]
+ ],
+ "layernorm/sb": [
+  [
+   "all",
+   "ok",
+   0,
+   ""
+  ],
+  [
+   "pad-only",
+   "ok",
+   0,
+   ""
+  ],
+  [
+   "blk@15",
+   "ok",
+   0,
+   "IADD3 R5, P1, R3, UR4, RZ"
+  ],
+  [
+   "blk@49",
+   "ok",
+   0,
+   "ISETP.GT.U32.AND P2, PT, R2, 0x1f, PT"
+  ],
+  [
+   "blk@56",
+   "ok",
+   0,
+   "SHFL.BFLY PT, R0, R13, 0x8, 0x1f"
+  ],
+  [
+   "blk@69",
+   "ok",
+   0,
+   "I2FP.F32.S32 R3, c[0x0][0x180]"
+  ],
+  [
+   "blk@75",
+   "ok",
+   0,
+   "FCHK P4, R0, R3"
+  ],
+  [
+   "blk@88",
+   "ok",
+   0,
+   "IADD3 R11, P4, R9, UR4, RZ"
+  ],
+  [
+   "blk@99",
+   "ok",
+   0,
+   "SHFL.BFLY PT, R9, R0, 0x10, 0x1f"
+  ],
+  [
+   "blk@120",
+   "ok",
+   0,
+   "SHFL.BFLY PT, R0, R13, 0x8, 0x1f"
+  ],
+  [
+   "blk@132",
+   "ok",
+   0,
+   "MUFU.RCP R0, R3"
+  ],
+  [
+   "blk@137",
+   "ok",
+   0,
+   "FCHK P1, R4, R3"
+  ],
+  [
+   "blk@142",
+   "ok",
+   0,
+   "MOV R0, R4"
+  ],
+  [
+   "blk@147",
+   "ok",
+   0,
+   "FADD R0, R0, 9.9999997473787516356e-06"
+  ],
+  [
+   "blk@174",
+   "ok",
+   0,
+   "IMAD.MOV.U32 R13, RZ, RZ, R0"
+  ],
+  [
+   "blk@180",
+   "ok",
+   0,
+   "MOV R14, 0x8"
+  ],
+  [
+   "blk@183",
+   "ok",
+   0,
+   "FADD R13, R13, R9"
+  ],
+  [
+   "blk@187",
+   "ok",
+   0,
+   "FADD R13, R13, R9"
+  ],
+  [
+   "blk@191",
+   "ok",
+   0,
+   "FADD R8, R13, R9"
+  ],
+  [
+   "blk@197",
+   "ok",
+   0,
+   "IMAD.MOV.U32 R14, RZ, RZ, 0x10"
+  ],
+  [
+   "blk@202",
+   "ok",
+   0,
+   "MOV R14, 0x8"
+  ],
+  [
+   "blk@205",
+   "ok",
+   0,
+   "FADD R13, R13, R9"
+  ],
+  [
+   "blk@209",
+   "ok",
+   0,
+   "FADD R13, R13, R9"
+  ],
+  [
+   "blk@213",
+   "ok",
+   0,
+   "FADD R13, R13, R9"
+  ],
+  [
+   "blk@219",
+   "ok",
+   0,
+   "SHF.R.U32.HI R11, RZ, 0x17, R3"
+  ],
+  [
+   "blk@247",
+   "ok",
+   0,
+   "ISETP.GE.AND P4, PT, R13, RZ, PT"
+  ],
+  [
+   "blk@254",
+   "ok",
+   0,
+   "LEA R14, R18, 0xc0800000, 0x17"
+  ],
+  [
+   "blk@279",
+   "ok",
+   0,
+   "ISETP.GE.AND P4, PT, R15, -0x18, PT"
+  ],
+  [
+   "blk@304",
+   "ok",
+   0,
+   "LOP3.LUT R13, R13, 0x80000000, RZ, 0xc0,"
+  ],
+  [
+   "blk@309",
+   "ok",
+   0,
+   "LOP3.LUT R0, R9, 0x80000000, R0, 0x48, !"
+  ]
+ ],
+ "sgemm_tiled/identity": [
+  [
+   "all",
+   "ok",
+   0,
+   ""
+  ],
+  [
+   "pad-only",
+   "ok",
+   0,
+   ""
+  ],
+  [
+   "blk@11",
+   "ok",
+   0,
+   "CS2R R38, SRZ"
+  ],
+  [
+   "blk@22",
+   "ok",
+   0,
+   "SHF.L.U32 R4, R6, 0x2, RZ"
+  ],
+  [
+   "blk@81",
+   "ok",
+   0,
+   "IADD3 R2, R2, 0x10, RZ"
+  ]
+ ],
+ "sgemm_tiled/sb": [
+  [
+   "all",
+   "ok",
+   0,
+   ""
+  ],
+  [
+   "pad-only",
+   "ok",
+   0,
+   ""
+  ],
+  [
+   "blk@11",
+   "ok",
+   0,
+   "CS2R R38, SRZ"
+  ],
+  [
+   "blk@22",
+   "ok",
+   0,
+   "SHF.L.U32 R4, R6, 0x2, RZ"
+  ]
+ ]
+}
