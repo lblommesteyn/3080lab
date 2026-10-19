@@ -33,7 +33,7 @@ import torch  # noqa: E402,F401  (puts the CUDA DLLs nvrtc needs on the search p
 from lab import resched, sass, toolchain  # noqa: E402
 from lab.suite import CASES, compare  # noqa: E402
 
-VARIANTS = {"crit": dict(policy="crit"), "crit_noreuse": dict(policy="crit", reuse=False),
+VARIANTS = {"sb": dict(policy="sb"), "sb_wide": dict(policy="sb_wide"), "crit": dict(policy="crit"), "crit_noreuse": dict(policy="crit", reuse=False),
             "crit_loops": dict(policy="crit", only_loops=True), "random": dict(policy="random"),
             "identity": dict(policy="identity")}
 FLUSH_BYTES = 64 << 20
