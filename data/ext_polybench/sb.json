@@ -5,8 +5,8 @@
  "static_fail": 0,
  "differential_fail": 0,
  "timed": 28,
- "geomean_raw_rewrite": 1.0105336849844682,
- "geomean_with_decision": 1.008143344888309,
+ "geomean_raw_rewrite": 0.9920220184583093,
+ "geomean_with_decision": 1.0,
  "rows": [
   {
    "file": "2dconv__convolution2D_kernel.cu",
@@ -30,32 +30,32 @@
   },
   {
    "file": "adi__adi_kernel1.cu",
-   "decision": "kept ptxas: rewrite x0.989, below the 1.02 threshold",
+   "decision": "kept ptxas: rewrite x0.988, below the 1.02 threshold",
    "returncode": 0,
    "compat": true,
    "static": true,
    "differential": true,
-   "speedup": 0.9892683245949911,
+   "speedup": 0.9883041181182065,
    "changed": true
   },
   {
    "file": "adi__adi_kernel2.cu",
-   "decision": "kept rewrite: x1.250 faster, bitwise equal on 4 input sets",
+   "decision": "kept ptxas: rewrite x1.000, below the 1.02 threshold",
    "returncode": 0,
    "compat": true,
    "static": true,
    "differential": true,
-   "speedup": 1.2499999715782906,
+   "speedup": 1.0,
    "changed": true
   },
   {
    "file": "adi__adi_kernel3.cu",
-   "decision": "kept ptxas: rewrite x0.975, below the 1.02 threshold",
+   "decision": "kept ptxas: rewrite x0.977, below the 1.02 threshold",
    "returncode": 0,
    "compat": true,
    "static": true,
    "differential": true,
-   "speedup": 0.9754098570858764,
+   "speedup": 0.9774590530567611,
    "changed": true
   },
   {
@@ -90,62 +90,62 @@
   },
   {
    "file": "atax__atax_kernel1.cu",
-   "decision": "kept rewrite: x1.027 faster, bitwise equal on 4 input sets",
+   "decision": "kept ptxas: rewrite x0.951, below the 1.02 threshold",
    "returncode": 0,
    "compat": true,
    "static": true,
    "differential": true,
-   "speedup": 1.0266271910820814,
+   "speedup": 0.9514562821491352,
    "changed": true
   },
   {
    "file": "atax__atax_kernel2.cu",
-   "decision": "kept ptxas: rewrite x0.999, below the 1.02 threshold",
+   "decision": "kept ptxas: rewrite x1.001, below the 1.02 threshold",
    "returncode": 0,
    "compat": true,
    "static": true,
    "differential": true,
-   "speedup": 0.9991281537818993,
+   "speedup": 1.0008453086234836,
    "changed": true
   },
   {
    "file": "bicg__bicg_kernel1.cu",
-   "decision": "kept ptxas: rewrite x0.999, below the 1.02 threshold",
-   "returncode": 0,
-   "compat": true,
-   "static": true,
-   "differential": true,
-   "speedup": 0.9986922306728491,
-   "changed": true
-  },
-  {
-   "file": "bicg__bicg_kernel2.cu",
-   "decision": "kept rewrite: x1.025 faster, bitwise equal on 4 input sets",
-   "returncode": 0,
-   "compat": true,
-   "static": true,
-   "differential": true,
-   "speedup": 1.0246304989319612,
-   "changed": true
-  },
-  {
-   "file": "corr__mean_kernel.cu",
-   "decision": "kept ptxas: rewrite x0.998, below the 1.02 threshold",
-   "returncode": 0,
-   "compat": true,
-   "static": true,
-   "differential": true,
-   "speedup": 0.9982486731252367,
-   "changed": true
-  },
-  {
-   "file": "corr__std_kernel.cu",
    "decision": "kept ptxas: rewrite x1.000, below the 1.02 threshold",
    "returncode": 0,
    "compat": true,
    "static": true,
    "differential": true,
    "speedup": 1.0,
+   "changed": true
+  },
+  {
+   "file": "bicg__bicg_kernel2.cu",
+   "decision": "kept ptxas: rewrite x0.953, below the 1.02 threshold",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": true,
+   "speedup": 0.9533073784549898,
+   "changed": true
+  },
+  {
+   "file": "corr__mean_kernel.cu",
+   "decision": "kept ptxas: rewrite x1.001, below the 1.02 threshold",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": true,
+   "speedup": 1.0008771997007921,
+   "changed": true
+  },
+  {
+   "file": "corr__std_kernel.cu",
+   "decision": "kept ptxas: rewrite x0.998, below the 1.02 threshold",
+   "returncode": 0,
+   "compat": true,
+   "static": true,
+   "differential": true,
+   "speedup": 0.9981810955296516,
    "changed": true
   },
   {
@@ -160,12 +160,12 @@
   },
   {
    "file": "corr__corr_kernel.cu",
-   "decision": "kept ptxas: rewrite x1.001, below the 1.02 threshold",
+   "decision": "kept ptxas: rewrite x1.004, below the 1.02 threshold",
    "returncode": 0,
    "compat": true,
    "static": true,
    "differential": true,
-   "speedup": 1.0009496760052508,
+   "speedup": 1.003581699809423,
    "changed": true
   },
   {
@@ -190,22 +190,22 @@
   },
   {
    "file": "covar__covar_kernel.cu",
-   "decision": "kept ptxas: rewrite x1.002, below the 1.02 threshold",
+   "decision": "kept ptxas: rewrite x1.004, below the 1.02 threshold",
    "returncode": 0,
    "compat": true,
    "static": true,
    "differential": true,
-   "speedup": 1.0019494691082054,
+   "speedup": 1.0038379551741832,
    "changed": true
   },
   {
    "file": "fdtd-2d__fdtd_step1_kernel.cu",
-   "decision": "kept ptxas: rewrite x0.993, below the 1.02 threshold",
+   "decision": "kept ptxas: rewrite x1.013, below the 1.02 threshold",
    "returncode": 0,
    "compat": true,
    "static": true,
    "differential": true,
-   "speedup": 0.993103446199489,
+   "speedup": 1.013415438007576,
    "changed": true
   },
   {
@@ -230,12 +230,12 @@
   },
   {
    "file": "gemm__gemm_kernel.cu",
-   "decision": "kept ptxas: rewrite x1.001, below the 1.02 threshold",
+   "decision": "kept ptxas: rewrite x1.004, below the 1.02 threshold",
    "returncode": 0,
    "compat": true,
    "static": true,
    "differential": true,
-   "speedup": 1.001414690422585,
+   "speedup": 1.0041208704443811,
    "changed": true
   },
   {
@@ -255,37 +255,37 @@
    "compat": true,
    "static": true,
    "differential": true,
-   "speedup": 1.0,
+   "speedup": 1.0004064081492352,
    "changed": true
   },
   {
    "file": "gemver__gemver_kernel3.cu",
-   "decision": "kept rewrite: x1.026 faster, bitwise equal on 4 input sets",
+   "decision": "kept ptxas: rewrite x0.956, below the 1.02 threshold",
    "returncode": 0,
    "compat": true,
    "static": true,
    "differential": true,
-   "speedup": 1.02566630244263,
+   "speedup": 0.9561403578443559,
    "changed": true
   },
   {
    "file": "gesummv__gesummv_kernel.cu",
-   "decision": "kept ptxas: rewrite x1.010, below the 1.02 threshold",
+   "decision": "kept ptxas: rewrite x1.008, below the 1.02 threshold",
    "returncode": 0,
    "compat": true,
    "static": true,
    "differential": true,
-   "speedup": 1.0096463132839864,
+   "speedup": 1.0081081069175934,
    "changed": true
   },
   {
    "file": "gramschm__gramschmidt_kernel1.cu",
-   "decision": "kept ptxas: rewrite x1.003, below the 1.02 threshold",
+   "decision": "kept ptxas: rewrite x0.967, below the 1.02 threshold",
    "returncode": 0,
    "compat": true,
    "static": true,
    "differential": true,
-   "speedup": 1.002693923239527,
+   "speedup": 0.966666715173052,
    "changed": true
   },
   {
@@ -305,7 +305,7 @@
    "compat": true,
    "static": true,
    "differential": true,
-   "speedup": 0.999534013236411,
+   "speedup": 0.9995335785439614,
    "changed": true
   },
   {
@@ -370,22 +370,22 @@
   },
   {
    "file": "mvt__mvt_kernel1.cu",
-   "decision": "kept rewrite: x1.026 faster, bitwise equal on 4 input sets",
+   "decision": "kept ptxas: rewrite x0.955, below the 1.02 threshold",
    "returncode": 0,
    "compat": true,
    "static": true,
    "differential": true,
-   "speedup": 1.0256409903154855,
+   "speedup": 0.9552529185082578,
    "changed": true
   },
   {
    "file": "mvt__mvt_kernel2.cu",
-   "decision": "kept ptxas: rewrite x0.999, below the 1.02 threshold",
+   "decision": "kept ptxas: rewrite x1.000, below the 1.02 threshold",
    "returncode": 0,
    "compat": true,
    "static": true,
    "differential": true,
-   "speedup": 0.9991281537818993,
+   "speedup": 0.9995776772859701,
    "changed": true
   },
   {
@@ -405,7 +405,7 @@
    "compat": true,
    "static": true,
    "differential": true,
-   "speedup": 1.0002647607182475,
+   "speedup": 1.0000564342388734,
    "changed": true
   }
  ]
