@@ -154,7 +154,8 @@ class ReschedRandom(RandomKernels):
         out = []
         for v in super().variants(opts):
             for pol in ("ptxas", "crit", "random", "identity", "sb", "sb_wide",
-                        "identity_ptxreuse", "identity_noreuse", "rename_crit"):
+                        "identity_ptxreuse", "identity_noreuse", "rename_crit",
+                        "identity_late", "crit_late", "sb_late"):
                 out.append(Variant(f"{v.label}/{pol}", dict(v.params, policy=pol)))
         return out
 
@@ -175,7 +176,11 @@ class ReschedRandom(RandomKernels):
         if pol == "rename_crit":
             cubin = regalloc.apply(cubin, regalloc.optimize(cubin, "k", seed=v.params["seed"]), "k")
             pol = "crit"
-        out, _ = resched.reschedule(cubin, "k", policy=pol, seed=v.params["seed"])
+        # *_late (Oct 21): waits on values from earlier blocks stay at ptxas's position, not block entry,
+        # and a wait already resolved by an earlier wait in the block is not repeated (sticky)
+        late = pol.endswith("_late")
+        out, _ = resched.reschedule(cubin, "k", policy=pol.removesuffix("_late"), seed=v.params["seed"],
+                                    late_entry=late, sticky_waits=late)
         return out
 
 

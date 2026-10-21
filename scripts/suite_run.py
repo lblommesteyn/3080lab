@@ -35,7 +35,9 @@ from lab.suite import CASES, compare  # noqa: E402
 
 VARIANTS = {"sb": dict(policy="sb"), "sb_wide": dict(policy="sb_wide"), "crit": dict(policy="crit"), "crit_noreuse": dict(policy="crit", reuse=False),
             "crit_loops": dict(policy="crit", only_loops=True), "random": dict(policy="random"),
-            "identity": dict(policy="identity")}
+            "identity": dict(policy="identity"), "identity_late": dict(policy="identity", late_entry=True, sticky_waits=True),
+            "crit_late": dict(policy="crit", late_entry=True, sticky_waits=True), "sb_late": dict(policy="sb", late_entry=True, sticky_waits=True),
+            "sb_wide_late": dict(policy="sb_wide", late_entry=True, sticky_waits=True)}
 FLUSH_BYTES = 64 << 20
 FLUSH_SRC = r"""
 extern "C" __global__ void flush(const float4* p, int n, float* sink) {

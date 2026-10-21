@@ -222,11 +222,24 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
                    rng: random.Random | None = None, reg_bars: dict | None = None,
                    bar_alloc: str = "first", keep_bars: bool = False, self_loop: bool = False,
                    soft_war: bool = False, sticky_waits: bool = False, wide: bool = False,
-                   mem_floor: int = 0):
+                   mem_floor: int = 0, late_entry: bool = False):
     """Returns (order, stalls, waits): the new instruction order (indices into ins), each one's stall,
     and each one's extra wait mask. ins/res are the block's instructions and resources. mem_floor:
-    no memory op issues before this cycle (a block entered from a barrier, see BAR_MEM)."""
+    no memory op issues before this cycle (a block entered from a barrier, see BAR_MEM). late_entry:
+    a wait on a value from outside the block goes on the first instruction, in the new order, that
+    stood at or after ptxas's own wait (instead of on the block's first instruction)."""
     n = len(ins)
+    # External waits: barriers waited on before anything in the block armed them (values from a
+    # predecessor, or a drain for a successor); ext_at[b] = ptxas's position of the first such wait
+    armed, entry, ext_at = 0, 0, {}
+    for v in range(n):
+        for b_ in range(6):
+            if (ins[v].wait & ~armed & ~entry) >> b_ & 1:
+                ext_at[b_] = v
+        entry |= ins[v].wait & ~armed
+        for bar in (ins[v].wbar, ins[v].rbar):
+            if bar != 7:
+                armed |= 1 << bar
     term = n - 1 if is_control(ins[-1]) else None
     body = [k for k in range(n) if k != term]
     # dependence edges: succ[u] = [(v, min_distance, wait_bit_or_None)]
@@ -350,6 +363,7 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
                                             {v: ins[v].wbar for v in range(n)}) if kind == "w"}
         rset = {x.rbar for x in ins if x.rbar != 7}
         sb_cands = [c for c in range(6) if c not in rset] or list(range(6))
+        ext_open = set(ext_at) if late_entry else set()      # external waits not yet issued
         bpend = {b_: [] for b_ in range(6)}
         sb_assign: dict[int, int] = {}
 
@@ -365,7 +379,7 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
             mine = wait_bars(v)
             best = None
             for b_ in sb_cands:
-                if b_ == ins[v].rbar:
+                if b_ == ins[v].rbar or (b_ in ext_open and len(sb_cands) > len(ext_open) + 1):
                     continue
                 pend = [] if b_ in mine else bpend[b_]           # v's own wait clears b_ first
                 c = sum(max(0, done - d) for d in pend)
@@ -416,6 +430,7 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
         issued[v] = max(t, port_free.get(port, 0))
         port_free[port] = issued[v] + cost
         if sb:
+            ext_open -= {b_ for b_ in ext_open if v >= ext_at[b_]}
             wb = wait_bars(v)
             for b_ in wb:
                 bpend[b_] = []
@@ -465,12 +480,14 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
     # protects a value from a predecessor, or drains for a successor). Those waits all go on the
     # block's FIRST issued instruction, so external values are resolved before anything here can
     # re-arm the same barrier (which would make the wait a false dependence on an in-block op).
-    armed, entry = 0, 0
-    for v in range(n):
-        entry |= ins[v].wait & ~armed
-        for bar in (ins[v].wbar, ins[v].rbar):
-            if bar != 7:
-                armed |= 1 << bar
+    ext_place: dict[int, int] = {}                     # instruction -> external wait bits it carries
+    if late_entry:
+        for b_, j in ext_at.items():
+            v0 = next(v for v in order if v >= j)
+            ext_place[v0] = ext_place.get(v0, 0) | 1 << b_
+    else:
+        ext_place[order[0]] = entry
+    ext_open = dict(ext_at) if late_entry else {}
     # Write barriers are reallocated in the new order (ptxas's numbering assumed its order: shared
     # barriers become false waits once ops move). Producers still in flight at the ORIGINAL block
     # exit keep their barrier: a later block waits on that number.
@@ -491,7 +508,9 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
     elif bar_alloc == "cost" and policy != "identity":
         new_w = _alloc_barriers(order, ins, preds, issued, pinned, cands, entry)
     for v in order:
-        m = entry if v == order[0] else 0
+        m = ext_place.get(v, 0)
+        for b_ in [b_ for b_ in ext_open if m >> b_ & 1]:
+            del ext_open[b_]
         for u, _, kind in preds[v]:
             if sticky and (u, kind) in resolved:
                 continue                                    # an earlier wait already covered it
@@ -522,7 +541,8 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
         if v in pinned or policy == "identity":
             b_ = ins[v].wbar
         else:
-            free = [c for c in cands if not outstanding[c] and c != ins[v].rbar]
+            free = [c for c in cands if not outstanding[c] and c != ins[v].rbar and c not in ext_open]
+            free = free or [c for c in cands if not outstanding[c] and c != ins[v].rbar]
             free = free or [c for c in range(6) if not outstanding[c] and c != ins[v].rbar]
             b_ = free[0] if free else min(cands, key=lambda c: len(outstanding[c]))
         new_w[v] = b_
@@ -619,7 +639,7 @@ def _war_short(blk, res, order, stalls) -> set:
 
 
 def _rb_fixpoint(blk, res, table, policy, rng, reg_bars, bar_alloc, keep_bars, loop_blk, sticky=False,
-                 mem_floor=0):
+                 mem_floor=0, late_entry=False):
     """Schedule with WAR edges on barrier-less variable-latency ops relaxed; an op whose source is
     then overwritten sooner than ptxas allowed gets a read barrier (ptxas's own read-barrier index
     if the block has one, else a barrier the block never uses), and the block is rescheduled with
@@ -630,7 +650,7 @@ def _rb_fixpoint(blk, res, table, policy, rng, reg_bars, bar_alloc, keep_bars, l
     cur = list(blk)
     for _ in range(4):
         sched = schedule_block(cur, res, table, policy, rng, reg_bars, bar_alloc, keep_bars, self_loop=loop_blk,
-                               soft_war=True, sticky_waits=sticky, mem_floor=mem_floor)
+                               soft_war=True, sticky_waits=sticky, mem_floor=mem_floor, late_entry=late_entry)
         short = _war_short(cur, res, sched[0], sched[1])
         if not short:
             return cur, sched
@@ -691,7 +711,7 @@ def reschedule(cubin: bytes, kernel: str = "k", policy: str = "crit", seed: int 
                only_loops: bool = False, validate: bool = True, reuse: bool = True,
                bar_alloc: str = "first", keep_bars: bool = False, loop_aware: bool = False,
                read_bars: bool = False, sticky_waits: bool = False, wide: bool = False,
-               only_blocks: set | None = None) -> tuple[bytes, list]:
+               only_blocks: set | None = None, late_entry: bool = False) -> tuple[bytes, list]:
     """Reschedule every safe basic block (only those starting at an index in only_blocks, if given;
     scripts/suite_bisect.py). Returns (cubin, log)."""
     if policy == "sb_wide":                     # alias: scoreboard-aware order, stores/atomics schedulable
@@ -744,11 +764,11 @@ def reschedule(cubin: bytes, kernel: str = "k", policy: str = "crit", seed: int 
             try:
                 if read_bars:
                     blk, sched = _rb_fixpoint(blk, res, table, policy, rng, reg_bars, bar_alloc, keep_bars, loop_blk,
-                                              sticky_waits, mem_floor=floor)
+                                              sticky_waits, mem_floor=floor, late_entry=late_entry)
                 else:
                     sched = schedule_block(blk, res, table, policy, rng, reg_bars, bar_alloc, keep_bars,
                                            self_loop=loop_blk, sticky_waits=sticky_waits, wide=wide,
-                                           mem_floor=floor)
+                                           mem_floor=floor, late_entry=late_entry)
             except ValueError as err:
                 unsafe = [str(err)]
         if sched is None:
