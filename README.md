@@ -613,8 +613,8 @@ batched Q4_0 GEMVs read each weight once for B input vectors:
 `down` (long K, only 96 row tiles of 16) lacks parallelism at small B.
 
 At large B the B fragments (inputs) are the expensive part: each is converted bf16 -> fp16 and
-loaded once per 16-row tile. Giving each warp MT m-tiles (16·MT rows) reuses every B fragment MT
-times. Split-K partials go through one shared [16·MT][B] buffer, accumulated warp by warp in a
+loaded once per 16-row tile. Giving each warp MT m-tiles (16Â·MT rows) reuses every B fragment MT
+times. Split-K partials go through one shared [16Â·MT][B] buffer, accumulated warp by warp in a
 fixed order (deterministic, and under the 48 KB static shared-memory limit). Best per shape:
 
 | us per launch, tuned (S, U, MT) | B = 8 | 16 | 32 |
@@ -1152,7 +1152,84 @@ The targeted Phase 7 pass is still the right tool for these kernels. Why the gen
 loses on memory-bound code is open; suspects are the entry-wait placement and its single-warp
 model of load latency.
 
-### FP32/INT32 sharing (superseded by the section above)
+### Oct 18-21: held-out tests, cross-kernel fusion, and why the scheduler stops at parity
+
+Every test in this round was fixed before it was measured: the kernel suite, the outside benchmark
+and the tile-ranking predictions were committed before any GPU timing.
+
+**Held-out kernel suite** (`lab/suite.py`, `scripts/suite_run.py`, `data/suite/`). 20 textbook kernels
+(saxpy, reduce, transpose, stencils, softmax, layernorm, scan, bitonic sort, sgemm, nbody, ...),
+checked bitwise against ptxas and timed interleaved with an L2 flush. It exposed four hardware rules
+the random kernels never hit; each broke at least one kernel under every policy, including ptxas's
+own order, and `scripts/suite_bisect.py` found the block by rescheduling one block at a time on the GPU:
+
+| rule | evidence |
+|---|---|
+| a fixed-latency producer -> SHFL needs 5 cycles, not 4 | wrong reductions in spmv_csr, layernorm |
+| a predicate read by BRA/EXIT needs 13 cycles (ptxas floor over 240 pairs) | 12 broke spmv_csr |
+| memory ops issue at least 4 cycles apart | a 1-cycle gap broke transpose |
+| BAR.SYNC.DEFER_BLOCKING -> first memory op at least 6 cycles (66 barriers) | 2 broke layernorm |
+
+`lab/verify.py` checks all four. With them, all 19 timed cases are bitwise identical under every
+policy (black_scholes is excluded: ptxas's own build misses the CPU reference). Geomean vs ptxas:
+crit 0.999, identity 0.999, sb 1.000 (`data/suite/imad.json`). Parity, not a win.
+
+**Outside benchmark** (`scripts/sassopt.py`, `data/ext_polybench/`). 40 PolyBench/GPU kernels at a
+pinned commit, rescheduled with a static hazard check, a multi-seed bitwise differential and a timed
+keep/revert decision. 0 static failures, 0 bitwise failures. On the corrected scheduler, sb changes
+28 kernels and is 0.992x raw, 1.000x after keep/revert; sb_wide is 1.003x raw, 1.008x after
+keep/revert. An earlier 1.011x relied on timings the four rules above now forbid.
+
+**Where the gap comes from** (`lab/experiments/randk.py`, `data/ablation/`). Same 40 random kernels as
+above, geomean of ptxas/ours:
+
+| variant | geomean |
+|---|---|
+| ptxas order, my control words (identity) | 0.959 |
+| same, with ptxas's own reuse flags | 0.965 |
+| same, no reuse flags | 0.939 |
+| critical-path order | 0.920 |
+| register renaming (`lab/regalloc.py`), then critical path | 0.917 |
+| scoreboard-aware order (sb) | 0.980 |
+| random legal order | 0.845 |
+
+Reuse flags are worth about 0.5%. Renaming registers first does not free the scheduler. Giving
+IMAD its own issue port removed most of the extra static stall cycles and changed nothing measured:
+the hardware interlocks structural conflicts, so stall slack is not the loss. A control-word diff of
+the worst kernel (0.85x in ptxas's own order) shows stalls and reuse matching ptxas almost
+everywhere; the difference is where scoreboard waits sit. Each block is encoded on its own, so waits
+on values from earlier blocks are hoisted to the block's first instruction, and barriers still in
+flight are drained before block exit or a CALL. Ptxas waits only at the consumer. The next step is
+tracking pending barriers across blocks.
+
+**Cross-kernel optimizer** (`lab/xkernel.py`, `data/xkernel/polybench.json`). Vertical (thread-local)
+and horizontal (grid-concatenated) fusion of adjacent launches, plus CUDA graph capture, on the 12
+multi-kernel PolyBench programs. All outputs bitwise identical to the original. Geomean of fused +
+graph: **1.226x**.
+
+| program | launches | fused + graph |
+|---|---|---|
+| jacobi1d | 20 | 3.92x (graph only) |
+| mvt | 2 -> 1 | 1.36x (horizontal) |
+| bicg | 2 -> 1 | 1.34x (horizontal) |
+| 3dconv | 8 | 1.23x (graph only) |
+| fdtd-2d | 30 -> 20 | 1.13x (vertical) |
+| jacobi2d | 20 | 1.10x |
+| lu | 16 | 1.04x |
+| other 5 | | 1.00x |
+
+**Blind tile ranking** (`data/rank_fresh/`, `data/rank_direction/`). Both prefill GEMM cost models
+predicted 195 never-measured tiles before timing. Median error was 5-15%, but ranking was near
+chance: pairwise accuracy 0.57 (copy-cap model) and 0.46 (queue model), Spearman -0.49 to 0.49 per
+shape. The prediction error is larger than the spread among good tiles. Single-variable tests show
+which directions the model gets right: occupancy alone 15/16 and k-chunk 29/30, but launch bounds
+2-4 of 12 and ring depth 4-8 of 13. Not usable for picking tiles.
+
+**L2 placement** (`data/l2_place/`). Address sets aimed at one inferred L2 slice are 3-12x slower on
+every page of a fresh allocation, so the slice map partly transfers. Spreading a working set
+evenly across slices does not reliably beat a contiguous layout (0.69-1.34x by page and K). Negative.
+
+### FP32/INT32 sharing (superseded by Phase 8 above)
 
 GA102 has 16 FP32 + 16 FP32/INT32 lanes per partition. If INT ops simply
 borrowed the shared half, a 50/50 FFMA:SHF mix would reach 4 warp-instr/cyc/SM.
