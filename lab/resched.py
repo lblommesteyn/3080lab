@@ -186,6 +186,11 @@ def var_latency(i: sass.Instr) -> int:
 def _port(i: sass.Instr) -> tuple[str, int]:
     """Issue port and cycles it is held per warp instruction (model.py v1 tables, measured)."""
     port, cost, _, _ = port_of_v1(i.opcode)
+    if _base(i.opcode) == "IMAD" and port == "fma":
+        # IMAD holds its half-rate datapath 2 cycles, but an independent FFMA/FMUL/FADD issues the next
+        # cycle on the other FP32 path (ptxas does this 400+ times on randk; the shared port cost 3% of
+        # the identity-order stall budget, Oct 21 2026)
+        port = "imad"
     if _memory(i):                     # ptxas spaces memory ops >= 4 cycles; 1 gave wrong results
         cost = max(cost, 4)            # (suite transpose, Oct 18 2026; lab/verify.py MEM_GAP)
     return port, cost
