@@ -613,8 +613,8 @@ batched Q4_0 GEMVs read each weight once for B input vectors:
 `down` (long K, only 96 row tiles of 16) lacks parallelism at small B.
 
 At large B the B fragments (inputs) are the expensive part: each is converted bf16 -> fp16 and
-loaded once per 16-row tile. Giving each warp MT m-tiles (16Â·MT rows) reuses every B fragment MT
-times. Split-K partials go through one shared [16Â·MT][B] buffer, accumulated warp by warp in a
+loaded once per 16-row tile. Giving each warp MT m-tiles (16·MT rows) reuses every B fragment MT
+times. Split-K partials go through one shared [16·MT][B] buffer, accumulated warp by warp in a
 fixed order (deterministic, and under the 48 KB static shared-memory limit). Best per shape:
 
 | us per launch, tuned (S, U, MT) | B = 8 | 16 | 32 |
