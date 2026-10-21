@@ -793,7 +793,9 @@ def reschedule(cubin: bytes, kernel: str = "k", policy: str = "crit", seed: int 
             hi = patch.set_field(hi, "wbar", new_w[order[pos]])
             hi = patch.set_field(hi, "rbar", x.rbar)              # _rb_fixpoint may have added one
             reuse = 0
-            if reuse_on and pos + 1 < len(new):
+            if reuse_on == "ptxas" and order == list(range(len(order))):
+                reuse = x.reuse                            # unchanged order: ptxas's flags stay valid
+            elif reuse_on and pos + 1 < len(new):
                 reuse = _reuse_flags(x, new[pos + 1], cache, reuse_ops)
             hi = _set_stall(patch.set_field(hi, "reuse", reuse), st)
             _write(elf, sec, (blk[0].offset // 16) + pos, x.lo, hi)

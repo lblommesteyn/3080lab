@@ -153,7 +153,8 @@ class ReschedRandom(RandomKernels):
     def variants(self, opts: dict) -> list[Variant]:
         out = []
         for v in super().variants(opts):
-            for pol in ("ptxas", "crit", "random", "identity"):
+            for pol in ("ptxas", "crit", "random", "identity", "sb", "sb_wide",
+                        "identity_ptxreuse", "identity_noreuse", "rename_crit"):
                 out.append(Variant(f"{v.label}/{pol}", dict(v.params, policy=pol)))
         return out
 
@@ -163,8 +164,18 @@ class ReschedRandom(RandomKernels):
     def transform(self, cubin: bytes, v: Variant) -> bytes:
         if v.params["policy"] == "ptxas":
             return cubin
-        from lab import resched
-        out, _ = resched.reschedule(cubin, "k", policy=v.params["policy"], seed=v.params["seed"])
+        from lab import regalloc, resched
+        pol = v.params["policy"]
+        # ablations (Oct 21): ptxas order with only ptxas's reuse flags / no reuse flags isolates the
+        # stall+wait encoding; rename_crit recolors registers (lab/regalloc.py) before scheduling
+        if pol == "identity_ptxreuse":
+            return resched.reschedule(cubin, "k", policy="identity", reuse="ptxas")[0]
+        if pol == "identity_noreuse":
+            return resched.reschedule(cubin, "k", policy="identity", reuse=False)[0]
+        if pol == "rename_crit":
+            cubin = regalloc.apply(cubin, regalloc.optimize(cubin, "k", seed=v.params["seed"]), "k")
+            pol = "crit"
+        out, _ = resched.reschedule(cubin, "k", policy=pol, seed=v.params["seed"])
         return out
 
 
