@@ -1199,8 +1199,32 @@ the hardware interlocks structural conflicts, so stall slack is not the loss. A 
 the worst kernel (0.85x in ptxas's own order) shows stalls and reuse matching ptxas almost
 everywhere; the difference is where scoreboard waits sit. Each block is encoded on its own, so waits
 on values from earlier blocks are hoisted to the block's first instruction, and barriers still in
-flight are drained before block exit or a CALL. Ptxas waits only at the consumer. The next step is
-tracking pending barriers across blocks.
+flight are drained before block exit or a CALL. Ptxas waits only at the consumer.
+
+**Wait placement fix (Oct 21-22, `late_entry` + `sticky_waits`, `*_late` variants).** Two changes:
+- a wait on a value from an earlier block stays at ptxas's position, not the block's first instruction;
+- a barrier already cleared by an earlier wait in the block is not waited on again.
+
+The second was most of the loss: a repeated wait on a barrier that a new MUFU or SHFL had re-armed
+also waited for that op. In ptxas order my wait words now match ptxas on 12,172 of 12,200
+instructions (11,138 before), with 0 static hazards.
+
+| random kernels (job 1882) | before | after |
+|---|---|---|
+| identity | 0.959 | **0.987** (worst 0.848 -> 0.920) |
+| crit | 0.920 | **0.976** (worst 0.588 -> 0.823) |
+| sb | 0.980 | 0.980 |
+
+Suite (job 1993, `data/suite/late2.json`): all 19 bitwise ok under every variant; geomean
+identity_late 0.996, crit_late 1.002, sb 0.996, sb_late 1.003, sb_wide 1.003, sb_wide_late 0.997.
+That is still parity: run-to-run noise on these kernels is about 1% (ptxas's own softmax time moved
+from 176 to 183 us between runs). No variant beats ptxas without the timed keep/revert yet.
+
+The same runs found one more correctness rule. Ptxas leaves some LDS without a scoreboard and
+covers the result with the next load's barrier, because shared loads return in order. sb_wide moved
+such a load behind the next one (conv_row wrong output, bitonic_block illegal address, bisect in
+`data/suite/bisect_wide_late.json`). Memory order is now kept around barrier-less loads, and their
+readers wait on the covering load's barrier.
 
 **Cross-kernel optimizer** (`lab/xkernel.py`, `data/xkernel/polybench.json`). Vertical (thread-local)
 and horizontal (grid-concatenated) fusion of adjacent launches, plus CUDA graph capture, on the 12
