@@ -1,6 +1,6 @@
 """Find which rescheduled basic block breaks a suite case (bitwise mismatch vs ptxas).
 
-  pcslurm submit -- python scripts/suite_bisect.py cases=layernorm,spmv_csr policies=sb,sb_wide [port=old|new]
+  pcslurm submit -- python scripts/suite_bisect.py cases=layernorm,spmv_csr policies=sb,sb_wide [port=old|new] [out=name]
 
 For each (case, policy): the full rewrite, a padding-only rewrite (no block scheduled), then one cubin
 per scheduled block with only that block rewritten. Each runs once in its own process on the suite's
@@ -42,12 +42,13 @@ def main():
                 continue
             ins = sass.parse(b.sass)
             for pol in policies:
-                _, log = resched.reschedule(b.cubin, "k", policy=pol)
+                kw = SR.VARIANTS.get(pol, dict(policy=pol))          # suite_run variant names too
+                _, log = resched.reschedule(b.cubin, "k", **kw)
                 starts = sorted({s for s, m in log if m.startswith("scheduled")})
                 variants = [("all", None), ("pad-only", set())] + [(f"blk@{s}", {s}) for s in starts]
                 rows = []
                 for tag, only in variants:
-                    cub, _ = resched.reschedule(b.cubin, "k", policy=pol, only_blocks=only)
+                    cub, _ = resched.reschedule(b.cubin, "k", **kw, only_blocks=only)
                     if cub == b.cubin:
                         rows.append((tag, "identical"))
                         continue
@@ -60,7 +61,7 @@ def main():
                     rows.append((tag, st, len(hz), first))
                     print(f"{name:14s} {pol:8s} {tag:10s} {st:9s} hazards={len(hz):3d} {first}", flush=True)
                 out[f"{name}/{pol}"] = rows
-    dst = ROOT / "data" / "suite" / f"bisect_{kv.get('port', 'old')}.json"
+    dst = ROOT / "data" / "suite" / f"bisect_{kv.get('out', kv.get('port', 'old'))}.json"
     dst.write_text(json.dumps(out, indent=1))
     print("wrote", dst)
 
