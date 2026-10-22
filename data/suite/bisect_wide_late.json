@@ -1,0 +1,738 @@
+{
+ "conv_row/sb_wide": [
+  [
+   "all",
+   "MISMATCH",
+   0,
+   ""
+  ],
+  [
+   "pad-only",
+   "identical"
+  ],
+  [
+   "blk@45",
+   "MISMATCH",
+   0,
+   "LDS R3, [R20]"
+  ]
+ ],
+ "conv_row/sb_wide_late": [
+  [
+   "all",
+   "MISMATCH",
+   0,
+   ""
+  ],
+  [
+   "pad-only",
+   "identical"
+  ],
+  [
+   "blk@45",
+   "MISMATCH",
+   0,
+   "LDS R3, [R20]"
+  ]
+ ],
+ "bitonic_block/sb_wide": [
+  [
+   "all",
+   "fault",
+   0,
+   ""
+  ],
+  [
+   "pad-only",
+   "ok",
+   0,
+   ""
+  ],
+  [
+   "blk@21",
+   "MISMATCH",
+   0,
+   "LDS R11, [R5]"
+  ],
+  [
+   "blk@27",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R7, 0x4, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@38",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R2, 0x2, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@46",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R10, 0x8, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@53",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R7, 0x8, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@65",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R2, 0x4, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@72",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R13, 0x10, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@79",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R10, 0x10, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@87",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R7, 0x10, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@98",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R2, 0x8, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@105",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R16, 0x20, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@112",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R13, 0x20, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@123",
+   "fault",
+   0,
+   "LOP3.LUT P0, RZ, R10, 0x20, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@130",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R7, 0x20, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@138",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R2, 0x10, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@145",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R19, 0x40, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@152",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R16, 0x40, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@159",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R13, 0x40, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@166",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R10, 0x40, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@174",
+   "fault",
+   0,
+   "LOP3.LUT P0, RZ, R7, 0x40, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@184",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R2, 0x20, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@192",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R22, 0x80, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@199",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R19, 0x80, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@206",
+   "fault",
+   0,
+   "LOP3.LUT P0, RZ, R16, 0x80, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@213",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R13, 0x80, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@224",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R10, 0x80, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@232",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R7, 0x80, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@239",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R2, 0x40, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@246",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R25, 0x100, RZ, 0xc0, !"
+  ],
+  [
+   "blk@253",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R22, 0x100, RZ, 0xc0, !"
+  ],
+  [
+   "blk@260",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R19, 0x100, RZ, 0xc0, !"
+  ],
+  [
+   "blk@267",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R16, 0x100, RZ, 0xc0, !"
+  ],
+  [
+   "blk@274",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R13, 0x100, RZ, 0xc0, !"
+  ],
+  [
+   "blk@281",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R10, 0x100, RZ, 0xc0, !"
+  ],
+  [
+   "blk@288",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R7, 0x100, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@299",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R2, 0x80, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@307",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R28, 0x200, RZ, 0xc0, !"
+  ],
+  [
+   "blk@314",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R25, 0x200, RZ, 0xc0, !"
+  ],
+  [
+   "blk@321",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R22, 0x200, RZ, 0xc0, !"
+  ],
+  [
+   "blk@328",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R19, 0x200, RZ, 0xc0, !"
+  ],
+  [
+   "blk@335",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R16, 0x200, RZ, 0xc0, !"
+  ],
+  [
+   "blk@342",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R13, 0x200, RZ, 0xc0, !"
+  ],
+  [
+   "blk@349",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R10, 0x200, RZ, 0xc0, !"
+  ],
+  [
+   "blk@360",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R7, 0x200, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@368",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R2, 0x100, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@375",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R33, 0x400, RZ, 0xc0, !"
+  ],
+  [
+   "blk@382",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R28, 0x400, RZ, 0xc0, !"
+  ],
+  [
+   "blk@389",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R25, 0x400, RZ, 0xc0, !"
+  ],
+  [
+   "blk@396",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R22, 0x400, RZ, 0xc0, !"
+  ],
+  [
+   "blk@403",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R19, 0x400, RZ, 0xc0, !"
+  ],
+  [
+   "blk@410",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R16, 0x400, RZ, 0xc0, !"
+  ],
+  [
+   "blk@417",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R13, 0x400, RZ, 0xc0, !"
+  ],
+  [
+   "blk@424",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R10, 0x400, RZ, 0xc0, !"
+  ],
+  [
+   "blk@431",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R7, 0x400, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@439",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R2, 0x200, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@446",
+   "ok",
+   0,
+   "LEA R6, P0, R0, c[0x0][0x168], 0x2"
+  ]
+ ],
+ "bitonic_block/sb_wide_late": [
+  [
+   "all",
+   "fault",
+   0,
+   ""
+  ],
+  [
+   "pad-only",
+   "ok",
+   0,
+   ""
+  ],
+  [
+   "blk@21",
+   "MISMATCH",
+   0,
+   "LDS R11, [R5]"
+  ],
+  [
+   "blk@27",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R7, 0x4, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@38",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R2, 0x2, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@46",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R10, 0x8, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@53",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R7, 0x8, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@65",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R2, 0x4, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@72",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R13, 0x10, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@79",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R10, 0x10, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@87",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R7, 0x10, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@98",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R2, 0x8, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@105",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R16, 0x20, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@112",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R13, 0x20, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@123",
+   "fault",
+   0,
+   "LOP3.LUT P0, RZ, R10, 0x20, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@130",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R7, 0x20, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@138",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R2, 0x10, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@145",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R19, 0x40, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@152",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R16, 0x40, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@159",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R13, 0x40, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@166",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R10, 0x40, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@174",
+   "fault",
+   0,
+   "LOP3.LUT P0, RZ, R7, 0x40, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@184",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R2, 0x20, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@192",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R22, 0x80, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@199",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R19, 0x80, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@206",
+   "fault",
+   0,
+   "LOP3.LUT P0, RZ, R16, 0x80, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@213",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R13, 0x80, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@224",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R10, 0x80, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@232",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R7, 0x80, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@239",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R2, 0x40, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@246",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R25, 0x100, RZ, 0xc0, !"
+  ],
+  [
+   "blk@253",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R22, 0x100, RZ, 0xc0, !"
+  ],
+  [
+   "blk@260",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R19, 0x100, RZ, 0xc0, !"
+  ],
+  [
+   "blk@267",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R16, 0x100, RZ, 0xc0, !"
+  ],
+  [
+   "blk@274",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R13, 0x100, RZ, 0xc0, !"
+  ],
+  [
+   "blk@281",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R10, 0x100, RZ, 0xc0, !"
+  ],
+  [
+   "blk@288",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R7, 0x100, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@299",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R2, 0x80, RZ, 0xc0, !PT"
+  ],
+  [
+   "blk@307",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R28, 0x200, RZ, 0xc0, !"
+  ],
+  [
+   "blk@314",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R25, 0x200, RZ, 0xc0, !"
+  ],
+  [
+   "blk@321",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R22, 0x200, RZ, 0xc0, !"
+  ],
+  [
+   "blk@328",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R19, 0x200, RZ, 0xc0, !"
+  ],
+  [
+   "blk@335",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R16, 0x200, RZ, 0xc0, !"
+  ],
+  [
+   "blk@342",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R13, 0x200, RZ, 0xc0, !"
+  ],
+  [
+   "blk@349",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R10, 0x200, RZ, 0xc0, !"
+  ],
+  [
+   "blk@360",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R7, 0x200, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@368",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R2, 0x100, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@375",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R33, 0x400, RZ, 0xc0, !"
+  ],
+  [
+   "blk@382",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R28, 0x400, RZ, 0xc0, !"
+  ],
+  [
+   "blk@389",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R25, 0x400, RZ, 0xc0, !"
+  ],
+  [
+   "blk@396",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R22, 0x400, RZ, 0xc0, !"
+  ],
+  [
+   "blk@403",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R19, 0x400, RZ, 0xc0, !"
+  ],
+  [
+   "blk@410",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R16, 0x400, RZ, 0xc0, !"
+  ],
+  [
+   "blk@417",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R13, 0x400, RZ, 0xc0, !"
+  ],
+  [
+   "blk@424",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R10, 0x400, RZ, 0xc0, !"
+  ],
+  [
+   "blk@431",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R7, 0x400, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@439",
+   "MISMATCH",
+   0,
+   "LOP3.LUT P0, RZ, R2, 0x200, RZ, 0xc0, !P"
+  ],
+  [
+   "blk@446",
+   "ok",
+   0,
+   "LEA R6, P0, R0, c[0x0][0x168], 0x2"
+  ]
+ ]
+}

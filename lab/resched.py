@@ -285,6 +285,24 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
             for u in range(v):
                 if _memory(ins[u]) and (_writes_mem(ins[u]) or _writes_mem(ins[v])):
                     preds[v].append((u, 1, None))
+    # A load with no write barrier (e.g. LDS R3 in suite conv_row) is not timed by distance: its reader
+    # waits on the NEXT barriered memory op, because the LSU returns results in order. Keep memory
+    # order around it, and its readers/overwriters after that op wait on that op's barrier (moving
+    # the load behind it broke conv_row and bitonic_block under sb_wide).
+    for u in range(n):
+        if ins[u].wbar == 7 and _memory(ins[u]) and not _writes_mem(ins[u]) and res[u][0]:
+            for k in range(n):
+                if k != u and _memory(ins[k]):
+                    if k < u:
+                        preds[u].append((k, 1, None))
+                    else:
+                        preds[k].append((u, 1, None))
+            cov = next((k for k in range(u + 1, n) if _memory(ins[k]) and ins[k].wbar != 7), None)
+            for v in range(u + 1, n):
+                if res[u][0] & (res[v][0] | res[v][1]):
+                    if cov is None or cov > v:
+                        raise ValueError("barrier-less load without a covering barrier before its reader")
+                    preds[v].append((cov, 2, "w"))
     # A variable-latency unit op with no write barrier (ptxas times it by distance, e.g. a dead MUFU
     # whose register is later overwritten) keeps at least ptxas's original cycle distance to every
     # later reader/writer of its destination and to the block end.
