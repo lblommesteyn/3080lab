@@ -1226,6 +1226,30 @@ such a load behind the next one (conv_row wrong output, bitonic_block illegal ad
 `data/suite/bisect_wide_late.json`). Memory order is now kept around barrier-less loads, and their
 readers wait on the covering load's barrier.
 
+**Reuse and stall model (Oct 22, commits d7dae46 and 682a8d2).** Reuse flags now come from a model of
+the operand reuse cache:
+- one entry per (register bank, operand slot);
+- only FMA/ALU-pipe instructions hit or evict, so MUFU, SHFL and memory ops do not;
+- FADD's second operand uses the third slot;
+- a cleared yield bit flushes the cache.
+
+In ptxas order this reproduces ptxas's reuse field on 12,185 of 12,200 instructions. Two stall fixes
+followed:
+- FFMA/FADD/FMUL into MUFU is 4 cycles, as ptxas uses on all 91 such pairs.
+- The exit rule counts the terminator's own stall, which removes 4 wasted cycles per loop iteration.
+
+| random kernels (geomean vs ptxas) | job 1882 | + reuse model (2050) | + stall fixes (2054) |
+|---|---|---|---|
+| identity_late | 0.987 | 0.993 | **1.003** |
+| crit_late | 0.976 | 0.982 | 0.989 |
+| sb_late | 0.980 | 0.985 | 0.995 |
+
+Suite (`data/suite/reuse.json`, `data/suite/exit.json`): every rescheduled variant is bitwise ok
+(ptxas's own black_scholes baseline trips the reference check as in every run). Geomeans are 0.994 to
+0.998, which is within noise. Copying ptxas's order is now at parity on random kernels. The
+reordering policies are still about 1% behind it, so the order the scheduler picks is now the loss,
+not the control words. Cycles: `data/ablation/job2050_reuse_cycles.txt`, `job2054_exit_cycles.txt`.
+
 **Cross-kernel optimizer** (`lab/xkernel.py`, `data/xkernel/polybench.json`). Vertical (thread-local)
 and horizontal (grid-concatenated) fusion of adjacent launches, plus CUDA graph capture, on the 12
 multi-kernel PolyBench programs. All outputs bitwise identical to the original. Geomean of fused +
