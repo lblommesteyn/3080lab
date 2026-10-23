@@ -711,7 +711,52 @@ def _form(i: sass.Instr) -> tuple:
     return (i.opcode, tuple("R" if re.match(r"^-?\|?R\d", t) else "X" for t in toks))
 
 
+# Reuse cache (Oct 22; reproduces ptxas's flags on 2813 of 2860 operand slots in the random kernels and
+# the suite, 0 flags ptxas would not set): one entry per (register bank, operand port). Only FMA/ALU-pipe
+# instructions read through the ports, so MUFU, SHFL and memory ops neither hit nor evict; FADD's second
+# source uses port c (FADD = FFMA a*1+c); an instruction with the yield bit clear flushes the cache.
+_PORT_REMAP = {("FADD", "b"): "c"}
+
+
+def _phys(i: sass.Instr, srcs):
+    base = _base(i.opcode)
+    return [(_PORT_REMAP.get((base, sl), sl), r, sl) for sl, r in srcs]
+
+
+def _reuse_block(new: list, stalls: list, cache: dict, reuse_ops: dict) -> list[int]:
+    """Reuse flags for a scheduled block: set on an operand when the next FMA/ALU-pipe read of the same
+    bank and port (within the block, with no yield and no write of the register in between) reads the
+    same register."""
+    ops = [opnd.operands(x, cache) for x in new]
+    yields = [x.yield_ and st <= 11 for x, st in zip(new, stalls)]
+    piped = [port_of_v1(x.opcode)[0] in ("fma", "alu") for x in new]
+    defs = [reg_use(x, cache).defs for x in new]
+    flags = [0] * len(new)
+    for i, x in enumerate(new):
+        a = ops[i]
+        if _form(x) not in reuse_ops or not yields[i] or not piped[i] or a.wide or not a.complete:
+            continue
+        for port, reg, enc in _phys(x, a.srcs):
+            if enc not in REUSE_SLOTS or reg == 255 or reg in defs[i]:
+                continue
+            for j in range(i + 1, len(new)):
+                if piped[j]:
+                    b = ops[j]
+                    if not b.complete or b.wide:
+                        break
+                    hit = [r for sl, r, _ in _phys(new[j], b.srcs) if sl == port and r != 255 and r % 2 == reg % 2]
+                    if hit:
+                        if hit[0] == reg:
+                            flags[i] |= REUSE_SLOTS[enc]
+                        break
+                if reg in defs[j] or not yields[j]:
+                    break
+        flags[i] &= reuse_ops[_form(x)]                  # only bits ptxas used on this form
+    return flags
+
+
 def _reuse_flags(prev: sass.Instr, nxt: sass.Instr, cache: dict, reuse_ops: dict) -> int:
+    """The pre-Oct 22 rule (reuse="next"): a flag only when the very next instruction reads it."""
     if _form(prev) not in reuse_ops or nxt.opcode not in {k[0] for k in reuse_ops} or prev.yield_ == 0:
         return 0
     a, b = opnd.operands(prev, cache), opnd.operands(nxt, cache)
@@ -830,6 +875,7 @@ def reschedule(cubin: bytes, kernel: str = "k", policy: str = "crit", seed: int 
             if any(bar != 7 and mask >> bar & 1 for bar in (new_w[a_], blk[a_].rbar)) and stalls[pos] < 2:
                 stalls[pos] = 2
         new = [blk[k] for k in order]
+        cached = _reuse_block(new, stalls, cache, reuse_ops) if reuse_on is True else None
         for pos, (x, st) in enumerate(zip(new, stalls)):
             hi = x.hi
             hi = patch.set_field(hi, "wait", waits[order[pos]])
@@ -838,7 +884,9 @@ def reschedule(cubin: bytes, kernel: str = "k", policy: str = "crit", seed: int 
             reuse = 0
             if reuse_on == "ptxas" and order == list(range(len(order))):
                 reuse = x.reuse                            # unchanged order: ptxas's flags stay valid
-            elif reuse_on and pos + 1 < len(new):
+            elif cached is not None:
+                reuse = cached[pos]
+            elif reuse_on == "next" and pos + 1 < len(new):
                 reuse = _reuse_flags(x, new[pos + 1], cache, reuse_ops)
             hi = _set_stall(patch.set_field(hi, "reuse", reuse), st)
             _write(elf, sec, (blk[0].offset // 16) + pos, x.lo, hi)
