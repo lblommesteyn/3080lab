@@ -165,6 +165,9 @@ def latency(i: sass.Instr, table: dict[str, int], consumer: sass.Instr | None = 
         # the suite + PolyBench at exactly 13, none below); 12 broke spmv_csr (Oct 18 2026)
         return PRED_BRANCH
     p = pipe(i.opcode)
+    if consumer is not None and _base(consumer.opcode) == "MUFU" and _base(i.opcode) in ("FFMA", "FADD", "FMUL"):
+        # measured 4 (mufu_latency); ptxas uses exactly 4 on 91 of these pairs in randk + suite, never less
+        return 4
     if p is not None:
         if consumer is None:
             return 5
@@ -330,10 +333,14 @@ def schedule_block(ins: list[sass.Instr], res: list, table: dict, policy: str = 
                 for v in range(u):
                     if ins[v].wait >> b_ & 1 and v != term:
                         preds[u].append((v, 1, None))
-    # the terminator waits for everything, and for every fixed-latency result (exit rule)
+    # the terminator waits for everything, and every fixed-latency result is written by the time the
+    # next block can issue: the terminator's own stall (kept from ptxas) counts, as for ptxas, which
+    # lets a loop-carried FFMA straddle the back branch (exit rule)
     if term is not None:
+        tst = ins[term].stall
         for u in body:
-            preds[term].append((u, latency(ins[u], table) if _fixed_producer(ins[u], res[u]) else 1, None))
+            preds[term].append((u, max(1, latency(ins[u], table) - tst) if _fixed_producer(ins[u], res[u]) else 1,
+                                None))
     # priority: longest latency path to the end
     succ = {k: [] for k in range(n)}
     for v in range(n):
