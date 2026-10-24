@@ -1250,6 +1250,21 @@ Suite (`data/suite/reuse.json`, `data/suite/exit.json`): every rescheduled varia
 reordering policies are still about 1% behind it, so the order the scheduler picks is now the loss,
 not the control words. Cycles: `data/ablation/job2050_reuse_cycles.txt`, `job2054_exit_cycles.txt`.
 
+**Reordering has almost no headroom left (Oct 24, `scripts/sim_pick.py`).**
+- **Where sb_late loses** (2 to 5% vs identity_late): high-occupancy kernels where ptxas already
+  issues about 3 warp-instructions per cycle per SM. A latency-driven reorder cannot help there.
+- **Where it changes nothing:** low-occupancy kernels.
+- **Model pick:** I simulated identity_late, sb_late and crit_late in `lab/model.simulate` at the
+  measured occupancy and kept the predicted-fastest per kernel. That measures **1.001**, against
+  1.003 for identity_late alone. The simulator gets the sign right on 16 of the 24 seeds where the
+  orders differ by more than 0.5%.
+- **The ceiling:** a perfect oracle over the three orders reaches only **1.005**. ptxas's order is
+  close to optimal on these kernels.
+
+The wins that do exist (1.02 to 1.04 on low-occupancy seeds) come from control words. One example:
+ptxas sometimes stalls 6 cycles on FFMA -> MUFU where 4 is enough. Beating ptxas by 1.05x needs
+something block-local reordering cannot reach, such as register allocation or cross-block motion.
+
 **Cross-kernel optimizer** (`lab/xkernel.py`, `data/xkernel/polybench.json`). Vertical (thread-local)
 and horizontal (grid-concatenated) fusion of adjacent launches, plus CUDA graph capture, on the 12
 multi-kernel PolyBench programs. All outputs bitwise identical to the original. Geomean of fused +
