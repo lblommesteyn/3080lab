@@ -1326,6 +1326,109 @@ Reproduce: `python scripts/ra_headroom.py`, `python scripts/swp_headroom.py`,
 `python -m lab.cli run resched_rand_b --policies identity_late,sb_late,split_identity_late,split_sb_late`,
 then `scripts/ra_report.py` and `scripts/rand_report.py` on the outputs.
 
+**Can the hardware model pick optimizations? (Nov 14, `lab/optsel.py`, `scripts/optsel_*.py`, `data/optsel/`)**
+The question is whether the measured hardware model predicts *whether an optimization helps*, not how
+long a kernel runs. The split, threshold, predictors and metrics were committed before any model was fit
+(`data/optsel/PROTOCOL.md`). The demo plan was also committed before its run.
+
+*Step 1: the A/A noise.* The Nov 14 softmax A/A gap of 3.5% had three sources.
+- **Buffer placement:** `scripts/aa_noise.py`, a 2x2 design over module copy and output-buffer set
+  with 3 fresh processes (job 2216). Buffer placement gives transpose a stable 1.0% gap, the same sign
+  in every process. The module copy contributes 0.
+- **Timer resolution:** the CUDA event timer reads in steps of 1.024 us, which is 1% of a 100 us
+  kernel, and a median cannot resolve below one step.
+- **The fix, protocol v2:** K arms rotate over K buffer sets every round, an A/A arm (`ptxas_dup`)
+  rides in every case, and the statistic is a 10%-trimmed mean of paired per-round log ratios, pooled
+  over 2 processes.
+- **Result:** suite A/A is now at most 0.69% (q95 0.47%) over 20 kernels.
+- **Still noisy on PolyBench:** A/A q95 is 2.8%, from two characterized causes. Kernels of 4-5 us
+  are 4-5 timer steps long (adi 4-6, lu1, gramschm2, jacobi1d/2d). In-place accumulating kernels
+  (atax2, gramschm3) have 9-15% CV because their data changes from launch to launch. Fixing the first
+  would need back-to-back launches per sample, which I did not build.
+
+*Corpus* (1,086 decisions, raw data in `data/optsel/`; y = log(t_base / t_candidate)):
+- **rand_dev / rand_heldout:** 40 + 40 random kernels x 4 SASS transforms (jobs 2211/2212, clock64).
+- **suite:** 19 kernels x 7 SASS transforms, protocol v2 (job 2217).
+- **polybench_sass:** 40 PolyBench kernels x 7 transforms, protocol v2, every candidate bitwise checked
+  on 3 input sets (job 2219).
+- **polybench_fusion:** 12 programs x {graph, fused, fused_graph} (`data/xkernel`).
+
+Features come from static SASS and the launch configuration, never from a candidate's time:
+- occupancy and its change, registers and their change;
+- hot-loop instruction mix (memory, MUFU, FP, INT, sync);
+- changes in stall sum, scoreboard waits, dependence depth and reuse flags;
+- launch-count change, and data shared between launches;
+- the hardware model's own prediction (`lab/model.simulate` at resident warps/SM for SASS; a
+  launch-cost model for fusion, with constants from `scripts/launch_gap.py`).
+
+Training was on rand_dev and suite only, and each test family was scored once. Win or loss means
+\|y\| > 1%.
+
+| held-out family | predictor | directional acc. | Spearman | applied W/L | regret | realised (oracle) |
+|---|---|---|---|---|---|---|
+| rand_heldout (160) | never / always | 0.65 / 0.35 | | 0/0, 27/50 | 0.0062 | 1.000 (1.0047) |
+| | heuristic | 0.75 | 0.40 | 13/5 | 0.0081 | 0.998 |
+| | hw_model | 0.74 | 0.43 | 14/7 | 0.0081 | 0.998 |
+| | feature model | 0.73 | 0.49 | 6/0 | 0.0054 | **1.0007** |
+| polybench_sass (276) | always | 0.43 | | 29/38 | 0.0138 | 0.994 (1.0064) |
+| | hw_model | 0.57 | 0.16 | 0/0 | 0.0079 | 1.000 |
+| | feature model | 0.75 | 0.09 | 13/1 | 0.0070 | 1.0007 |
+| polybench_fusion (36) | always | 0.94 | | 17/1 | 0.0612 | 1.159 (1.231) |
+| | heuristic (launches fall or graph) | 1.00 | 0.53 | 17/0 | 0.0612 | 1.159 |
+| | **hw_model (launch cost)** | 0.83 | **0.65** | 14/0 | **0.0026** | **1.229** |
+| | feature model | 0.94 | 0.65 | 17/1 | 0.0033 | 1.229 |
+| | features without hw_pred | 0.94 | 0.28 | 17/1 | 0.0612 | 1.159 |
+
+- **SASS transforms: the decision is not worth making.** The oracle's ceiling is 0.47-0.64% on
+  every SASS family. The best predictor captures 0.07% of it. Spearman on held-out seeds is 0.43-0.49,
+  so the sign is better than chance. On PolyBench it is 0.09-0.16, because there the noise is larger
+  than the effects.
+- **In-family vs held-out:** inside the development family the hardware model looks good: rand_dev
+  has directional accuracy 0.90, Spearman 0.75, and realises 1.005 against an oracle of 1.006, scored
+  leave-one-family-out. On unseen seeds of the same generator it falls to 0.74, and realises 0.998.
+  It approves sb_late on kernels where sb_late loses, the same failure to generalize found earlier today.
+- **Fusion and graphs: the measured model does pick.** The launch-cost model chooses among graph,
+  fused and fused_graph within 0.2% of the oracle (1.229 vs 1.231). The best fixed rule realises
+  1.159. The model's magnitudes are badly wrong: it predicts e^3 on 3dconv, because a Python stream
+  launch costs 8.8 us when issued alone but overlaps with kernel work in a real sequence. Only its
+  ranking is right. Without hw_pred the feature model falls to the fixed-rule result, so all of the
+  value is the hardware model's.
+- **Calibration:** after Platt scaling on the training families, held-out ECE is 0.09-0.16. That is
+  not reliable enough to act on alone. Abstention (apply only when P(win) >= 0.7) never takes a loss,
+  but covers 0-7% of SASS decisions. On fusion it covers 28-31% and realises 1.169 against 1.229
+  without abstention.
+- **Sensitivity at tau = 3%** (above PolyBench's A/A q95; post-hoc and labelled as such): the SASS
+  families have almost no real wins left, 4 of 160 and 5 of 276. Every predictor ties with "never".
+
+*Demo: deciding for a problem size never measured before* (PolyBench at 1/4 of every dimension,
+job 2222, `scripts/optsel_demo.py`, `data/optsel/demo_eval.json`). Predictors were fit on the whole
+benchmark. Per program, each picks one of base, graph, fused or fused_graph. Geomean over 12 programs:
+
+| policy | realised | programs slower than base |
+|---|---|---|
+| never (base) | 1.000 | 0 |
+| always graph / heuristic | 1.479 | 3 |
+| hw_model | 1.602 | 2 |
+| always fused_graph | 1.619 | 1 |
+| feature model | **1.631** | 2 |
+| oracle | 1.642 | 0 |
+
+The feature model gets within 0.7% of the oracle and beats the best fixed policy (always fused_graph)
+by 0.7%. That margin is inside this run's A/A noise: base vs base_dup reaches 5% on jacobi1d and 3.3%
+on corr. So at this size the predictor matches, but does not demonstrably beat, the obvious rule
+"fuse what is legal, then capture a graph". The "slower" picks are graph on atax and gemver, at
+-1.1% to -1.2%, which is near noise.
+
+*Recommendation.* Use the hardware model as a selector only where the oracle headroom is several
+times the measurement noise: launch structure (fusion, graphs, and likely tile or occupancy choices).
+For block-local SASS rewrites the headroom (< 0.7%) is below both the noise and the model's held-out
+error, so selecting among them is not worth doing on this corpus. A next step with a real
+chance: replace the launch model's additive gap with an overlap-aware one, max(issue time, work), so
+its magnitudes are calibrated. That is a model change and would need a new held-out set.
+Reproduce: `scripts/aa_noise.py`, `optsel_suite.py`, `optsel_poly.py`, `launch_gap.py` (GPU, through
+pcslurm), then `optsel_build.py rand|suite|poly|fusion`, `optsel_eval.py split=frozen|lofo`, and
+`optsel_demo.py` after the 1/4-size `xkernel_bench.py` run (`scripts/run_env.py XK_AA=1 XK_KDIR=... --`).
+
 **Cross-kernel optimizer** (`lab/xkernel.py`, `data/xkernel/polybench.json`). Vertical (thread-local)
 and horizontal (grid-concatenated) fusion of adjacent launches, plus CUDA graph capture, on the 12
 multi-kernel PolyBench programs. All outputs bitwise identical to the original. Geomean of fused +

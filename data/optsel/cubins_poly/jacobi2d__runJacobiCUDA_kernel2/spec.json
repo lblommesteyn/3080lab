@@ -1,0 +1,1 @@
+{"kernel": "runJacobiCUDA_kernel2", "params": [{"name": "n", "kind": "scalar", "type": "int"}, {"name": "A", "kind": "ptr", "type": "float", "const": false}, {"name": "B", "kind": "ptr", "type": "float", "const": false}], "counts": {"A": 1132096, "B": 1132096}, "scalars": {"n": 1000}, "smem": 0, "grid": [32, 125, 1], "block": [32, 8, 1], "int_range": [0, 1024]}

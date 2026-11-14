@@ -1,0 +1,21 @@
+saxpy ok ptxas_dup:-0.0007 identity_late:-0.0001 crit_late:-0.0011 sb_late:-0.0005 sb_wide_late:-0.0011 split_identity_late:-0.0011 split_sb_late:-0.0004 split24_sb_late:-0.0016 
+reduce ok ptxas_dup:-0.0007 identity_late:-0.0009 crit_late:-0.0010 sb_late:-0.0007 sb_wide_late:-0.0016 split_identity_late:+0.0005 split_sb_late:-0.0005 split24_sb_late:-0.0019 
+transpose ok ptxas_dup:+0.0004 identity_late:+0.0011 crit_late:-0.0025 sb_late:-0.0017 sb_wide_late:+0.0026 split_identity_late:+0.0020 split_sb_late:+0.0005 split24_sb_late:+0.0012 
+stencil1d ok ptxas_dup:-0.0006 identity_late:-0.0004 crit_late:-0.0016 sb_late:-0.0008 sb_wide_late:-0.0005 split_identity_late:-0.0010 split_sb_late:-0.0011 split24_sb_late:-0.0001 
+jacobi2d ok ptxas_dup:-0.0005 identity_late:-0.0008 crit_late:-0.0013 sb_late:-0.0008 sb_wide_late:-0.0005 split_identity_late:+0.0003 split_sb_late:-0.0010 split24_sb_late:-0.0010 
+conv_row ok ptxas_dup:+0.0001 identity_late:-0.0001 crit_late:+0.0001 sb_late:-0.0008 sb_wide_late:+0.0007 split_identity_late:-0.0002 split_sb_late:-0.0000 split24_sb_late:+0.0001 
+box_blur3 ok ptxas_dup:+0.0005 identity_late:-0.0006 crit_late:+0.0001 sb_late:+0.0008 sb_wide_late:+0.0010 split_identity_late:-0.0000 split_sb_late:+0.0001 split24_sb_late:+0.0004 
+gelu_fused ok ptxas_dup:+0.0009 identity_late:+0.0010 crit_late:-0.0002 sb_late:+0.0001 sb_wide_late:+0.0012 split_identity_late:-0.0013 split_sb_late:-0.0004 split24_sb_late:+0.0023 
+histogram ok ptxas_dup:-0.0009 identity_late:-0.0041 crit_late:-0.0051 sb_late:-0.0051 sb_wide_late:-0.0052 split_identity_late:-0.0029 split_sb_late:-0.0040 split24_sb_late:-0.0033 
+gemv ok ptxas_dup:+0.0005 identity_late:-0.0007 crit_late:+0.0018 sb_late:+0.0011 sb_wide_late:+0.0012 split_identity_late:-0.0010 split_sb_late:+0.0010 split24_sb_late:+0.0000 
+black_scholes ref_mismatch ptxas_dup:+0.0014 identity_late:+0.0009 crit_late:+0.0024 sb_late:+0.0009 sb_wide_late:+0.0005 split_identity_late:+0.0011 split24_sb_late:+0.0016 
+spmv_csr ok ptxas_dup:+0.0002 identity_late:-0.0041 crit_late:-0.0067 sb_late:-0.0069 sb_wide_late:-0.0070 split_identity_late:-0.0045 split_sb_late:-0.0066 split24_sb_late:-0.0063 
+softmax ok ptxas_dup:+0.0010 identity_late:-0.0002 crit_late:+0.0016 sb_late:+0.0018 sb_wide_late:-0.0012 split_identity_late:-0.0007 split_sb_late:+0.0017 split24_sb_late:+0.0036 
+layernorm ok ptxas_dup:-0.0069 identity_late:-0.0059 crit_late:-0.0024 sb_late:-0.0012 sb_wide_late:-0.0005 split_identity_late:-0.0047 split_sb_late:-0.0027 split24_sb_late:-0.0014 
+scan_block ok ptxas_dup:-0.0010 identity_late:-0.0004 crit_late:-0.0002 sb_late:+0.0012 sb_wide_late:-0.0027 split_identity_late:-0.0009 split_sb_late:+0.0003 split24_sb_late:+0.0014 
+bitonic_block ok ptxas_dup:+0.0004 identity_late:-0.0001 crit_late:+0.0004 sb_late:-0.0000 sb_wide_late:-0.0002 split_identity_late:-0.0005 split_sb_late:-0.0001 split24_sb_late:-0.0006 
+sgemm_tiled ok ptxas_dup:-0.0002 identity_late:-0.0012 crit_late:+0.0116 sb_late:+0.0120 sb_wide_late:+0.0025 split_identity_late:-0.0012 split_sb_late:+0.0043 split24_sb_late:-0.4574 
+sgemm_naive ok ptxas_dup:-0.0002 identity_late:-0.0014 crit_late:-0.0010 sb_late:-0.0013 sb_wide_late:-0.0011 split_identity_late:-0.0011 split_sb_late:-0.0012 split24_sb_late:-0.0011 
+nbody ok ptxas_dup:-0.0002 identity_late:-0.0068 crit_late:-0.0071 sb_late:-0.0071 sb_wide_late:-0.0083 split_identity_late:-0.0035 split_sb_late:-0.0034 split24_sb_late:-0.0034 
+mandelbrot ok ptxas_dup:-0.0046 identity_late:-0.0050 crit_late:-0.0027 sb_late:-0.0043 sb_wide_late:-0.0007 split_identity_late:-0.0032 split_sb_late:-0.0054 split24_sb_late:-0.0045 
+wrote C:\Users\LukeB\.pcslurm\worktrees\claude-optsel-20261114-133325-256607\job-optsel-suite-20261114-134015-836075\data\optsel\suite_v2.json

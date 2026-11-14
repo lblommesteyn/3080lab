@@ -1,0 +1,3221 @@
+{
+ "tau": 0.03,
+ "split": "frozen",
+ "families_present": [
+  "polybench_fusion",
+  "polybench_sass",
+  "rand_dev",
+  "rand_heldout",
+  "suite"
+ ],
+ "aa_noise": {
+  "polybench_sass": {
+   "n": 40,
+   "abs_q95": 0.02833874138056013,
+   "max_abs": 0.02975247047691226
+  },
+  "suite": {
+   "n": 20,
+   "abs_q95": 0.004745428700536077,
+   "max_abs": 0.006867387123334104
+  }
+ },
+ "scores": {
+  "rand_heldout": {
+   "n": 160,
+   "groups": 40,
+   "wins": 4,
+   "losses": 29,
+   "neutral": 127,
+   "predictors": {
+    "never": {
+     "dir_acc": 0.8787878787878788,
+     "spearman": NaN,
+     "applied": 0,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.006174870403017721,
+     "realised_geomean": 1.0,
+     "realised_ci": [
+      1.0,
+      1.0
+     ],
+     "ece": 0.0017558528428093662,
+     "reliability": [
+      [
+       0.0,
+       160,
+       0.027,
+       0.025
+      ]
+     ],
+     "brier": 0.024378083019205615,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      }
+     ]
+    },
+    "always": {
+     "dir_acc": 0.12121212121212122,
+     "spearman": NaN,
+     "applied": 160,
+     "applied_wins": 4,
+     "applied_losses": 29,
+     "mean_regret": 0.00613556137262621,
+     "realised_geomean": 1.0000393098030016,
+     "realised_ci": [
+      0.9957365237454582,
+      1.0042576038841524
+     ],
+     "ece": 0.0017558528428093662,
+     "reliability": [
+      [
+       0.0,
+       160,
+       0.027,
+       0.025
+      ]
+     ],
+     "brier": 0.024378083019205615,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      }
+     ]
+    },
+    "heuristic": {
+     "dir_acc": 0.8787878787878788,
+     "spearman": 0.40480487519043706,
+     "applied": 3,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.007064325870980737,
+     "realised_geomean": 0.9991109399802985,
+     "realised_ci": [
+      0.9977436537421894,
+      1.0
+     ],
+     "ece": 0.0020929522578317372,
+     "reliability": [
+      [
+       0.0,
+       160,
+       0.023,
+       0.025
+      ]
+     ],
+     "brier": 0.024492129663836,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      }
+     ]
+    },
+    "hw_model": {
+     "dir_acc": 0.8787878787878788,
+     "spearman": 0.42587894058361647,
+     "applied": 9,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.005550497291408035,
+     "realised_geomean": 1.000624568073075,
+     "realised_ci": [
+      0.9995760147338858,
+      1.0021840191356466
+     ],
+     "ece": 0.05721100930183264,
+     "reliability": [
+      [
+       0.0,
+       151,
+       0.003,
+       0.026
+      ],
+      [
+       0.2,
+       3,
+       0.332,
+       0.0
+      ],
+      [
+       0.4,
+       2,
+       0.462,
+       0.0
+      ],
+      [
+       0.8,
+       4,
+       0.928,
+       0.0
+      ]
+     ],
+     "brier": 0.05142559916511276,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.025,
+       "applied": 4,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0003064332930893,
+       "mean_regret": 0.005868484051020587
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.025,
+       "applied": 4,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0003064332930893,
+       "mean_regret": 0.005868484051020587
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.025,
+       "applied": 4,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0003064332930893,
+       "mean_regret": 0.005868484051020587
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.025,
+       "applied": 4,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0003064332930893,
+       "mean_regret": 0.005868484051020587
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.025,
+       "applied": 4,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0003064332930893,
+       "mean_regret": 0.005868484051020587
+      }
+     ]
+    },
+    "feature_model": {
+     "dir_acc": 0.8787878787878788,
+     "spearman": 0.486350052736435,
+     "applied": 0,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.006174870403017721,
+     "realised_geomean": 1.0,
+     "realised_ci": [
+      1.0,
+      1.0
+     ],
+     "ece": 0.018463508044607634,
+     "reliability": [
+      [
+       0.0,
+       160,
+       0.007,
+       0.025
+      ]
+     ],
+     "brier": 0.0253742739151832,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      }
+     ]
+    },
+    "features_no_hw": {
+     "dir_acc": 0.8787878787878788,
+     "spearman": 0.44877827258877295,
+     "applied": 0,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.006174870403017721,
+     "realised_geomean": 1.0,
+     "realised_ci": [
+      1.0,
+      1.0
+     ],
+     "ece": 0.01567080180906131,
+     "reliability": [
+      [
+       0.0,
+       160,
+       0.009,
+       0.025
+      ]
+     ],
+     "brier": 0.025471929071241416,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.006174870403017721
+      }
+     ]
+    },
+    "oracle": {
+     "dir_acc": 1.0,
+     "spearman": 1.0,
+     "applied": 4,
+     "applied_wins": 4,
+     "applied_losses": 0,
+     "mean_regret": 0.005019909617850869,
+     "realised_geomean": 1.0011556280092222,
+     "realised_ci": [
+      1.0,
+      1.0034708919992676
+     ],
+     "ece": 0.0,
+     "reliability": [
+      [
+       0.0,
+       156,
+       0.0,
+       0.0
+      ],
+      [
+       0.8,
+       4,
+       1.0,
+       1.0
+      ]
+     ],
+     "brier": 0.0,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.025,
+       "applied": 4,
+       "losses": 0,
+       "wins": 4,
+       "realised_geomean": 1.0011556280092222,
+       "mean_regret": 0.005019909617850869
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.025,
+       "applied": 4,
+       "losses": 0,
+       "wins": 4,
+       "realised_geomean": 1.0011556280092222,
+       "mean_regret": 0.005019909617850869
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.025,
+       "applied": 4,
+       "losses": 0,
+       "wins": 4,
+       "realised_geomean": 1.0011556280092222,
+       "mean_regret": 0.005019909617850869
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.025,
+       "applied": 4,
+       "losses": 0,
+       "wins": 4,
+       "realised_geomean": 1.0011556280092222,
+       "mean_regret": 0.005019909617850869
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.025,
+       "applied": 4,
+       "losses": 0,
+       "wins": 4,
+       "realised_geomean": 1.0011556280092222,
+       "mean_regret": 0.005019909617850869
+      }
+     ]
+    }
+   },
+   "lambda": 1,
+   "train_families": [
+    "rand_dev",
+    "suite"
+   ]
+  },
+  "polybench_sass": {
+   "n": 276,
+   "groups": 40,
+   "wins": 5,
+   "losses": 11,
+   "neutral": 260,
+   "predictors": {
+    "never": {
+     "dir_acc": 0.6875,
+     "spearman": NaN,
+     "applied": 0,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.007679846296441473,
+     "realised_geomean": 1.0,
+     "realised_ci": [
+      1.0,
+      1.0
+     ],
+     "ece": 0.00863991081382386,
+     "reliability": [
+      [
+       0.0,
+       276,
+       0.027,
+       0.018
+      ]
+     ],
+     "brier": 0.017862402732258774,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      }
+     ]
+    },
+    "always": {
+     "dir_acc": 0.3125,
+     "spearman": NaN,
+     "applied": 276,
+     "applied_wins": 5,
+     "applied_losses": 11,
+     "mean_regret": 0.01379312803835106,
+     "realised_geomean": 0.9939053663452305,
+     "realised_ci": [
+      0.9884900102938701,
+      0.9985623798508565
+     ],
+     "ece": 0.00863991081382386,
+     "reliability": [
+      [
+       0.0,
+       276,
+       0.027,
+       0.018
+      ]
+     ],
+     "brier": 0.017862402732258774,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      }
+     ]
+    },
+    "heuristic": {
+     "dir_acc": 0.6875,
+     "spearman": 0.1725568984460838,
+     "applied": 1,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.007831780977630584,
+     "realised_geomean": 0.9998480768603001,
+     "realised_ci": [
+      0.9995442998193148,
+      1.0
+     ],
+     "ece": 0.001200232361083877,
+     "reliability": [
+      [
+       0.0,
+       276,
+       0.019,
+       0.018
+      ]
+     ],
+     "brier": 0.017918761654037163,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      }
+     ]
+    },
+    "hw_model": {
+     "dir_acc": 0.6875,
+     "spearman": 0.15877855624206277,
+     "applied": 1,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.007646665683864717,
+     "realised_geomean": 1.0000331811630594,
+     "realised_ci": [
+      1.0,
+      1.0000995467921834
+     ],
+     "ece": 0.01848004990826367,
+     "reliability": [
+      [
+       0.0,
+       275,
+       0.0,
+       0.018
+      ],
+      [
+       0.2,
+       1,
+       0.202,
+       0.0
+      ]
+     ],
+     "brier": 0.01828369095609605,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      }
+     ]
+    },
+    "feature_model": {
+     "dir_acc": 0.6875,
+     "spearman": 0.0888725902883806,
+     "applied": 5,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.007760248608148756,
+     "realised_geomean": 0.9999196009204719,
+     "realised_ci": [
+      0.9997195893715856,
+      1.000117405969372
+     ],
+     "ece": 0.011573468313417013,
+     "reliability": [
+      [
+       0.0,
+       275,
+       0.008,
+       0.018
+      ],
+      [
+       0.2,
+       1,
+       0.3,
+       0.0
+      ]
+     ],
+     "brier": 0.018347969228926276,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      }
+     ]
+    },
+    "features_no_hw": {
+     "dir_acc": 0.6875,
+     "spearman": 0.12500221172643086,
+     "applied": 6,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.00783175006467173,
+     "realised_geomean": 0.9998481077685629,
+     "realised_ci": [
+      0.9996072236863618,
+      1.0000712232368225
+     ],
+     "ece": 0.003979874612578704,
+     "reliability": [
+      [
+       0.0,
+       274,
+       0.02,
+       0.018
+      ],
+      [
+       0.2,
+       1,
+       0.243,
+       0.0
+      ],
+      [
+       0.4,
+       1,
+       0.474,
+       0.0
+      ]
+     ],
+     "brier": 0.019255908832264874,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007679846296441473
+      }
+     ]
+    },
+    "oracle": {
+     "dir_acc": 1.0,
+     "spearman": 1.0,
+     "applied": 5,
+     "applied_wins": 5,
+     "applied_losses": 0,
+     "mean_regret": 0.004054074462404282,
+     "realised_geomean": 1.0036323528961395,
+     "realised_ci": [
+      1.0007597416664333,
+      1.0072986722846535
+     ],
+     "ece": 0.0,
+     "reliability": [
+      [
+       0.0,
+       271,
+       0.0,
+       0.0
+      ],
+      [
+       0.8,
+       5,
+       1.0,
+       1.0
+      ]
+     ],
+     "brier": 0.0,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.018115942028985508,
+       "applied": 5,
+       "losses": 0,
+       "wins": 5,
+       "realised_geomean": 1.0036323528961395,
+       "mean_regret": 0.004054074462404282
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.018115942028985508,
+       "applied": 5,
+       "losses": 0,
+       "wins": 5,
+       "realised_geomean": 1.0036323528961395,
+       "mean_regret": 0.004054074462404282
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.018115942028985508,
+       "applied": 5,
+       "losses": 0,
+       "wins": 5,
+       "realised_geomean": 1.0036323528961395,
+       "mean_regret": 0.004054074462404282
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.018115942028985508,
+       "applied": 5,
+       "losses": 0,
+       "wins": 5,
+       "realised_geomean": 1.0036323528961395,
+       "mean_regret": 0.004054074462404282
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.018115942028985508,
+       "applied": 5,
+       "losses": 0,
+       "wins": 5,
+       "realised_geomean": 1.0036323528961395,
+       "mean_regret": 0.004054074462404282
+      }
+     ]
+    }
+   },
+   "lambda": 1,
+   "train_families": [
+    "rand_dev",
+    "suite"
+   ]
+  },
+  "polybench_fusion": {
+   "n": 36,
+   "groups": 12,
+   "wins": 14,
+   "losses": 0,
+   "neutral": 22,
+   "predictors": {
+    "never": {
+     "dir_acc": 0.0,
+     "spearman": NaN,
+     "applied": 0,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.20917160360230966,
+     "realised_geomean": 1.0,
+     "realised_ci": [
+      1.0,
+      1.0
+     ],
+     "ece": 0.36213303604607955,
+     "reliability": [
+      [
+       0.0,
+       36,
+       0.027,
+       0.389
+      ]
+     ],
+     "brier": 0.36879465678360546,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      }
+     ]
+    },
+    "always": {
+     "dir_acc": 1.0,
+     "spearman": NaN,
+     "applied": 36,
+     "applied_wins": 14,
+     "applied_losses": 0,
+     "mean_regret": 0.06124246482044562,
+     "realised_geomean": 1.1594307347777626,
+     "realised_ci": [
+      1.0082228597385046,
+      1.4615489017115924
+     ],
+     "ece": 0.36213303604607955,
+     "reliability": [
+      [
+       0.0,
+       36,
+       0.027,
+       0.389
+      ]
+     ],
+     "brier": 0.36879465678360546,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      }
+     ]
+    },
+    "heuristic": {
+     "dir_acc": 0.0,
+     "spearman": 0.5330759330759332,
+     "applied": 0,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.20917160360230966,
+     "realised_geomean": 1.0,
+     "realised_ci": [
+      1.0,
+      1.0
+     ],
+     "ece": 0.35980985253516246,
+     "reliability": [
+      [
+       0.0,
+       36,
+       0.029,
+       0.389
+      ]
+     ],
+     "brier": 0.36442146433755274,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      }
+     ]
+    },
+    "hw_model": {
+     "dir_acc": 0.7142857142857143,
+     "spearman": 0.6532818532818533,
+     "applied": 11,
+     "applied_wins": 10,
+     "applied_losses": 0,
+     "mean_regret": 0.052910542948948425,
+     "realised_geomean": 1.1691313774548897,
+     "realised_ci": [
+      1.0149689596958489,
+      1.4715864837140538
+     ],
+     "ece": 0.14896917831933285,
+     "reliability": [
+      [
+       0.0,
+       25,
+       0.003,
+       0.16
+      ],
+      [
+       0.4,
+       1,
+       0.569,
+       1.0
+      ],
+      [
+       0.8,
+       10,
+       1.0,
+       0.9
+      ]
+     ],
+     "brier": 0.14399503337202743,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.3055555555555556,
+       "applied": 11,
+       "losses": 0,
+       "wins": 10,
+       "realised_geomean": 1.1691313774548897,
+       "mean_regret": 0.052910542948948425
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.2777777777777778,
+       "applied": 10,
+       "losses": 0,
+       "wins": 9,
+       "realised_geomean": 1.1691313774548897,
+       "mean_regret": 0.052910542948948425
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.2777777777777778,
+       "applied": 10,
+       "losses": 0,
+       "wins": 9,
+       "realised_geomean": 1.1691313774548897,
+       "mean_regret": 0.052910542948948425
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.2777777777777778,
+       "applied": 10,
+       "losses": 0,
+       "wins": 9,
+       "realised_geomean": 1.1691313774548897,
+       "mean_regret": 0.052910542948948425
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.2777777777777778,
+       "applied": 10,
+       "losses": 0,
+       "wins": 9,
+       "realised_geomean": 1.1691313774548897,
+       "mean_regret": 0.052910542948948425
+      }
+     ]
+    },
+    "feature_model": {
+     "dir_acc": 0.6428571428571429,
+     "spearman": 0.6532818532818533,
+     "applied": 10,
+     "applied_wins": 9,
+     "applied_losses": 0,
+     "mean_regret": 0.052910542948948425,
+     "realised_geomean": 1.1691313774548897,
+     "realised_ci": [
+      1.0149689596958489,
+      1.4715864837140538
+     ],
+     "ece": 0.13027049139541685,
+     "reliability": [
+      [
+       0.2,
+       23,
+       0.275,
+       0.174
+      ],
+      [
+       0.4,
+       2,
+       0.552,
+       0.0
+      ],
+      [
+       0.6,
+       1,
+       0.737,
+       1.0
+      ],
+      [
+       0.8,
+       10,
+       0.999,
+       0.9
+      ]
+     ],
+     "brier": 0.13808983082283716,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.3611111111111111,
+       "applied": 13,
+       "losses": 0,
+       "wins": 10,
+       "realised_geomean": 1.1694637365968663,
+       "mean_regret": 0.052626304653728216
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.3055555555555556,
+       "applied": 11,
+       "losses": 0,
+       "wins": 10,
+       "realised_geomean": 1.1691313774548897,
+       "mean_regret": 0.052910542948948425
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.3055555555555556,
+       "applied": 11,
+       "losses": 0,
+       "wins": 10,
+       "realised_geomean": 1.1691313774548897,
+       "mean_regret": 0.052910542948948425
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.2777777777777778,
+       "applied": 10,
+       "losses": 0,
+       "wins": 9,
+       "realised_geomean": 1.1691313774548897,
+       "mean_regret": 0.052910542948948425
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.2777777777777778,
+       "applied": 10,
+       "losses": 0,
+       "wins": 9,
+       "realised_geomean": 1.1691313774548897,
+       "mean_regret": 0.052910542948948425
+      }
+     ]
+    },
+    "features_no_hw": {
+     "dir_acc": 0.0,
+     "spearman": 0.2818532818532819,
+     "applied": 0,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.20917160360230966,
+     "realised_geomean": 1.0,
+     "realised_ci": [
+      1.0,
+      1.0
+     ],
+     "ece": 0.12907624065688333,
+     "reliability": [
+      [
+       0.4,
+       36,
+       0.518,
+       0.389
+      ]
+     ],
+     "brier": 0.25431499688976794,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 1.0,
+       "applied": 36,
+       "losses": 0,
+       "wins": 14,
+       "realised_geomean": 1.1594307347777626,
+       "mean_regret": 0.06124246482044562
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.20917160360230966
+      }
+     ]
+    },
+    "oracle": {
+     "dir_acc": 1.0,
+     "spearman": 1.0,
+     "applied": 14,
+     "applied_wins": 14,
+     "applied_losses": 0,
+     "mean_regret": 0.002657485761940108,
+     "realised_geomean": 1.229385090357005,
+     "realised_ci": [
+      1.056173497378858,
+      1.5488385547538852
+     ],
+     "ece": 0.0,
+     "reliability": [
+      [
+       0.0,
+       22,
+       0.0,
+       0.0
+      ],
+      [
+       0.8,
+       14,
+       1.0,
+       1.0
+      ]
+     ],
+     "brier": 0.0,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.3888888888888889,
+       "applied": 14,
+       "losses": 0,
+       "wins": 14,
+       "realised_geomean": 1.229385090357005,
+       "mean_regret": 0.002657485761940108
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.3888888888888889,
+       "applied": 14,
+       "losses": 0,
+       "wins": 14,
+       "realised_geomean": 1.229385090357005,
+       "mean_regret": 0.002657485761940108
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.3888888888888889,
+       "applied": 14,
+       "losses": 0,
+       "wins": 14,
+       "realised_geomean": 1.229385090357005,
+       "mean_regret": 0.002657485761940108
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.3888888888888889,
+       "applied": 14,
+       "losses": 0,
+       "wins": 14,
+       "realised_geomean": 1.229385090357005,
+       "mean_regret": 0.002657485761940108
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.3888888888888889,
+       "applied": 14,
+       "losses": 0,
+       "wins": 14,
+       "realised_geomean": 1.229385090357005,
+       "mean_regret": 0.002657485761940108
+      }
+     ]
+    }
+   },
+   "lambda": 1,
+   "train_families": [
+    "rand_dev",
+    "suite"
+   ]
+  },
+  "test_pooled": {
+   "n": 472,
+   "groups": 92,
+   "wins": 23,
+   "losses": 40,
+   "neutral": 409,
+   "predictors": {
+    "never": {
+     "dir_acc": 0.6349206349206349,
+     "spearman": NaN,
+     "applied": 0,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.033307042513109605,
+     "realised_geomean": 1.0,
+     "realised_ci": [
+      1.0,
+      1.0
+     ],
+     "ece": 0.021972960716512675,
+     "reliability": [
+      [
+       0.0,
+       472,
+       0.027,
+       0.049
+      ]
+     ],
+     "brier": 0.046837127291072284,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      }
+     ]
+    },
+    "always": {
+     "dir_acc": 0.36507936507936506,
+     "spearman": NaN,
+     "applied": 472,
+     "applied_wins": 23,
+     "applied_losses": 40,
+     "mean_regret": 0.01665279515526563,
+     "realised_geomean": 1.0167937024328464,
+     "realised_ci": [
+      0.9971645970039403,
+      1.051410471716645
+     ],
+     "ece": 0.021972960716512675,
+     "reliability": [
+      [
+       0.0,
+       472,
+       0.027,
+       0.049
+      ]
+     ],
+     "brier": 0.046837127291072284,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      }
+     ]
+    },
+    "heuristic": {
+     "dir_acc": 0.6349206349206349,
+     "spearman": 0.3119791189982926,
+     "applied": 4,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.03375982083882791,
+     "realised_geomean": 0.999547324162919,
+     "realised_ci": [
+      0.9989398838617425,
+      0.9999875087164994
+     ],
+     "ece": 0.027450768900126647,
+     "reliability": [
+      [
+       0.0,
+       472,
+       0.021,
+       0.049
+      ]
+     ],
+     "brier": 0.04657519423491507,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      }
+     ]
+    },
+    "hw_model": {
+     "dir_acc": 0.7936507936507936,
+     "spearman": 0.31176605919707384,
+     "applied": 21,
+     "applied_wins": 10,
+     "applied_losses": 0,
+     "mean_regret": 0.012639272113024904,
+     "realised_geomean": 1.020882827797109,
+     "realised_ci": [
+      1.0016243553384103,
+      1.0547912462592208
+     ],
+     "ece": 0.03973592834715309,
+     "reliability": [
+      [
+       0.0,
+       451,
+       0.001,
+       0.029
+      ],
+      [
+       0.2,
+       4,
+       0.3,
+       0.0
+      ],
+      [
+       0.4,
+       3,
+       0.497,
+       0.333
+      ],
+      [
+       0.8,
+       14,
+       0.98,
+       0.643
+      ]
+     ],
+     "brier": 0.03910638934680835,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.03177966101694915,
+       "applied": 15,
+       "losses": 0,
+       "wins": 10,
+       "realised_geomean": 1.0207269698087897,
+       "mean_regret": 0.01279195357919417
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.029661016949152543,
+       "applied": 14,
+       "losses": 0,
+       "wins": 9,
+       "realised_geomean": 1.0207269698087897,
+       "mean_regret": 0.01279195357919417
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.029661016949152543,
+       "applied": 14,
+       "losses": 0,
+       "wins": 9,
+       "realised_geomean": 1.0207269698087897,
+       "mean_regret": 0.01279195357919417
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.029661016949152543,
+       "applied": 14,
+       "losses": 0,
+       "wins": 9,
+       "realised_geomean": 1.0207269698087897,
+       "mean_regret": 0.01279195357919417
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.029661016949152543,
+       "applied": 14,
+       "losses": 0,
+       "wins": 9,
+       "realised_geomean": 1.0207269698087897,
+       "mean_regret": 0.01279195357919417
+      }
+     ]
+    },
+    "feature_model": {
+     "dir_acc": 0.7777777777777778,
+     "spearman": 0.3264498394234353,
+     "applied": 15,
+     "applied_wins": 9,
+     "applied_losses": 0,
+     "mean_regret": 0.012960122563413478,
+     "realised_geomean": 1.0205553296237941,
+     "realised_ci": [
+      1.0012896208366144,
+      1.0546146932221172
+     ],
+     "ece": 0.022962237779396873,
+     "reliability": [
+      [
+       0.0,
+       435,
+       0.007,
+       0.021
+      ],
+      [
+       0.2,
+       24,
+       0.276,
+       0.167
+      ],
+      [
+       0.4,
+       2,
+       0.552,
+       0.0
+      ],
+      [
+       0.6,
+       1,
+       0.737,
+       1.0
+      ],
+      [
+       0.8,
+       10,
+       0.999,
+       0.9
+      ]
+     ],
+     "brier": 0.02986262127804047,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.02754237288135593,
+       "applied": 13,
+       "losses": 0,
+       "wins": 10,
+       "realised_geomean": 1.0206288450018641,
+       "mean_regret": 0.012888090476338111
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.023305084745762712,
+       "applied": 11,
+       "losses": 0,
+       "wins": 10,
+       "realised_geomean": 1.0205910063376913,
+       "mean_regret": 0.012925165036584228
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.023305084745762712,
+       "applied": 11,
+       "losses": 0,
+       "wins": 10,
+       "realised_geomean": 1.0205910063376913,
+       "mean_regret": 0.012925165036584228
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0211864406779661,
+       "applied": 10,
+       "losses": 0,
+       "wins": 9,
+       "realised_geomean": 1.0205910063376913,
+       "mean_regret": 0.012925165036584228
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0211864406779661,
+       "applied": 10,
+       "losses": 0,
+       "wins": 9,
+       "realised_geomean": 1.0205910063376913,
+       "mean_regret": 0.012925165036584228
+      }
+     ]
+    },
+    "features_no_hw": {
+     "dir_acc": 0.6349206349206349,
+     "spearman": 0.307010500527343,
+     "applied": 6,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.03337308762973145,
+     "realised_geomean": 0.9999339570643089,
+     "realised_ci": [
+      0.999822507748713,
+      1.0000326719568073
+     ],
+     "ece": 0.015870968089110128,
+     "reliability": [
+      [
+       0.0,
+       434,
+       0.016,
+       0.021
+      ],
+      [
+       0.2,
+       1,
+       0.243,
+       0.0
+      ],
+      [
+       0.4,
+       37,
+       0.517,
+       0.378
+      ]
+     ],
+     "brier": 0.03929126986681225,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.07627118644067797,
+       "applied": 36,
+       "losses": 0,
+       "wins": 14,
+       "realised_geomean": 1.019482458660549,
+       "mean_regret": 0.0140119374546056
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.033307042513109605
+      }
+     ]
+    },
+    "oracle": {
+     "dir_acc": 1.0,
+     "spearman": 1.0,
+     "applied": 23,
+     "applied_wins": 23,
+     "applied_losses": 0,
+     "mean_regret": 0.004291839047320515,
+     "realised_geomean": 1.0294402454157094,
+     "realised_ci": [
+      1.0060267361031037,
+      1.0654028021372481
+     ],
+     "ece": 0.0,
+     "reliability": [
+      [
+       0.0,
+       449,
+       0.0,
+       0.0
+      ],
+      [
+       0.8,
+       23,
+       1.0,
+       1.0
+      ]
+     ],
+     "brier": 0.0,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.048728813559322036,
+       "applied": 23,
+       "losses": 0,
+       "wins": 23,
+       "realised_geomean": 1.0294402454157094,
+       "mean_regret": 0.004291839047320515
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.048728813559322036,
+       "applied": 23,
+       "losses": 0,
+       "wins": 23,
+       "realised_geomean": 1.0294402454157094,
+       "mean_regret": 0.004291839047320515
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.048728813559322036,
+       "applied": 23,
+       "losses": 0,
+       "wins": 23,
+       "realised_geomean": 1.0294402454157094,
+       "mean_regret": 0.004291839047320515
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.048728813559322036,
+       "applied": 23,
+       "losses": 0,
+       "wins": 23,
+       "realised_geomean": 1.0294402454157094,
+       "mean_regret": 0.004291839047320515
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.048728813559322036,
+       "applied": 23,
+       "losses": 0,
+       "wins": 23,
+       "realised_geomean": 1.0294402454157094,
+       "mean_regret": 0.004291839047320515
+      }
+     ]
+    }
+   },
+   "lambda": 1,
+   "train_families": [
+    "rand_dev",
+    "suite"
+   ]
+  },
+  "dev_lofo:rand_dev": {
+   "n": 160,
+   "groups": 40,
+   "wins": 8,
+   "losses": 14,
+   "neutral": 138,
+   "predictors": {
+    "never": {
+     "dir_acc": 0.6363636363636364,
+     "spearman": NaN,
+     "applied": 0,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.007287393252559229,
+     "realised_geomean": 1.0,
+     "realised_ci": [
+      1.0,
+      1.0
+     ],
+     "ece": 0.05,
+     "reliability": [
+      [
+       0.0,
+       160,
+       0.0,
+       0.05
+      ]
+     ],
+     "brier": 0.05,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      }
+     ]
+    },
+    "always": {
+     "dir_acc": 0.36363636363636365,
+     "spearman": NaN,
+     "applied": 160,
+     "applied_wins": 8,
+     "applied_losses": 14,
+     "mean_regret": 0.0046450797691902895,
+     "realised_geomean": 1.0026458074703664,
+     "realised_ci": [
+      0.9970617287117831,
+      1.0075519914381819
+     ],
+     "ece": 0.05,
+     "reliability": [
+      [
+       0.0,
+       160,
+       0.0,
+       0.05
+      ]
+     ],
+     "brier": 0.05,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      }
+     ]
+    },
+    "heuristic": {
+     "dir_acc": 1.0,
+     "spearman": 0.6832415328723779,
+     "applied": 14,
+     "applied_wins": 8,
+     "applied_losses": 0,
+     "mean_regret": 0.00577645663436341,
+     "realised_geomean": 1.0015120786580387,
+     "realised_ci": [
+      0.9995685107726575,
+      1.0042319023000226
+     ],
+     "ece": 0.04999999999990205,
+     "reliability": [
+      [
+       0.0,
+       160,
+       0.0,
+       0.05
+      ]
+     ],
+     "brier": 0.049999999999990205,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      }
+     ]
+    },
+    "hw_model": {
+     "dir_acc": 1.0,
+     "spearman": 0.7492792687214345,
+     "applied": 9,
+     "applied_wins": 8,
+     "applied_losses": 0,
+     "mean_regret": 0.005457597721963574,
+     "realised_geomean": 1.001831470627977,
+     "realised_ci": [
+      1.0,
+      1.004469464121854
+     ],
+     "ece": 0.04999999999990205,
+     "reliability": [
+      [
+       0.0,
+       160,
+       0.0,
+       0.05
+      ]
+     ],
+     "brier": 0.049999999999990205,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      }
+     ]
+    },
+    "feature_model": {
+     "dir_acc": 0.6363636363636364,
+     "spearman": 0.07727352630962146,
+     "applied": 0,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.007287393252559229,
+     "realised_geomean": 1.0,
+     "realised_ci": [
+      1.0,
+      1.0
+     ],
+     "ece": 0.04999999999990205,
+     "reliability": [
+      [
+       0.0,
+       160,
+       0.0,
+       0.05
+      ]
+     ],
+     "brier": 0.049999999999990205,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      }
+     ]
+    },
+    "features_no_hw": {
+     "dir_acc": 0.6363636363636364,
+     "spearman": -0.1979696472518458,
+     "applied": 0,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.007287393252559229,
+     "realised_geomean": 1.0,
+     "realised_ci": [
+      1.0,
+      1.0
+     ],
+     "ece": 0.04999999999990205,
+     "reliability": [
+      [
+       0.0,
+       160,
+       0.0,
+       0.05
+      ]
+     ],
+     "brier": 0.049999999999990205,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.007287393252559229
+      }
+     ]
+    },
+    "oracle": {
+     "dir_acc": 1.0,
+     "spearman": 1.0,
+     "applied": 8,
+     "applied_wins": 8,
+     "applied_losses": 0,
+     "mean_regret": 0.005561721154445684,
+     "realised_geomean": 1.001727161927071,
+     "realised_ci": [
+      1.0,
+      1.0043866951284806
+     ],
+     "ece": 0.0,
+     "reliability": [
+      [
+       0.0,
+       152,
+       0.0,
+       0.0
+      ],
+      [
+       0.8,
+       8,
+       1.0,
+       1.0
+      ]
+     ],
+     "brier": 0.0,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.05,
+       "applied": 8,
+       "losses": 0,
+       "wins": 8,
+       "realised_geomean": 1.001727161927071,
+       "mean_regret": 0.005561721154445684
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.05,
+       "applied": 8,
+       "losses": 0,
+       "wins": 8,
+       "realised_geomean": 1.001727161927071,
+       "mean_regret": 0.005561721154445684
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.05,
+       "applied": 8,
+       "losses": 0,
+       "wins": 8,
+       "realised_geomean": 1.001727161927071,
+       "mean_regret": 0.005561721154445684
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.05,
+       "applied": 8,
+       "losses": 0,
+       "wins": 8,
+       "realised_geomean": 1.001727161927071,
+       "mean_regret": 0.005561721154445684
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.05,
+       "applied": 8,
+       "losses": 0,
+       "wins": 8,
+       "realised_geomean": 1.001727161927071,
+       "mean_regret": 0.005561721154445684
+      }
+     ]
+    }
+   },
+   "lambda": 10.0
+  },
+  "dev_lofo:suite": {
+   "n": 139,
+   "groups": 20,
+   "wins": 0,
+   "losses": 1,
+   "neutral": 138,
+   "predictors": {
+    "never": {
+     "dir_acc": 1.0,
+     "spearman": NaN,
+     "applied": 0,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.0014486467510778558,
+     "realised_geomean": 1.0,
+     "realised_ci": [
+      1.0,
+      1.0
+     ],
+     "ece": 0.049999999999999996,
+     "reliability": [
+      [
+       0.0,
+       139,
+       0.05,
+       0.0
+      ]
+     ],
+     "brier": 0.0025000000000000005,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      }
+     ]
+    },
+    "always": {
+     "dir_acc": 0.0,
+     "spearman": NaN,
+     "applied": 139,
+     "applied_wins": 0,
+     "applied_losses": 1,
+     "mean_regret": 0.0029255281949089875,
+     "realised_geomean": 0.9985242086088761,
+     "realised_ci": [
+      0.9974641461345132,
+      0.9994516998259044
+     ],
+     "ece": 0.049999999999999996,
+     "reliability": [
+      [
+       0.0,
+       139,
+       0.05,
+       0.0
+      ]
+     ],
+     "brier": 0.0025000000000000005,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      }
+     ]
+    },
+    "heuristic": {
+     "dir_acc": 1.0,
+     "spearman": 0.1372760176951606,
+     "applied": 10,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.001582706223082799,
+     "realised_geomean": 0.9998659495135646,
+     "realised_ci": [
+      0.9990187921513876,
+      1.000448252662508
+     ],
+     "ece": 0.048565352658928106,
+     "reliability": [
+      [
+       0.0,
+       129,
+       0.011,
+       0.0
+      ],
+      [
+       0.2,
+       6,
+       0.315,
+       0.0
+      ],
+      [
+       0.4,
+       1,
+       0.43,
+       0.0
+      ],
+      [
+       0.8,
+       3,
+       1.0,
+       0.0
+      ]
+     ],
+     "brier": 0.028009482547843845,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.02158273381294964,
+       "applied": 3,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0000692834228126,
+       "mean_regret": 0.0013793657282507022
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.02158273381294964,
+       "applied": 3,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0000692834228126,
+       "mean_regret": 0.0013793657282507022
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.02158273381294964,
+       "applied": 3,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0000692834228126,
+       "mean_regret": 0.0013793657282507022
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.02158273381294964,
+       "applied": 3,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0000692834228126,
+       "mean_regret": 0.0013793657282507022
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.02158273381294964,
+       "applied": 3,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0000692834228126,
+       "mean_regret": 0.0013793657282507022
+      }
+     ]
+    },
+    "hw_model": {
+     "dir_acc": 1.0,
+     "spearman": 0.31764153894275876,
+     "applied": 1,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.0014593854298351177,
+     "realised_geomean": 0.9999892613789021,
+     "realised_ci": [
+      0.9999677844826591,
+      1.0
+     ],
+     "ece": 0.004777126950690791,
+     "reliability": [
+      [
+       0.0,
+       138,
+       0.001,
+       0.0
+      ],
+      [
+       0.4,
+       1,
+       0.513,
+       0.0
+      ]
+     ],
+     "brier": 0.0019203049695403615,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.007194244604316547,
+       "applied": 1,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 0.9999892613789021,
+       "mean_regret": 0.0014593854298351177
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      }
+     ]
+    },
+    "feature_model": {
+     "dir_acc": 1.0,
+     "spearman": 0.1977434201706957,
+     "applied": 0,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.0014486467510778558,
+     "realised_geomean": 1.0,
+     "realised_ci": [
+      1.0,
+      1.0
+     ],
+     "ece": 0.0070354693139813036,
+     "reliability": [
+      [
+       0.0,
+       139,
+       0.007,
+       0.0
+      ]
+     ],
+     "brier": 0.00012391725796245158,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      }
+     ]
+    },
+    "features_no_hw": {
+     "dir_acc": 1.0,
+     "spearman": 0.08616560168014656,
+     "applied": 1,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.0015055868368976052,
+     "realised_geomean": 0.9999430615352362,
+     "realised_ci": [
+      0.9998291943314902,
+      1.0
+     ],
+     "ece": 0.00904047483734212,
+     "reliability": [
+      [
+       0.0,
+       139,
+       0.009,
+       0.0
+      ]
+     ],
+     "brier": 0.00019069124321880644,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      }
+     ]
+    },
+    "oracle": {
+     "dir_acc": 1.0,
+     "spearman": 0.9999999999999998,
+     "applied": 0,
+     "applied_wins": 0,
+     "applied_losses": 0,
+     "mean_regret": 0.0014486467510778558,
+     "realised_geomean": 1.0,
+     "realised_ci": [
+      1.0,
+      1.0
+     ],
+     "ece": 0.0,
+     "reliability": [
+      [
+       0.0,
+       139,
+       0.0,
+       0.0
+      ]
+     ],
+     "brier": 0.0,
+     "abstention": [
+      {
+       "c": 0.5,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.6,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.7,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.8,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      },
+      {
+       "c": 0.9,
+       "coverage": 0.0,
+       "applied": 0,
+       "losses": 0,
+       "wins": 0,
+       "realised_geomean": 1.0,
+       "mean_regret": 0.0014486467510778558
+      }
+     ]
+    }
+   },
+   "lambda": 10.0
+  }
+ }
+}

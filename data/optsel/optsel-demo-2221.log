@@ -1,0 +1,8 @@
+& : The term 'env' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the 
+spelling of the name, or if a path was included, verify that the path is correct and try again.
+At C:\Users\LukeB\.pcslurm\jobs\20261114-134816-616519-optsel-demo.ps1:9 char:7
++     & 'env' 'XK_AA=1' 'XK_HOST=C:/Users/LukeB/.pcslurm/worktrees/3080 ...
++       ~~~~~
+    + CategoryInfo          : ObjectNotFound: (env:String) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 

@@ -1,0 +1,37 @@
+transpose    proc0 m0b0 203.8 m0b1 201.7 m1b0 203.8 m1b1 201.7  module m0/m1 1.0000  buffers b0/b1 1.0102
+transpose    proc1 m0b0 203.8 m0b1 201.7 m1b0 203.8 m1b1 201.7  module m0/m1 1.0000  buffers b0/b1 1.0102
+transpose    proc2 m0b0 203.8 m0b1 201.7 m1b0 203.8 m1b1 201.7  module m0/m1 1.0000  buffers b0/b1 1.0102
+softmax      proc0 m0b0 181.8 m0b1 183.3 m1b0 183.3 m1b1 183.3  module m0/m1 0.9958  buffers b0/b1 0.9958
+softmax      proc1 m0b0 182.3 m0b1 182.3 m1b0 181.7 m1b1 181.8  module m0/m1 1.0029  buffers b0/b1 0.9999
+softmax      proc2 m0b0 181.8 m0b1 182.8 m1b0 181.8 m1b1 182.3  module m0/m1 1.0014  buffers b0/b1 0.9958
+nbody        proc0 m0b0 442.4 m0b1 442.4 m1b0 442.4 m1b1 442.4  module m0/m1 1.0000  buffers b0/b1 1.0000
+nbody        proc1 m0b0 442.4 m0b1 442.4 m1b0 442.4 m1b1 442.4  module m0/m1 1.0000  buffers b0/b1 1.0000
+nbody        proc2 m0b0 442.4 m0b1 442.4 m1b0 442.4 m1b1 442.4  module m0/m1 1.0000  buffers b0/b1 1.0000
+layernorm    proc0 m0b0 105.5 m0b1 105.5 m1b0 105.5 m1b1 105.5  module m0/m1 1.0000  buffers b0/b1 1.0000
+layernorm    proc1 m0b0 105.5 m0b1 106.5 m1b0 105.5 m1b1 105.5  module m0/m1 1.0049  buffers b0/b1 0.9952
+layernorm    proc2 m0b0 106.5 m0b1 105.5 m1b0 105.5 m1b1 105.5  module m0/m1 1.0049  buffers b0/b1 1.0049
+saxpy        proc0 m0b0 291.8 m0b1 292.9 m1b0 291.8 m1b1 292.4  module m0/m1 1.0009  buffers b0/b1 0.9974
+saxpy        proc1 m0b0 292.9 m0b1 293.4 m1b0 291.8 m1b1 292.9  module m0/m1 1.0026  buffers b0/b1 0.9974
+saxpy        proc2 m0b0 292.9 m0b1 291.8 m1b0 291.8 m1b1 291.8  module m0/m1 1.0018  buffers b0/b1 1.0018
+reduce       proc0 m0b0 102.4 m0b1 102.4 m1b0 102.4 m1b1 102.4  module m0/m1 1.0000  buffers b0/b1 1.0000
+reduce       proc1 m0b0 102.4 m0b1 102.4 m1b0 102.4 m1b1 102.4  module m0/m1 1.0000  buffers b0/b1 1.0000
+reduce       proc2 m0b0 102.4 m0b1 102.4 m1b0 102.4 m1b1 102.4  module m0/m1 1.0000  buffers b0/b1 1.0000
+gemv         proc0 m0b0 191.5 m0b1 191.5 m1b0 191.5 m1b1 191.5  module m0/m1 1.0000  buffers b0/b1 1.0000
+gemv         proc1 m0b0 191.5 m0b1 191.5 m1b0 191.5 m1b1 191.5  module m0/m1 1.0000  buffers b0/b1 1.0000
+gemv         proc2 m0b0 191.5 m0b1 191.5 m1b0 191.5 m1b1 191.5  module m0/m1 1.0000  buffers b0/b1 1.0000
+jacobi2d     proc0 m0b0 196.6 m0b1 196.6 m1b0 196.6 m1b1 196.6  module m0/m1 1.0000  buffers b0/b1 1.0000
+jacobi2d     proc1 m0b0 196.6 m0b1 196.6 m1b0 196.6 m1b1 196.6  module m0/m1 1.0000  buffers b0/b1 1.0000
+jacobi2d     proc2 m0b0 196.6 m0b1 196.6 m1b0 196.6 m1b1 196.6  module m0/m1 1.0000  buffers b0/b1 1.0000
+Traceback (most recent call last):
+  File "C:\Users\LukeB\.pcslurm\worktrees\claude-optsel-20261114-133325-256607\job-aa-noise-20261114-133448-510564\scripts\aa_noise.py", line 76, in <module>
+    main()
+  File "C:\Users\LukeB\.pcslurm\worktrees\claude-optsel-20261114-133325-256607\job-aa-noise-20261114-133448-510564\scripts\aa_noise.py", line 69, in main
+    dst.write_text(json.dumps(out)); print("wrote", dst)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\LukeB\AppData\Local\Programs\Python\Python312\Lib\pathlib.py", line 1047, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\LukeB\AppData\Local\Programs\Python\Python312\Lib\pathlib.py", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\LukeB\\.pcslurm\\worktrees\\claude-optsel-20261114-133325-256607\\job-aa-noise-20261114-133448-510564\\data\\optsel\\aa_noise.json'

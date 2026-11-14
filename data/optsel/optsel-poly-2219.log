@@ -1,0 +1,41 @@
+2dconv__convolution2D_kernel ptxas_dup:-0.0002 identity_late:+0.0007 crit_late:+0.0009 sb_late:+0.0003 sb_wide_late:-0.0003 split_identity_late:+0.0003 split_sb_late:+0.0005 split24_sb_late:+0.0012  | 
+3dconv__convolution3D_kernel ptxas_dup:+0.0045 identity_late:-0.0012 crit_late:-0.0077 sb_late:+0.0057 sb_wide_late:+0.0006 split_identity_late:-0.0243 split_sb_late:-0.0491 split24_sb_late:-0.0130  | 
+adi__adi_kernel1 ptxas_dup:+0.0001 identity_late:+0.0003 crit_late:-0.0003 sb_late:+0.0004 sb_wide_late:+0.0002 split_identity_late:-0.0001 split_sb_late:+0.0001  | split24_sb_late:seed -1: bitwise mismatch
+adi__adi_kernel2 ptxas_dup:+0.0000 identity_late:-0.0147 crit_late:+0.0148 sb_late:+0.0290 sb_wide_late:+0.0298 split_identity_late:+0.0066 split_sb_late:+0.0208 split24_sb_late:+0.0074  | 
+adi__adi_kernel3 ptxas_dup:+0.0004 identity_late:-0.0058 crit_late:-0.0043 sb_late:-0.0036 sb_wide_late:-0.0050  | split_identity_late:seed -1: bitwise mismatch split_sb_late:seed -1: bitwise mismatch split24_sb_late:seed -1: bitwise mismatch
+adi__adi_kernel4 ptxas_dup:+0.0298 identity_late:+0.0016 crit_late:+0.0151 sb_late:+0.0441 sb_wide_late:-0.0006 split_identity_late:+0.0145 split_sb_late:+0.0077 split24_sb_late:+0.0079  | 
+adi__adi_kernel5 ptxas_dup:+0.0146 identity_late:-0.0588 crit_late:+0.0154 sb_late:-0.0069 sb_wide_late:-0.0074 split_identity_late:+0.0083 split_sb_late:-0.0065 split24_sb_late:+0.0077  | 
+adi__adi_kernel6 ptxas_dup:-0.0283 identity_late:-0.0359 crit_late:-0.0362 sb_late:-0.0205 sb_wide_late:-0.0503 split_identity_late:-0.0872 split_sb_late:-0.0133 split24_sb_late:-0.0580  | 
+atax__atax_kernel1 ptxas_dup:-0.0009 identity_late:+0.0017 crit_late:-0.0010 sb_late:+0.0002 sb_wide_late:-0.0021 split_identity_late:+0.0000 split_sb_late:-0.0023 split24_sb_late:-0.0012  | 
+atax__atax_kernel2 ptxas_dup:+0.0281 identity_late:+0.0210 crit_late:+0.0257 sb_late:+0.0342 sb_wide_late:+0.0156 split_identity_late:+0.0349 split_sb_late:+0.0228 split24_sb_late:+0.0144  | 
+bicg__bicg_kernel1 ptxas_dup:-0.0008 identity_late:+0.0155 crit_late:-0.0045 sb_late:+0.0113 sb_wide_late:+0.0226 split_identity_late:-0.0198 split_sb_late:+0.0168 split24_sb_late:+0.0170  | 
+bicg__bicg_kernel2 ptxas_dup:+0.0002 identity_late:-0.0000 crit_late:-0.0023 sb_late:-0.0011 sb_wide_late:-0.0019 split_identity_late:+0.0000 split_sb_late:-0.0018 split24_sb_late:-0.0028  | 
+corr__mean_kernel ptxas_dup:+0.0002 identity_late:-0.0004 crit_late:-0.0000 sb_late:-0.0004 sb_wide_late:-0.0001 split_identity_late:-0.0004 split_sb_late:-0.0006 split24_sb_late:-0.0002  | 
+corr__std_kernel ptxas_dup:-0.0000 identity_late:-0.0001 crit_late:-0.0005 sb_late:-0.0001 sb_wide_late:-0.0004 split_identity_late:-0.0002 split_sb_late:+0.0001 split24_sb_late:-0.0002  | 
+corr__reduce_kernel ptxas_dup:-0.0049 identity_late:-0.0048 crit_late:-0.0028 sb_late:-0.0015 sb_wide_late:-0.0049 split_identity_late:-0.0035 split_sb_late:-0.0007 split24_sb_late:-0.0028  | 
+corr__corr_kernel ptxas_dup:+0.0003 identity_late:+0.0003 crit_late:+0.0000 sb_late:-0.0014 sb_wide_late:-0.0006 split_identity_late:+0.0001 split_sb_late:-0.0001 split24_sb_late:+0.0001  | 
+covar__mean_kernel ptxas_dup:-0.0001 identity_late:+0.0004 crit_late:-0.0002 sb_late:-0.0004 sb_wide_late:-0.0008 split_identity_late:-0.0002 split_sb_late:-0.0003 split24_sb_late:-0.0003  | 
+covar__reduce_kernel ptxas_dup:+0.0041 identity_late:+0.0028 crit_late:+0.0001 sb_late:-0.0041 sb_wide_late:+0.0021 split_identity_late:+0.0021 split_sb_late:-0.0027 split24_sb_late:+0.0035  | 
+covar__covar_kernel ptxas_dup:+0.0034 identity_late:+0.0030 crit_late:+0.0036 sb_late:+0.0000 sb_wide_late:+0.0025 split_identity_late:+0.0008 split_sb_late:+0.0017 split24_sb_late:+0.0045  | 
+fdtd-2d__fdtd_step1_kernel ptxas_dup:-0.0005 identity_late:+0.0005 crit_late:-0.0004 sb_late:+0.0019 sb_wide_late:-0.0004 split_identity_late:+0.0000 split_sb_late:+0.0005 split24_sb_late:+0.0005  | 
+fdtd-2d__fdtd_step2_kernel ptxas_dup:+0.0000 identity_late:-0.0000 crit_late:+0.0005 sb_late:-0.0023 sb_wide_late:-0.0009 split_identity_late:-0.0004 split_sb_late:-0.0014 split24_sb_late:-0.0005  | 
+fdtd-2d__fdtd_step3_kernel ptxas_dup:-0.0003 identity_late:-0.0007 crit_late:+0.0004 sb_late:+0.0000 sb_wide_late:-0.0007 split_identity_late:-0.0010 split_sb_late:-0.0000 split24_sb_late:+0.0007  | 
+gemm__gemm_kernel ptxas_dup:-0.0004 identity_late:+0.0001 crit_late:-0.0013 sb_late:-0.0006 sb_wide_late:+0.0002 split_identity_late:-0.0005 split_sb_late:+0.0005 split24_sb_late:+0.0005  | 
+gemver__gemver_kernel1 ptxas_dup:+0.0004 identity_late:-0.0012 crit_late:+0.0012 sb_late:+0.0009 sb_wide_late:+0.0013 split_identity_late:+0.0008 split_sb_late:-0.0005 split24_sb_late:+0.0008  | 
+gemver__gemver_kernel2 ptxas_dup:-0.0030 identity_late:-0.0135 crit_late:-0.0231 sb_late:-0.0155 sb_wide_late:-0.0151 split_identity_late:-0.0007 split_sb_late:+0.0357 split24_sb_late:+0.0226  | 
+gemver__gemver_kernel3 ptxas_dup:-0.0021 identity_late:-0.0039 crit_late:-0.0057 sb_late:-0.0053 sb_wide_late:+0.0034 split_identity_late:+0.0016 split_sb_late:+0.0028 split24_sb_late:+0.0007  | 
+gesummv__gesummv_kernel ptxas_dup:-0.0013 identity_late:-0.0046 crit_late:-0.0206 sb_late:-0.0042 sb_wide_late:-0.0029 split_identity_late:-0.0225 split_sb_late:-0.0051 split24_sb_late:-0.0002  | 
+gramschm__gramschmidt_kernel1 ptxas_dup:+0.0079 identity_late:+0.0057 crit_late:+0.0034 sb_late:+0.0011 sb_wide_late:+0.0022 split_identity_late:+0.0034 split_sb_late:+0.0033 split24_sb_late:+0.0079  | 
+gramschm__gramschmidt_kernel2 ptxas_dup:-0.0298 identity_late:-0.0221 crit_late:+0.0071 sb_late:-0.0005 sb_wide_late:-0.0069 split_identity_late:-0.0287 split_sb_late:-0.0221 split24_sb_late:+0.0304  | 
+gramschm__gramschmidt_kernel3 ptxas_dup:-0.0148 identity_late:-0.0095 crit_late:-0.0004 sb_late:-0.0008 sb_wide_late:-0.0014 split_identity_late:-0.0081 split_sb_late:-0.0012 split24_sb_late:-0.0016  | 
+jacobi1d__runJacobiCUDA_kernel1 ptxas_dup:+0.0073 identity_late:-0.0163 crit_late:-0.0070 sb_late:-0.0368 sb_wide_late:+0.0153 split_identity_late:-0.0001 split_sb_late:+0.0281 split24_sb_late:+0.0214  | 
+jacobi1d__runJacobiCUDA_kernel2 ptxas_dup:-0.0122 identity_late:-0.0243 crit_late:-0.0122 sb_late:-0.0000 sb_wide_late:-0.0061 split_identity_late:-0.0000 split_sb_late:-0.0061 split24_sb_late:-0.0122  | 
+jacobi2d__runJacobiCUDA_kernel1 ptxas_dup:-0.0109 identity_late:-0.0084 crit_late:-0.0029 sb_late:+0.0052 sb_wide_late:-0.0001 split_identity_late:-0.0027 split_sb_late:-0.0057 split24_sb_late:-0.0134  | 
+jacobi2d__runJacobiCUDA_kernel2 ptxas_dup:-0.0051 identity_late:+0.0003 crit_late:+0.0137 sb_late:+0.0056 sb_wide_late:+0.0083 split_identity_late:+0.0109 split_sb_late:+0.0002 split24_sb_late:+0.0109  | 
+lu__lu_kernel1 ptxas_dup:-0.0226 identity_late:-0.0741 crit_late:-0.0070 sb_late:-0.0599 sb_wide_late:-0.0144 split_identity_late:-0.0364 split_sb_late:-0.0228 split24_sb_late:-0.0149  | 
+lu__lu_kernel2 ptxas_dup:+0.0040 identity_late:+0.0007 crit_late:+0.0006 sb_late:+0.0040 sb_wide_late:+0.0013 split_identity_late:+0.0033 split_sb_late:+0.0014 split24_sb_late:+0.0027  | 
+mvt__mvt_kernel1 ptxas_dup:-0.0009 identity_late:-0.0017 crit_late:-0.0034 sb_late:-0.0007 sb_wide_late:-0.0011 split_identity_late:-0.0011 split_sb_late:-0.0008 split24_sb_late:-0.0001  | 
+mvt__mvt_kernel2 ptxas_dup:-0.0063 identity_late:-0.0002 crit_late:-0.0008 sb_late:-0.0279 sb_wide_late:-0.0016 split_identity_late:-0.0007 split_sb_late:-0.0149 split24_sb_late:-0.0009  | 
+syr2k__syr2k_kernel ptxas_dup:-0.0030 identity_late:+0.0010 crit_late:+0.0008 sb_late:-0.0006 sb_wide_late:-0.0044 split_identity_late:+0.0041 split_sb_late:-0.0005 split24_sb_late:+0.0032  | 
+syrk__syrk_kernel ptxas_dup:-0.0037 identity_late:+0.0022 crit_late:-0.0023 sb_late:-0.0102 sb_wide_late:-0.0019 split_identity_late:-0.0118 split_sb_late:+0.0052 split24_sb_late:-0.0054  | 
+wrote C:\Users\LukeB\.pcslurm\worktrees\claude-optsel-20261114-133325-256607\job-optsel-poly-20261114-134354-644685\data\optsel\poly_v2.json

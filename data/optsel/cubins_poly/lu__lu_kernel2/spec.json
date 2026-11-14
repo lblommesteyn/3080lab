@@ -1,0 +1,1 @@
+{"kernel": "lu_kernel2", "params": [{"name": "n", "kind": "scalar", "type": "int"}, {"name": "A", "kind": "ptr", "type": "float", "const": false}, {"name": "k", "kind": "scalar", "type": "int"}], "counts": {"A": 4460544}, "scalars": {"n": 2048, "k": 1}, "smem": 0, "grid": [64, 256, 1], "block": [32, 8, 1], "int_range": [0, 1024]}

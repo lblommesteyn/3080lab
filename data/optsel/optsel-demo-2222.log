@@ -1,0 +1,13 @@
+3dconv     base:ok 23us x1.000  graph:ok 17us x1.294  fused:ok 23us x1.000  fused_graph:ok 18us x1.222  base_dup:ok 23us x1.000
+atax       base:ok 252us x1.000  graph:ok 255us x0.988  fused:ok 251us x1.004  fused_graph:ok 255us x0.988  base_dup:ok 251us x1.004
+bicg       base:ok 384us x1.000  graph:ok 387us x0.993  fused:ok 184us x2.083  fused_graph:ok 189us x2.027  base_dup:ok 383us x1.003
+corr       base:ok 44534us x1.000  graph:ok 44554us x1.000  fused:ok 44260us x1.006  fused_graph:ok 43586us x1.022  base_dup:ok 43104us x1.033
+covar      base:ok 46388us x1.000  graph:ok 44865us x1.034  fused:ok 45458us x1.020  fused_graph:ok 45741us x1.014  base_dup:ok 45403us x1.022
+fdtd-2d    base:ok 222us x1.000  graph:ok 82us x2.709  fused:ok 141us x1.571  fused_graph:ok 70us x3.187  base_dup:ok 221us x1.003
+gemver     base:ok 243us x1.000  graph:ok 246us x0.990  fused:ok 244us x0.998  fused_graph:ok 245us x0.994  base_dup:ok 244us x0.998
+gramschm   base:ok 1298us x1.000  graph:ok 1243us x1.044  fused:ok 1300us x0.998  fused_graph:ok 1268us x1.024  base_dup:ok 1293us x1.004
+jacobi1d   base:ok 95us x1.000  graph:ok 31us x3.083  fused:ok 98us x0.967  fused_graph:ok 31us x3.083  base_dup:ok 90us x1.051
+jacobi2d   base:ok 116us x1.000  graph:ok 35us x3.324  fused:ok 119us x0.970  fused_graph:ok 35us x3.324  base_dup:ok 118us x0.983
+lu         base:ok 100us x1.000  graph:ok 34us x2.955  fused:ok 99us x1.009  fused_graph:ok 34us x2.955  base_dup:ok 99us x1.005
+mvt        base:ok 252us x1.000  graph:ok 256us x0.984  fused:ok 188us x1.337  fused_graph:ok 194us x1.302  base_dup:ok 252us x1.000
+wrote C:\Users\LukeB\.pcslurm\worktrees\claude-optsel-20261114-133325-256607\job-optsel-demo-20261114-145631-920817\data\optsel\demo_small.json
