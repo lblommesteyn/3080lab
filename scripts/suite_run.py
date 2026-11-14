@@ -37,7 +37,20 @@ VARIANTS = {"sb": dict(policy="sb"), "sb_wide": dict(policy="sb_wide"), "crit": 
             "crit_loops": dict(policy="crit", only_loops=True), "random": dict(policy="random"),
             "identity": dict(policy="identity"), "identity_late": dict(policy="identity", late_entry=True, sticky_waits=True),
             "crit_late": dict(policy="crit", late_entry=True, sticky_waits=True), "sb_late": dict(policy="sb", late_entry=True, sticky_waits=True),
-            "sb_wide_late": dict(policy="sb_wide", late_entry=True, sticky_waits=True)}
+            "sb_wide_late": dict(policy="sb_wide", late_entry=True, sticky_waits=True),
+            # lab/jointra: split hot-loop webs on false edges of the critical path into spare registers first
+            "split_identity_late": dict(policy="identity", late_entry=True, sticky_waits=True, split=8),
+            "split_sb_late": dict(policy="sb", late_entry=True, sticky_waits=True, split=8),
+            "split24_sb_late": dict(policy="sb", late_entry=True, sticky_waits=True, split=24)}
+
+
+def transform(cubin: bytes, v: str) -> bytes:
+    kw = dict(VARIANTS[v])
+    extra = kw.pop("split", None)
+    if extra:
+        from lab import jointra
+        cubin = jointra.split_crit(cubin, "k", extra=extra)[0]
+    return resched.reschedule(cubin, "k", **kw)[0]
 FLUSH_BYTES = 64 << 20
 FLUSH_SRC = r"""
 extern "C" __global__ void flush(const float4* p, int n, float* sink) {
@@ -148,7 +161,7 @@ def main():
             ok = []
             for v in variants:
                 try:
-                    cub = b.cubin if v == "ptxas" else resched.reschedule(b.cubin, "k", **VARIANTS[v])[0]
+                    cub = b.cubin if v == "ptxas" else transform(b.cubin, v)
                 except Exception as e:                                # noqa: BLE001
                     res["variants"][v] = {"status": "build_failed", "error": f"{type(e).__name__}: {e}"[:600]}
                     continue

@@ -153,9 +153,12 @@ class ReschedRandom(RandomKernels):
     def variants(self, opts: dict) -> list[Variant]:
         out = []
         for v in super().variants(opts):
-            for pol in ("ptxas", "crit", "random", "identity", "sb", "sb_wide",
-                        "identity_ptxreuse", "identity_noreuse", "rename_crit",
-                        "identity_late", "crit_late", "sb_late"):
+            pols = ("ptxas", "crit", "random", "identity", "sb", "sb_wide",
+                    "identity_ptxreuse", "identity_noreuse", "rename_crit",
+                    "identity_late", "crit_late", "sb_late", "split_identity_late", "split_sb_late")
+            if opts.get("policies"):
+                pols = ("ptxas",) + tuple(p for p in str(opts["policies"]).split(",") if p != "ptxas")
+            for pol in pols:
                 out.append(Variant(f"{v.label}/{pol}", dict(v.params, policy=pol)))
         return out
 
@@ -176,6 +179,11 @@ class ReschedRandom(RandomKernels):
         if pol == "rename_crit":
             cubin = regalloc.apply(cubin, regalloc.optimize(cubin, "k", seed=v.params["seed"]), "k")
             pol = "crit"
+        # split_* (Nov 14): lab/jointra splits hot-loop webs on false edges of the critical path first
+        if pol.startswith("split_"):
+            from lab import jointra
+            cubin = jointra.split_crit(cubin, "k", extra=8)[0]
+            pol = pol.removeprefix("split_")
         # *_late (Oct 21): waits on values from earlier blocks stay at ptxas's position, not block entry,
         # and a wait already resolved by an earlier wait in the block is not repeated (sticky)
         late = pol.endswith("_late")
@@ -189,4 +197,6 @@ def registry():
     b = RandomKernels(seed0=2000)  # held-out set for model versions tuned on set A
     b.name = "rand_kernels_b"
     c = ReschedRandom()
-    return {a.name: a, b.name: b, c.name: c}
+    d = ReschedRandom(seed0=3000)  # held out (Nov 14): never generated while building lab/jointra
+    d.name = "resched_rand_b"
+    return {a.name: a, b.name: b, c.name: c, d.name: d}

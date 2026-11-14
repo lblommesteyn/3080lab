@@ -93,7 +93,8 @@ def cmd_run(a):
         if a.ptxas is not None:
             exp.ptxas_flags = a.ptxas.split()
         opts = {"force": a.force, "trials": a.trials, "warps": _ints(a.warps), "iters": a.iters,
-                "seed": a.seed, "lock_clock": a.lock_clock, "sizes": _sizes(a.sizes), "cold": a.cold}
+                "seed": a.seed, "lock_clock": a.lock_clock, "sizes": _sizes(a.sizes), "cold": a.cold,
+                "policies": a.policies, "n": a.n}
         try:
             rec = runner.run(exp, opts)
             print(runner.report(rec), flush=True)
@@ -164,6 +165,8 @@ def main(argv=None):
     r.add_argument("--warps", help="comma list, e.g. 1,4,8")
     r.add_argument("--iters", type=int, help="ops per chain per thread (default 10M)")
     r.add_argument("--seed", type=int)
+    r.add_argument("--policies", help="resched_rand*: comma list of policies to run (ptxas always first)")
+    r.add_argument("--n", type=int, help="resched_rand*: number of random kernels")
     r.add_argument("--sizes", help="working sets for chase experiments, e.g. 4k,64k,1m,64m")
     r.add_argument("--cold", action="store_true", help="chase: skip the warm walk")
     r.add_argument("--lock-clock", type=int, help="try nvidia-smi -lgc MHz (needs admin)")

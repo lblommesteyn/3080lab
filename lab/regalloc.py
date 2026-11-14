@@ -175,6 +175,15 @@ def webs(g: dict) -> dict:
             find(key)
         for a, b in zip(keys, keys[1:]):
             union(a, b)
+    # a predicated write keeps the old value when its guard is false: its implicit read and its write
+    # share one operand field, so the write must live in the same web as the value it may preserve
+    for k, lst in enumerate(g["occs"]):
+        for o in lst:
+            if o.is_def:
+                for u in lst:
+                    if not u.is_def and u.tok == o.tok and u.reg == o.reg:
+                        for d in uses.get((k, u.tok, u.reg), ()):
+                            union((k, o.reg), (d, o.reg))
     web_of_def = {key: find(key) for key in parent}
     # occurrence -> web id
     occ_web = {}
