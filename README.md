@@ -1265,6 +1265,67 @@ The wins that do exist (1.02 to 1.04 on low-occupancy seeds) come from control w
 ptxas sometimes stalls 6 cycles on FFMA -> MUFU where 4 is enough. Beating ptxas by 1.05x needs
 something block-local reordering cannot reach, such as register allocation or cross-block motion.
 
+**Joint register allocation + scheduling: negative (Nov 14, `lab/jointra.py`, `data/ra/`).** I tested
+both of the levers named above. Neither gives a measurable gain.
+
+*Static headroom first* (CPU only: `scripts/ra_headroom.py`, `ra_reuse_probe.py`, `swp_headroom.py`):
+
+| lever | what was measured | headroom |
+|---|---|---|
+| bank-aware recoloring | register-read cycles of each hot loop, ptxas vs annealed web recoloring | 6 of 51 loops improve, by 1 cycle each; ptxas is within 3-5% of a rough floor |
+| more reuse-cache hits through order | the same cost over 30 random legal orders | about 3% fewer reads at best, and only by ignoring latency |
+| removing false WAR/WAW edges | loop critical path with every dependence vs without register WAR/WAW (memory order kept) | 6% geomean; large on scan_block (2.07x), gemv, nbody, spmv_csr |
+| software pipelining | one-trip critical path vs max(recurrence, cross-trip memory order, issue) | random kernels 0.97 (dev) and 1.006 (held-out); the suite loops with room are DRAM-bound (gemv 700 GB/s, reduce 655 GB/s) or run 1-2 trips (spmv_csr) |
+
+Register reads do bind on high-throughput kernels. Stripping reuse flags costs 6.2% (up to 12%) on
+the 15 random kernels where ptxas reaches 2.8+ IPC, and 0.3% below IPC 1. But ptxas's allocation
+already sits near that floor.
+
+*Prototype.* `jointra.split_crit` takes each WAR/WAW edge on a loop's critical path and moves the
+later definition's web into a spare register (8 extra). It repeats while the path shrinks, then
+`resched` sb_late rebuilds the DAG from the renamed code. Every rename must pass `regalloc.prove`
+(each use keeps its reaching definitions) and `verify.new_hazards`. The proof caught a soundness gap
+in `regalloc.webs`: a predicated write and its implicit read of the old value were in different webs.
+That is fixed. CPU dry run over 100 kernels: 0 refusals, 0 new hazards.
+
+*GPU* (jobs 2210-2214; `data/suite/ra_suite*.json`, `ra_scan.json`, logs in `data/ra/`). Random-kernel
+timings are trial medians (CV < 1%). A kernel counts as improved only if its p05-p95 range clears
+ptxas's by more than 1%.
+
+| geomean vs ptxas | random dev (40) | random held-out, seed 3000+ (40) | suite (16-19) |
+|---|---|---|---|
+| identity_late (existing best) | 1.003 | 1.000 | 0.999 |
+| sb_late (existing scheduler) | 0.995 | **0.966** | 0.999 |
+| renaming only (split_identity_late) | 1.003 | 0.998 | 0.998 |
+| joint (split_sb_late) | 0.996 | 0.967 | 1.000 |
+| renaming vs identity_late, kernels improved / regressed | 0 / 0 | 0 / 1 | - |
+
+- **0 correctness failures:** every variant is bitwise equal to ptxas on all 80 random kernels and
+  every timed suite case.
+- **The best static case does not convert.** scan_block's critical path drops from 87 to 47 cycles,
+  and it measures 1.000 (renaming only) and 0.996 (joint). It is a barrier-synchronized loop with 32
+  warps per block, so other warps hide the shorter per-warp path.
+- **24 spare registers lose 3%** on the suite (0.969): the extra registers cost occupancy.
+- **sb_late does not generalize.** It was developed on seeds 1000-1039. On the unseen seeds it loses
+  16-18 of 40 kernels, down to 0.75x. Joint is the same, because the reorder decides the result.
+- **A/A check on noise.** On softmax no web moves, so split_identity_late is the same binary as
+  identity_late. They measured 1.035 and 0.997 in the same interleaved run, so suite differences
+  under about 4% on that kernel are noise. Bootstrap intervals that resample rounds are too narrow
+  there.
+
+*Why it fails, at the SASS level.*
+- At high occupancy, other warps hide the latency that false dependences add. Throughput is then
+  bound by register-file reads, and ptxas's allocation is already near that floor.
+- At low occupancy, the loops are true recurrences such as accumulator chains, which renaming cannot
+  shorten.
+- The loops where renaming would expose parallelism are DRAM-bound or run only a couple of trips.
+
+*Recommendation: abandon joint RA + scheduling and SASS software pipelining on this corpus.*
+Reproduce: `python scripts/ra_headroom.py`, `python scripts/swp_headroom.py`,
+`python scripts/suite_run.py variants=ptxas,identity_late,sb_late,split_identity_late,split_sb_late out=ra_suite`,
+`python -m lab.cli run resched_rand_b --policies identity_late,sb_late,split_identity_late,split_sb_late`,
+then `scripts/ra_report.py` and `scripts/rand_report.py` on the outputs.
+
 **Cross-kernel optimizer** (`lab/xkernel.py`, `data/xkernel/polybench.json`). Vertical (thread-local)
 and horizontal (grid-concatenated) fusion of adjacent launches, plus CUDA graph capture, on the 12
 multi-kernel PolyBench programs. All outputs bitwise identical to the original. Geomean of fused +
