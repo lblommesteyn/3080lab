@@ -32,7 +32,7 @@ from lab import toolchain, xkernel  # noqa: E402
 
 import os  # noqa: E402
 KDIR = Path(os.environ.get("XK_KDIR", ROOT / "vendor" / "ext_kernels"))
-HOST = ROOT / "vendor" / "polybenchGpu" / "CUDA"
+HOST = Path(os.environ.get("XK_HOST", ROOT / "vendor" / "polybenchGpu" / "CUDA"))
 OUT = ROOT / "data" / "xkernel"
 LOOPS = {"FDTD-2D": ("t", range(10)), "JACOBI1D": (None, range(10)), "JACOBI2D": (None, range(10)),
          "GRAMSCHM": ("k", range(8)), "LU": ("k", range(8)), "3DCONV": ("i", range(1, 9))}
