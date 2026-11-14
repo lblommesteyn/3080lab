@@ -89,7 +89,7 @@ def sim(body, warps: int) -> float | None:
 
 
 def sass_decision(base: bytes, cand: bytes, *, warps_sm: int, regs_base: int, regs_cand: int,
-                  occ_base: int, occ_cand: int, ctx: dict) -> dict:
+                  occ_base: int, occ_cand: int, ctx: dict, kernel: str = "k") -> dict:
     """Features for a SASS-level transformation (same launch, different binary)."""
     hb, hc = hot(base), hot(cand)
     sb, sc = loop_stats(hb), loop_stats(hc)
@@ -105,6 +105,35 @@ def sass_decision(base: bytes, cand: bytes, *, warps_sm: int, regs_base: int, re
          "changed": int(base != cand),
          "d_launch_frac": 0.0, "bw_frac": ctx.get("bw_frac", 0.0),
          "hw_pred": math.log(pb / pc) if pb and pc else 0.0}
+    return f
+
+
+def resident_warps(regs: int, threads: int, smem: int, grid_blocks: int, sms: int = 68) -> int:
+    """Warps per SM actually resident: occupancy limit, capped by how many blocks the grid gives each SM."""
+    from .model_gpu import resident_warps_per_sm
+    wpb = (threads + 31) // 32
+    lim = resident_warps_per_sm(regs, threads, smem)
+    return max(1, min(lim, -(-grid_blocks // sms) * wpb))
+
+
+def fusion_pred(t_base_us: float, launches_base: int, launches_cand: int, graph: bool, gap: dict) -> float:
+    """Launch-cost hardware model for fusion / CUDA graphs: each launch removed saves one stream launch
+    gap; a graph turns every remaining stream gap into a graph gap. gap = {"stream": us, "graph": us}
+    from scripts/launch_gap.py (dependent back-to-back launches, same Python launch path)."""
+    saved = (launches_base - launches_cand) * gap["stream"]
+    if graph:
+        saved += launches_cand * (gap["stream"] - gap["graph"])
+    t = max(t_base_us - saved, 0.05 * t_base_us)
+    return math.log(t_base_us / t)
+
+
+def fusion_decision(t_base_us, launches_base, launches_cand, graph, gap, shared_frac):
+    f = {k: 0.0 for k in FEATURES}
+    f.update(kind_fusion=1, kind_sass=0, changed=1,
+             d_launch_frac=(launches_base - launches_cand) / launches_base,
+             d_n=math.log(max(launches_cand, 1) / launches_base),
+             hw_pred=fusion_pred(t_base_us, launches_base, launches_cand, graph, gap),
+             bw_frac=shared_frac)
     return f
 
 

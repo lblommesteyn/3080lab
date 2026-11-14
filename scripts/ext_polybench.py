@@ -59,8 +59,9 @@ def fetch():
     subprocess.run(["git", "-C", str(VENDOR), "checkout", "-q", COMMIT], check=True)
 
 
-def extract():
-    SRC, DST = VENDOR / "CUDA", KDIR
+def extract(scale: int = 1, dst=None):
+    """scale > 1 divides every dataset size by `scale` (Nov 14 optsel demo: an unseen problem size)."""
+    SRC, DST = VENDOR / "CUDA", Path(dst) if dst else KDIR
     DST.mkdir(parents=True, exist_ok=True)
     manifest = []
     for d in sorted(p for p in SRC.iterdir() if p.is_dir()):
@@ -70,6 +71,9 @@ def extract():
             continue
         t_cu, t_cuh = cu.read_text(errors="replace"), cuh.read_text(errors="replace")
         sizes = std_defines(t_cuh)
+        if scale > 1:
+            sizes = {k: str(max(1, int(eval(v, {}, {})) // scale)) if re.fullmatch(r"[\d ()*+/-]+", v) else v
+                     for k, v in sizes.items()}
         defs = {**simple_defines(t_cu), **sizes}
         defs.pop("RUN_ON_CPU", None)
         devs = "\n\n".join(body for _, _, body in functions(t_cu, r"__device__"))

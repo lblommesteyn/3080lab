@@ -45,3 +45,12 @@ when confidence < c keep the baseline, report realised gain and risk (losses tak
 
 ## Rules
 Never tune on test families. Every run's raw data stays in data/optsel/. Negative results are reported.
+
+## Addendum (Nov 14, before the demo run was measured): guided decision on an unseen problem size
+Workload: the 12 multi-kernel PolyBench programs at 1/4 of every dataset dimension
+(`ext_polybench.extract(scale=4)`, vendor/ext_kernels_s4), never measured before. Per program the choice is
+one of {base, graph, fused, fused_graph}. Measured by scripts/xkernel_bench.py with an A/A arm (base_dup,
+XK_AA=1) into data/optsel/demo_small.json. Each predictor, fit on all five benchmark families (nothing from
+this run), picks the highest-scoring option whose score > tau, else base; inputs are static features and
+the measured base time only. Reported: realised speedup per predictor vs never, always-fused_graph and
+the oracle, plus how many programs each predictor sends to a slower configuration than base.

@@ -30,7 +30,8 @@ import torch  # noqa: E402
 
 from lab import toolchain, xkernel  # noqa: E402
 
-KDIR = ROOT / "vendor" / "ext_kernels"
+import os  # noqa: E402
+KDIR = Path(os.environ.get("XK_KDIR", ROOT / "vendor" / "ext_kernels"))
 HOST = ROOT / "vendor" / "polybenchGpu" / "CUDA"
 OUT = ROOT / "data" / "xkernel"
 LOOPS = {"FDTD-2D": ("t", range(10)), "JACOBI1D": (None, range(10)), "JACOBI2D": (None, range(10)),
@@ -84,8 +85,11 @@ def programs():
 
 def variants(prog):
     fused, log = xkernel.plan(prog["launches"])
-    return {"base": (prog["launches"], False), "graph": (prog["launches"], True),
-            "fused": (fused, False), "fused_graph": (fused, True)}, log
+    vs = {"base": (prog["launches"], False), "graph": (prog["launches"], True),
+          "fused": (fused, False), "fused_graph": (fused, True)}
+    if os.environ.get("XK_AA"):                       # A/A arm: the base sequence again, its own buffers
+        vs["base_dup"] = (list(prog["launches"]), False)
+    return vs, log
 
 
 def _scal(info, a, pname):
@@ -242,7 +246,7 @@ def cmd_run(rounds):
             if v == "base":
                 base = r["sha"]
             st = "ok" if r["sha"] == base else "bitwise_mismatch"
-            if v != "base" and vs[v][0] is vs["base"][0] and not vs[v][1]:
+            if v != "base" and (vs[v][0] is vs["base"][0] or v == "base_dup") and not vs[v][1]:
                 st = "ok"
             row["variants"][v] = {"status": st, "sha": r["sha"]}
             if st == "ok":
@@ -263,8 +267,10 @@ def cmd_run(rounds):
         for v, i in row["variants"].items():
             if i["status"] != "ok":
                 print(f"    {v}: {i['status']} {i.get('error', '')[-300:]}", flush=True)
-    (OUT / "polybench.json").write_text(json.dumps(res, indent=1))
-    print(f"wrote {OUT / 'polybench.json'}")
+    dst = ROOT / os.environ.get("XK_OUT", str(OUT / "polybench.json"))
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.write_text(json.dumps(res, indent=1))
+    print(f"wrote {dst}")
 
 
 if __name__ == "__main__":
