@@ -65,7 +65,7 @@ def main():
             bf = (med["m0b0"] + med["m1b0"]) / (med["m0b1"] + med["m1b1"])
             print(f"{n:12s} proc{p} " + " ".join(f"{a} {m:.1f}" for a, m in med.items()) +
                   f"  module m0/m1 {mod:.4f}  buffers b0/b1 {bf:.4f}", flush=True)
-    dst = ROOT / kv.get("out", "data/optsel/aa_noise.json")
+    dst = ROOT / kv.get("out", "data/optsel/aa_noise.json"); dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_text(json.dumps(out)); print("wrote", dst)
 
 
