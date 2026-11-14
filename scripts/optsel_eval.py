@@ -19,6 +19,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.append(r"C:\Users\LukeB\dev\3080lab\.venv\Lib\site-packages")
 from lab.optsel import FEATURES  # noqa: E402
 
 TAU = 0.01
@@ -289,6 +290,8 @@ def table(out):
 def main():
     kv = dict(a.split("=", 1) for a in sys.argv[1:] if "=" in a)
     split = kv.get("split", "frozen")
+    global TAU
+    TAU = float(kv.get("tau", TAU))                    # sensitivity runs only; the protocol's tau is 0.01
     out = run(split)
     dst = ROOT / kv.get("out", f"data/optsel/eval_{split}.json")
     dst.write_text(json.dumps(out, indent=1))
