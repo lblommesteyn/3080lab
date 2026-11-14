@@ -34,12 +34,17 @@ class Case:
 
 
 def compare(out: np.ndarray, ref: np.ndarray, tol: tuple, frac: float = 0.0) -> dict:
-    out64, ref64 = out.astype(np.float64), np.asarray(ref, np.float64)
-    err = np.abs(out64 - ref64)
-    bad = ~(err <= tol[1] + tol[0] * np.abs(ref64))
-    bad_frac = float(bad.mean()) if bad.size else 0.0
-    return {"ok": bool(bad_frac <= frac), "max_abs": float(np.nanmax(err)) if err.size else 0.0,
-            "bad_frac": bad_frac}
+    # chunked: a 16M-element float64 temporary per step ran the host out of memory (Nov 14 2026)
+    out, ref = out.reshape(-1), np.asarray(ref).reshape(-1)
+    n_bad, max_abs, step = 0, 0.0, 1 << 20
+    for i in range(0, out.size, step):
+        o64, r64 = out[i:i + step].astype(np.float64), ref[i:i + step].astype(np.float64)
+        err = np.abs(o64 - r64)
+        n_bad += int(np.count_nonzero(~(err <= tol[1] + tol[0] * np.abs(r64))))
+        if err.size:
+            max_abs = max(max_abs, float(np.nanmax(err)))
+    bad_frac = n_bad / out.size if out.size else 0.0
+    return {"ok": bool(bad_frac <= frac), "max_abs": max_abs, "bad_frac": bad_frac}
 
 
 def _u(rng, shape, lo=-1.0, hi=1.0):
