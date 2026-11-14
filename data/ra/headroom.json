@@ -1,0 +1,623 @@
+[
+ {
+  "name": "seed1000",
+  "n_loop": 67,
+  "warps_sm": 32,
+  "cp_all": 118,
+  "cp_raw": 113,
+  "stall_sum": 123,
+  "rf_ptxas": 84,
+  "rf_best": 84,
+  "hot_webs": 65
+ },
+ {
+  "name": "seed1001",
+  "n_loop": 16,
+  "warps_sm": 32,
+  "cp_all": 88,
+  "cp_raw": 88,
+  "stall_sum": 60,
+  "rf_ptxas": 23,
+  "rf_best": 23,
+  "hot_webs": 13
+ },
+ {
+  "name": "seed1002",
+  "n_loop": 382,
+  "warps_sm": 48,
+  "cp_all": 486,
+  "cp_raw": 479,
+  "stall_sum": 502,
+  "rf_ptxas": 514,
+  "rf_best": 514,
+  "hot_webs": 380
+ },
+ {
+  "name": "seed1003",
+  "n_loop": 193,
+  "warps_sm": 48,
+  "cp_all": 369,
+  "cp_raw": 367,
+  "stall_sum": 353,
+  "rf_ptxas": 264,
+  "rf_best": 264,
+  "hot_webs": 191
+ },
+ {
+  "name": "seed1004",
+  "n_loop": 128,
+  "warps_sm": 16,
+  "cp_all": 230,
+  "cp_raw": 230,
+  "stall_sum": 231,
+  "rf_ptxas": 174,
+  "rf_best": 173,
+  "hot_webs": 126,
+  "sim_speedup": 0.9996818326439707
+ },
+ {
+  "name": "seed1005",
+  "n_loop": 255,
+  "warps_sm": 48,
+  "cp_all": 502,
+  "cp_raw": 502,
+  "stall_sum": 476,
+  "rf_ptxas": 337,
+  "rf_best": 337,
+  "hot_webs": 254
+ },
+ {
+  "name": "seed1006",
+  "n_loop": 99,
+  "warps_sm": 16,
+  "cp_all": 272,
+  "cp_raw": 271,
+  "stall_sum": 220,
+  "rf_ptxas": 137,
+  "rf_best": 137,
+  "hot_webs": 96
+ },
+ {
+  "name": "seed1007",
+  "n_loop": 35,
+  "warps_sm": 48,
+  "cp_all": 318,
+  "cp_raw": 318,
+  "stall_sum": 139,
+  "rf_ptxas": 48,
+  "rf_best": 48,
+  "hot_webs": 30
+ },
+ {
+  "name": "seed1008",
+  "n_loop": 286,
+  "warps_sm": 48,
+  "cp_all": 388,
+  "cp_raw": 388,
+  "stall_sum": 380,
+  "rf_ptxas": 375,
+  "rf_best": 375,
+  "hot_webs": 284
+ },
+ {
+  "name": "seed1009",
+  "n_loop": 126,
+  "warps_sm": 16,
+  "cp_all": 549,
+  "cp_raw": 549,
+  "stall_sum": 398,
+  "rf_ptxas": 178,
+  "rf_best": 178,
+  "hot_webs": 123
+ },
+ {
+  "name": "seed1010",
+  "n_loop": 251,
+  "warps_sm": 48,
+  "cp_all": 311,
+  "cp_raw": 290,
+  "stall_sum": 337,
+  "rf_ptxas": 306,
+  "rf_best": 306,
+  "hot_webs": 250
+ },
+ {
+  "name": "seed1011",
+  "n_loop": 50,
+  "warps_sm": 48,
+  "cp_all": 121,
+  "cp_raw": 113,
+  "stall_sum": 111,
+  "rf_ptxas": 64,
+  "rf_best": 63,
+  "hot_webs": 45,
+  "sim_speedup": 1.005566311713456
+ },
+ {
+  "name": "seed1012",
+  "n_loop": 99,
+  "warps_sm": 32,
+  "cp_all": 201,
+  "cp_raw": 185,
+  "stall_sum": 201,
+  "rf_ptxas": 142,
+  "rf_best": 142,
+  "hot_webs": 97
+ },
+ {
+  "name": "seed1013",
+  "n_loop": 131,
+  "warps_sm": 48,
+  "cp_all": 250,
+  "cp_raw": 249,
+  "stall_sum": 226,
+  "rf_ptxas": 179,
+  "rf_best": 179,
+  "hot_webs": 128
+ },
+ {
+  "name": "seed1014",
+  "n_loop": 192,
+  "warps_sm": 16,
+  "cp_all": 295,
+  "cp_raw": 295,
+  "stall_sum": 282,
+  "rf_ptxas": 240,
+  "rf_best": 240,
+  "hot_webs": 190
+ },
+ {
+  "name": "seed1015",
+  "n_loop": 64,
+  "warps_sm": 48,
+  "cp_all": 345,
+  "cp_raw": 345,
+  "stall_sum": 248,
+  "rf_ptxas": 98,
+  "rf_best": 98,
+  "hot_webs": 59
+ },
+ {
+  "name": "seed1016",
+  "n_loop": 193,
+  "warps_sm": 32,
+  "cp_all": 506,
+  "cp_raw": 506,
+  "stall_sum": 435,
+  "rf_ptxas": 264,
+  "rf_best": 264,
+  "hot_webs": 190
+ },
+ {
+  "name": "seed1017",
+  "n_loop": 258,
+  "warps_sm": 32,
+  "cp_all": 548,
+  "cp_raw": 548,
+  "stall_sum": 493,
+  "rf_ptxas": 342,
+  "rf_best": 342,
+  "hot_webs": 255
+ },
+ {
+  "name": "seed1018",
+  "n_loop": 251,
+  "warps_sm": 32,
+  "cp_all": 505,
+  "cp_raw": 505,
+  "stall_sum": 477,
+  "rf_ptxas": 315,
+  "rf_best": 315,
+  "hot_webs": 250
+ },
+ {
+  "name": "seed1019",
+  "n_loop": 35,
+  "warps_sm": 48,
+  "cp_all": 203,
+  "cp_raw": 203,
+  "stall_sum": 130,
+  "rf_ptxas": 49,
+  "rf_best": 49,
+  "hot_webs": 30
+ },
+ {
+  "name": "seed1020",
+  "n_loop": 67,
+  "warps_sm": 16,
+  "cp_all": 393,
+  "cp_raw": 393,
+  "stall_sum": 282,
+  "rf_ptxas": 101,
+  "rf_best": 101,
+  "hot_webs": 64
+ },
+ {
+  "name": "seed1021",
+  "n_loop": 189,
+  "warps_sm": 48,
+  "cp_all": 217,
+  "cp_raw": 209,
+  "stall_sum": 238,
+  "rf_ptxas": 240,
+  "rf_best": 240,
+  "hot_webs": 186
+ },
+ {
+  "name": "seed1022",
+  "n_loop": 96,
+  "warps_sm": 48,
+  "cp_all": 341,
+  "cp_raw": 341,
+  "stall_sum": 290,
+  "rf_ptxas": 130,
+  "rf_best": 130,
+  "hot_webs": 91
+ },
+ {
+  "name": "seed1023",
+  "n_loop": 257,
+  "warps_sm": 32,
+  "cp_all": 423,
+  "cp_raw": 422,
+  "stall_sum": 454,
+  "rf_ptxas": 298,
+  "rf_best": 297,
+  "hot_webs": 251,
+  "sim_speedup": 1.0093280632411068
+ },
+ {
+  "name": "seed1024",
+  "n_loop": 66,
+  "warps_sm": 48,
+  "cp_all": 483,
+  "cp_raw": 483,
+  "stall_sum": 264,
+  "rf_ptxas": 93,
+  "rf_best": 93,
+  "hot_webs": 60
+ },
+ {
+  "name": "seed1025",
+  "n_loop": 34,
+  "warps_sm": 16,
+  "cp_all": 93,
+  "cp_raw": 93,
+  "stall_sum": 85,
+  "rf_ptxas": 45,
+  "rf_best": 45,
+  "hot_webs": 31
+ },
+ {
+  "name": "seed1026",
+  "n_loop": 51,
+  "warps_sm": 48,
+  "cp_all": 254,
+  "cp_raw": 254,
+  "stall_sum": 190,
+  "rf_ptxas": 75,
+  "rf_best": 75,
+  "hot_webs": 47
+ },
+ {
+  "name": "seed1027",
+  "n_loop": 19,
+  "warps_sm": 16,
+  "cp_all": 113,
+  "cp_raw": 113,
+  "stall_sum": 68,
+  "rf_ptxas": 23,
+  "rf_best": 23,
+  "hot_webs": 16
+ },
+ {
+  "name": "seed1028",
+  "n_loop": 254,
+  "warps_sm": 48,
+  "cp_all": 591,
+  "cp_raw": 591,
+  "stall_sum": 512,
+  "rf_ptxas": 356,
+  "rf_best": 356,
+  "hot_webs": 252
+ },
+ {
+  "name": "seed1029",
+  "n_loop": 195,
+  "warps_sm": 48,
+  "cp_all": 343,
+  "cp_raw": 334,
+  "stall_sum": 319,
+  "rf_ptxas": 264,
+  "rf_best": 264,
+  "hot_webs": 193
+ },
+ {
+  "name": "seed1030",
+  "n_loop": 35,
+  "warps_sm": 48,
+  "cp_all": 254,
+  "cp_raw": 254,
+  "stall_sum": 143,
+  "rf_ptxas": 49,
+  "rf_best": 49,
+  "hot_webs": 31
+ },
+ {
+  "name": "seed1031",
+  "n_loop": 131,
+  "warps_sm": 48,
+  "cp_all": 137,
+  "cp_raw": 137,
+  "stall_sum": 148,
+  "rf_ptxas": 167,
+  "rf_best": 167,
+  "hot_webs": 130
+ },
+ {
+  "name": "seed1032",
+  "n_loop": 252,
+  "warps_sm": 32,
+  "cp_all": 441,
+  "cp_raw": 441,
+  "stall_sum": 427,
+  "rf_ptxas": 331,
+  "rf_best": 331,
+  "hot_webs": 251
+ },
+ {
+  "name": "seed1033",
+  "n_loop": 383,
+  "warps_sm": 32,
+  "cp_all": 481,
+  "cp_raw": 472,
+  "stall_sum": 576,
+  "rf_ptxas": 465,
+  "rf_best": 465,
+  "hot_webs": 381
+ },
+ {
+  "name": "seed1034",
+  "n_loop": 19,
+  "warps_sm": 32,
+  "cp_all": 74,
+  "cp_raw": 74,
+  "stall_sum": 66,
+  "rf_ptxas": 31,
+  "rf_best": 31,
+  "hot_webs": 16
+ },
+ {
+  "name": "seed1035",
+  "n_loop": 252,
+  "warps_sm": 48,
+  "cp_all": 271,
+  "cp_raw": 245,
+  "stall_sum": 301,
+  "rf_ptxas": 335,
+  "rf_best": 334,
+  "hot_webs": 251,
+  "sim_speedup": 1.002680965147453
+ },
+ {
+  "name": "seed1036",
+  "n_loop": 64,
+  "warps_sm": 32,
+  "cp_all": 139,
+  "cp_raw": 139,
+  "stall_sum": 128,
+  "rf_ptxas": 83,
+  "rf_best": 83,
+  "hot_webs": 62
+ },
+ {
+  "name": "seed1037",
+  "n_loop": 67,
+  "warps_sm": 48,
+  "cp_all": 509,
+  "cp_raw": 509,
+  "stall_sum": 283,
+  "rf_ptxas": 96,
+  "rf_best": 96,
+  "hot_webs": 63
+ },
+ {
+  "name": "seed1038",
+  "n_loop": 49,
+  "warps_sm": 16,
+  "cp_all": 324,
+  "cp_raw": 324,
+  "stall_sum": 188,
+  "rf_ptxas": 72,
+  "rf_best": 72,
+  "hot_webs": 43
+ },
+ {
+  "name": "seed1039",
+  "n_loop": 255,
+  "warps_sm": 32,
+  "cp_all": 338,
+  "cp_raw": 338,
+  "stall_sum": 316,
+  "rf_ptxas": 311,
+  "rf_best": 311,
+  "hot_webs": 253
+ },
+ {
+  "name": "suite:saxpy",
+  "n_loop": 0,
+  "warps_sm": 8,
+  "skip": "no loop"
+ },
+ {
+  "name": "suite:reduce",
+  "n_loop": 12,
+  "warps_sm": 8,
+  "cp_all": 71,
+  "cp_raw": 57,
+  "stall_sum": 57,
+  "rf_ptxas": 12,
+  "rf_best": 12,
+  "hot_webs": 6
+ },
+ {
+  "name": "suite:transpose",
+  "n_loop": 0,
+  "warps_sm": 8,
+  "skip": "no loop"
+ },
+ {
+  "name": "suite:stencil1d",
+  "n_loop": 0,
+  "warps_sm": 8,
+  "skip": "no loop"
+ },
+ {
+  "name": "suite:jacobi2d",
+  "n_loop": 0,
+  "warps_sm": 8,
+  "skip": "no loop"
+ },
+ {
+  "name": "suite:conv_row",
+  "n_loop": 0,
+  "warps_sm": 8,
+  "skip": "no loop"
+ },
+ {
+  "name": "suite:box_blur3",
+  "n_loop": 0,
+  "warps_sm": 8,
+  "skip": "no loop"
+ },
+ {
+  "name": "suite:gelu_fused",
+  "n_loop": 0,
+  "warps_sm": 8,
+  "skip": "no loop"
+ },
+ {
+  "name": "suite:histogram",
+  "n_loop": 9,
+  "warps_sm": 8,
+  "cp_all": 22,
+  "cp_raw": 22,
+  "stall_sum": 39,
+  "rf_ptxas": 9,
+  "rf_best": 9,
+  "hot_webs": 1
+ },
+ {
+  "name": "suite:gemv",
+  "n_loop": 55,
+  "warps_sm": 8,
+  "cp_all": 1014,
+  "cp_raw": 559,
+  "stall_sum": 179,
+  "rf_ptxas": 71,
+  "rf_best": 71,
+  "hot_webs": 50
+ },
+ {
+  "name": "suite:black_scholes",
+  "n_loop": 0,
+  "warps_sm": 8,
+  "skip": "no loop"
+ },
+ {
+  "name": "suite:spmv_csr",
+  "n_loop": 87,
+  "warps_sm": 8,
+  "cp_all": 1550,
+  "cp_raw": 1062,
+  "stall_sum": 250,
+  "rf_ptxas": 104,
+  "rf_best": 103,
+  "hot_webs": 59,
+  "sim_speedup": 1.0064935064935066
+ },
+ {
+  "name": "suite:softmax",
+  "n_loop": 60,
+  "warps_sm": 4,
+  "cp_all": 2175,
+  "cp_raw": 554,
+  "stall_sum": 178,
+  "rf_ptxas": 60,
+  "rf_best": 60,
+  "hot_webs": 51
+ },
+ {
+  "name": "suite:layernorm",
+  "n_loop": 134,
+  "warps_sm": 8,
+  "cp_all": 1573,
+  "cp_raw": 693,
+  "stall_sum": 419,
+  "rf_ptxas": 146,
+  "rf_best": 142,
+  "hot_webs": 78,
+  "ra_error": "RuntimeError('reaching definitions changed at ins 50 tok 0: [33] -> [38]')"
+ },
+ {
+  "name": "suite:scan_block",
+  "n_loop": 39,
+  "warps_sm": 32,
+  "cp_all": 87,
+  "cp_raw": 42,
+  "stall_sum": 118,
+  "rf_ptxas": 39,
+  "rf_best": 39,
+  "hot_webs": 30
+ },
+ {
+  "name": "suite:bitonic_block",
+  "n_loop": 0,
+  "warps_sm": 16,
+  "skip": "no loop"
+ },
+ {
+  "name": "suite:sgemm_tiled",
+  "n_loop": 336,
+  "warps_sm": 8,
+  "cp_all": 1284,
+  "cp_raw": 538,
+  "stall_sum": 480,
+  "rf_ptxas": 429,
+  "rf_best": 429,
+  "hot_webs": 269
+ },
+ {
+  "name": "suite:sgemm_naive",
+  "n_loop": 74,
+  "warps_sm": 8,
+  "cp_all": 540,
+  "cp_raw": 540,
+  "stall_sum": 197,
+  "rf_ptxas": 90,
+  "rf_best": 90,
+  "hot_webs": 43
+ },
+ {
+  "name": "suite:nbody",
+  "n_loop": 307,
+  "warps_sm": 8,
+  "cp_all": 510,
+  "cp_raw": 510,
+  "stall_sum": 775,
+  "rf_ptxas": 414,
+  "rf_best": 414,
+  "hot_webs": 207
+ },
+ {
+  "name": "suite:mandelbrot",
+  "n_loop": 11,
+  "warps_sm": 8,
+  "cp_all": 31,
+  "cp_raw": 31,
+  "stall_sum": 36,
+  "rf_ptxas": 15,
+  "rf_best": 15,
+  "hot_webs": 6
+ }
+]

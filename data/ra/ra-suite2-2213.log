@@ -1,0 +1,17 @@
+saxpy          ptxas:ok 291.8us x1.000 identity_late:ok 291.8us x1.000 sb_late:ok 291.8us x1.000 split_identity_late:ok 291.8us x1.000 split_sb_late:ok 290.8us x1.004
+softmax        ptxas:ok 181.2us x1.000 identity_late:ok 181.8us x0.997 sb_late:ok 174.1us x1.041 split_identity_late:ok 175.1us x1.035 split_sb_late:ok 181.2us x1.000
+layernorm      ptxas:ok 104.4us x1.000 identity_late:ok 103.4us x1.010 sb_late:ok 101.4us x1.030 split_identity_late:ok 102.4us x1.020 split_sb_late:ok 103.4us x1.010
+scan_block     ptxas:fault identity_late:bitwise_mismatch sb_late:bitwise_mismatch split_identity_late:bitwise_mismatch split_sb_late:bitwise_mismatch
+    ptxas: fault aude-joint-ra-20261114-022549-943008\job-ra-suite2-20261114-030233-567153\lab\suite.py", line 38, in compare
+    err = np.abs(out64 - ref64)
+                 ~~~~~~^~~~~~~
+numpy._core._exceptions._ArrayMemoryError: Unable to allocate 128. MiB for an array with shape (16777216,) and data type float64
+    identity_late: bitwise_mismatch 
+    sb_late: bitwise_mismatch 
+    split_identity_late: bitwise_mismatch 
+    split_sb_late: bitwise_mismatch 
+geomean ptxas/identity_late: 1.0023 over 3 cases
+geomean ptxas/sb_late: 1.0237 over 3 cases
+geomean ptxas/split_identity_late: 1.0183 over 3 cases
+geomean ptxas/split_sb_late: 1.0045 over 3 cases
+wrote C:\Users\LukeB\.pcslurm\worktrees\claude-joint-ra-20261114-022549-943008\job-ra-suite2-20261114-030233-567153\data\suite\ra_suite_rerun.json

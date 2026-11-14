@@ -1,0 +1,63 @@
+saxpy          ptxas:fault identity_late:bitwise_mismatch sb_late:bitwise_mismatch split_identity_late:bitwise_mismatch split_sb_late:bitwise_mismatch split24_sb_late:bitwise_mismatch
+    ptxas: fault aude-joint-ra-20261114-022549-943008\job-ra-suite-20261114-025001-664356\lab\suite.py", line 38, in compare
+    err = np.abs(out64 - ref64)
+          ^^^^^^^^^^^^^^^^^^^^^
+numpy._core._exceptions._ArrayMemoryError: Unable to allocate 128. MiB for an array with shape (16777216,) and data type float64
+    identity_late: bitwise_mismatch 
+    sb_late: bitwise_mismatch 
+    split_identity_late: bitwise_mismatch 
+    split_sb_late: bitwise_mismatch 
+    split24_sb_late: bitwise_mismatch 
+reduce         ptxas:ok 102.4us x1.000 identity_late:ok 102.4us x1.000 sb_late:ok 102.4us x1.000 split_identity_late:ok 102.4us x1.000 split_sb_late:ok 102.4us x1.000 split24_sb_late:ok 102.4us x1.000
+transpose      ptxas:ok 200.7us x1.000 identity_late:ok 198.7us x1.010 sb_late:ok 202.8us x0.990 split_identity_late:ok 202.2us x0.992 split_sb_late:ok 198.7us x1.010 split24_sb_late:ok 198.7us x1.010
+stencil1d      ptxas:ok 196.6us x1.000 identity_late:ok 196.6us x1.000 sb_late:ok 197.6us x0.995 split_identity_late:ok 197.6us x0.995 split_sb_late:ok 197.6us x0.995 split24_sb_late:ok 197.6us x0.995
+jacobi2d       ptxas:ok 196.6us x1.000 identity_late:ok 196.6us x1.000 sb_late:ok 196.6us x1.000 split_identity_late:ok 196.6us x1.000 split_sb_late:ok 196.6us x1.000 split24_sb_late:ok 196.6us x1.000
+conv_row       ptxas:ok 277.5us x1.000 identity_late:ok 278.5us x0.996 sb_late:ok 278.5us x0.996 split_identity_late:ok 278.5us x0.996 split_sb_late:ok 277.5us x1.000 split24_sb_late:ok 278.5us x0.996
+box_blur3      ptxas:ok 202.8us x1.000 identity_late:ok 201.7us x1.005 sb_late:ok 202.3us x1.002 split_identity_late:ok 201.7us x1.005 split_sb_late:ok 202.8us x1.000 split24_sb_late:ok 202.3us x1.002
+gelu_fused     ptxas:ok 98.3us x1.000 identity_late:ok 98.3us x1.000 sb_late:ok 98.3us x1.000 split_identity_late:ok 98.3us x1.000 split_sb_late:ok 98.3us x1.000 split24_sb_late:ok 98.3us x1.000
+histogram      ptxas:ok 102.4us x1.000 identity_late:ok 103.4us x0.990 sb_late:ok 102.4us x1.000 split_identity_late:ok 103.4us x0.990 split_sb_late:ok 103.4us x0.990 split24_sb_late:ok 103.4us x0.990
+gemv           ptxas:ok 191.5us x1.000 identity_late:ok 191.5us x1.000 sb_late:ok 190.5us x1.005 split_identity_late:ok 191.5us x1.000 split_sb_late:ok 190.5us x1.005 split24_sb_late:ok 190.5us x1.005
+black_scholes  ptxas:ref_mismatch identity_late:ok sb_late:ok split_identity_late:ok split_sb_late:ok split24_sb_late:ok
+    ptxas: ref_mismatch 
+spmv_csr       ptxas:ok 183.3us x1.000 identity_late:ok 183.3us x1.000 sb_late:ok 184.3us x0.994 split_identity_late:ok 183.3us x1.000 split_sb_late:ok 184.3us x0.994 split24_sb_late:ok 184.3us x0.994
+softmax        ptxas:fault identity_late:bitwise_mismatch sb_late:bitwise_mismatch split_identity_late:bitwise_mismatch split_sb_late:bitwise_mismatch split24_sb_late:bitwise_mismatch
+    ptxas: fault job-ra-suite-20261114-025001-664356\lab\suite.py", line 298, in _softmax
+    e = np.exp(a - a.max(axis=1, keepdims=True))
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+numpy._core._exceptions._ArrayMemoryError: Unable to allocate 64.0 MiB for an array with shape (8192, 1024) and data type float64
+    identity_late: bitwise_mismatch 
+    sb_late: bitwise_mismatch 
+    split_identity_late: bitwise_mismatch 
+    split_sb_late: bitwise_mismatch 
+    split24_sb_late: bitwise_mismatch 
+layernorm      ptxas:fault identity_late:bitwise_mismatch sb_late:bitwise_mismatch split_identity_late:bitwise_mismatch split_sb_late:bitwise_mismatch split24_sb_late:bitwise_mismatch
+    ptxas: fault 20261114-022549-943008\job-ra-suite-20261114-025001-664356\lab\suite.py", line 324, in _layernorm
+    var = ((a - mu) ** 2).mean(axis=1, keepdims=True)
+            ~~^~~~
+numpy._core._exceptions._ArrayMemoryError: Unable to allocate 64.0 MiB for an array with shape (8192, 1024) and data type float64
+    identity_late: bitwise_mismatch 
+    sb_late: bitwise_mismatch 
+    split_identity_late: bitwise_mismatch 
+    split_sb_late: bitwise_mismatch 
+    split24_sb_late: bitwise_mismatch 
+scan_block     ptxas:fault identity_late:bitwise_mismatch sb_late:bitwise_mismatch split_identity_late:bitwise_mismatch split_sb_late:bitwise_mismatch split24_sb_late:bitwise_mismatch
+    ptxas: fault aude-joint-ra-20261114-022549-943008\job-ra-suite-20261114-025001-664356\lab\suite.py", line 38, in compare
+    err = np.abs(out64 - ref64)
+          ^^^^^^^^^^^^^^^^^^^^^
+numpy._core._exceptions._ArrayMemoryError: Unable to allocate 128. MiB for an array with shape (16777216,) and data type float64
+    identity_late: bitwise_mismatch 
+    sb_late: bitwise_mismatch 
+    split_identity_late: bitwise_mismatch 
+    split_sb_late: bitwise_mismatch 
+    split24_sb_late: bitwise_mismatch 
+bitonic_block  ptxas:ok 251.9us x1.000 identity_late:ok 251.9us x1.000 sb_late:ok 251.9us x1.000 split_identity_late:ok 251.9us x1.000 split_sb_late:ok 251.9us x1.000 split24_sb_late:ok 251.9us x1.000
+sgemm_tiled    ptxas:ok 258.0us x1.000 identity_late:ok 259.1us x0.996 sb_late:ok 255.0us x1.012 split_identity_late:ok 259.1us x0.996 split_sb_late:ok 257.5us x1.002 split24_sb_late:ok 408.6us x0.632
+sgemm_naive    ptxas:ok 457.7us x1.000 identity_late:ok 458.2us x0.999 sb_late:ok 458.2us x0.999 split_identity_late:ok 458.7us x0.998 split_sb_late:ok 458.2us x0.999 split24_sb_late:ok 458.2us x0.999
+nbody          ptxas:ok 443.4us x1.000 identity_late:ok 446.5us x0.993 sb_late:ok 446.5us x0.993 split_identity_late:ok 444.4us x0.998 split_sb_late:ok 444.4us x0.998 split24_sb_late:ok 444.4us x0.998
+mandelbrot     ptxas:ok 127.0us x1.000 identity_late:ok 128.0us x0.992 sb_late:ok 127.0us x1.000 split_identity_late:ok 127.0us x1.000 split_sb_late:ok 127.0us x1.000 split24_sb_late:ok 128.0us x0.992
+geomean ptxas/identity_late: 0.9988 over 15 cases
+geomean ptxas/sb_late: 0.9991 over 15 cases
+geomean ptxas/split_identity_late: 0.9980 over 15 cases
+geomean ptxas/split_sb_late: 0.9996 over 15 cases
+geomean ptxas/split24_sb_late: 0.9687 over 15 cases
+wrote C:\Users\LukeB\.pcslurm\worktrees\claude-joint-ra-20261114-022549-943008\job-ra-suite-20261114-025001-664356\data\suite\ra_suite.json

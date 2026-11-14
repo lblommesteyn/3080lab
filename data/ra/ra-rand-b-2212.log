@@ -1,0 +1,2258 @@
+experiment:      resched_rand_b  (lab/resched.py block scheduler vs ptxas on seeded random kernels)
+device:          NVIDIA GeForce RTX 3080 (sm_86, 68 SMs), driver 610.88
+clocks:          unlocked (not requested)
+ptxas flags:     (default -O3)
+trials:          30 per variant, shuffled (seed 1375431339), 651 warmup launches
+
+[seed3000/ptxas]
+  GPU clock:       1962 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       28  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       1.856  [p05 1.856, p95 1.856, CV 0.00%]
+  throughput:      1.078 warp-instr/cycle/SM  = 34.5 thread-ops/cycle/SM
+  runtime:         0.306 ms (event-timed)
+  instructions:    ~296,780 per warp (static loop body 380 x trips)
+  loop body:       FFMAx153, FMULx58, FADDx51, MUFU.EX2x33, MUFU.RSQx33, SHF.L.U32x22, IMADx22, SHFL.IDXx4, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3000/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       28  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       1.879  [p05 1.879, p95 1.879, CV 0.00%]
+  throughput:      1.064 warp-instr/cycle/SM  = 34.1 thread-ops/cycle/SM
+  runtime:         0.312 ms (event-timed)
+  instructions:    ~296,780 per warp (static loop body 380 x trips)
+  loop body:       FFMAx153, FMULx58, FADDx51, MUFU.EX2x33, MUFU.RSQx33, SHF.L.U32x22, IMADx22, SHFL.IDXx4, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3000/sb_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       28  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       1.866  [p05 1.865, p95 1.866, CV 0.02%]
+  throughput:      1.072 warp-instr/cycle/SM  = 34.3 thread-ops/cycle/SM
+  runtime:         0.311 ms (event-timed)
+  instructions:    ~296,780 per warp (static loop body 380 x trips)
+  loop body:       FFMAx153, FMULx58, FADDx51, MUFU.EX2x33, MUFU.RSQx33, SHF.L.U32x22, IMADx22, SHFL.IDXx4, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3000/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       33  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       1.879  [p05 1.879, p95 1.879, CV 0.01%]
+  throughput:      1.064 warp-instr/cycle/SM  = 34.1 thread-ops/cycle/SM
+  runtime:         0.310 ms (event-timed)
+  instructions:    ~296,780 per warp (static loop body 380 x trips)
+  loop body:       FFMAx153, FMULx58, FADDx51, MUFU.EX2x33, MUFU.RSQx33, SHF.L.U32x22, IMADx22, SHFL.IDXx4, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3000/split_sb_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       33  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       1.866  [p05 1.866, p95 1.866, CV 0.00%]
+  throughput:      1.072 warp-instr/cycle/SM  = 34.3 thread-ops/cycle/SM
+  runtime:         0.307 ms (event-timed)
+  instructions:    ~296,780 per warp (static loop body 380 x trips)
+  loop body:       FFMAx153, FMULx58, FADDx51, MUFU.EX2x33, MUFU.RSQx33, SHF.L.U32x22, IMADx22, SHFL.IDXx4, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3001/ptxas]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       20  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       12.356  [p05 12.353, p95 13.160, CV 3.43%]
+  throughput:      2.590 warp-instr/cycle/SM  = 82.9 thread-ops/cycle/SM
+  runtime:         1.911 ms (event-timed)
+  instructions:    ~292,094 per warp (static loop body 187 x trips)
+  loop body:       FFMAx99, FMULx26, FADDx24, MUFU.EX2x19, MUFU.RSQx16, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3001/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       20  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       12.356  [p05 12.347, p95 14.232, CV 5.03%]
+  throughput:      2.590 warp-instr/cycle/SM  = 82.9 thread-ops/cycle/SM
+  runtime:         1.909 ms (event-timed)
+  instructions:    ~292,094 per warp (static loop body 187 x trips)
+  loop body:       FFMAx99, FMULx26, FADDx24, MUFU.EX2x19, MUFU.RSQx16, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3001/sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       20  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       12.434  [p05 12.430, p95 13.446, CV 4.22%]
+  throughput:      2.574 warp-instr/cycle/SM  = 82.4 thread-ops/cycle/SM
+  runtime:         1.918 ms (event-timed)
+  instructions:    ~292,094 per warp (static loop body 187 x trips)
+  loop body:       FFMAx99, FMULx26, FADDx24, MUFU.EX2x19, MUFU.RSQx16, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3001/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       23  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       12.357  [p05 12.356, p95 14.300, CV 5.25%]
+  throughput:      2.590 warp-instr/cycle/SM  = 82.9 thread-ops/cycle/SM
+  runtime:         1.908 ms (event-timed)
+  instructions:    ~292,094 per warp (static loop body 187 x trips)
+  loop body:       FFMAx99, FMULx26, FADDx24, MUFU.EX2x19, MUFU.RSQx16, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3001/split_sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 46 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       23  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       12.432  [p05 12.432, p95 14.083, CV 4.32%]
+  throughput:      2.574 warp-instr/cycle/SM  = 82.4 thread-ops/cycle/SM
+  runtime:         1.922 ms (event-timed)
+  instructions:    ~292,094 per warp (static loop body 187 x trips)
+  loop body:       FFMAx99, FMULx26, FADDx24, MUFU.EX2x19, MUFU.RSQx16, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3002/ptxas]
+  GPU clock:       1963 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           32
+  registers:       19  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       13.623  [p05 13.621, p95 13.629, CV 0.04%]
+  throughput:      2.349 warp-instr/cycle/SM  = 75.2 thread-ops/cycle/SM
+  runtime:         0.435 ms (event-timed)
+  instructions:    ~58,500 per warp (static loop body 125 x trips)
+  loop body:       FFMAx66, FMULx15, FADDx15, MUFU.RSQx14, MUFU.EX2x12, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3002/identity_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           32
+  registers:       19  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       13.632  [p05 13.629, p95 13.638, CV 0.03%]
+  throughput:      2.347 warp-instr/cycle/SM  = 75.1 thread-ops/cycle/SM
+  runtime:         0.436 ms (event-timed)
+  instructions:    ~58,500 per warp (static loop body 125 x trips)
+  loop body:       FFMAx66, FMULx15, FADDx15, MUFU.RSQx14, MUFU.EX2x12, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3002/sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           32
+  registers:       19  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       13.652  [p05 13.636, p95 13.652, CV 0.05%]
+  throughput:      2.344 warp-instr/cycle/SM  = 75.0 thread-ops/cycle/SM
+  runtime:         0.437 ms (event-timed)
+  instructions:    ~58,500 per warp (static loop body 125 x trips)
+  loop body:       FFMAx66, FMULx15, FADDx15, MUFU.RSQx14, MUFU.EX2x12, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3002/split_identity_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           32
+  registers:       21  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       13.644  [p05 13.634, p95 13.656, CV 0.06%]
+  throughput:      2.345 warp-instr/cycle/SM  = 75.1 thread-ops/cycle/SM
+  runtime:         0.439 ms (event-timed)
+  instructions:    ~58,500 per warp (static loop body 125 x trips)
+  loop body:       FFMAx66, FMULx15, FADDx15, MUFU.RSQx14, MUFU.EX2x12, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3002/split_sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           32
+  registers:       21  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       13.648  [p05 13.646, p95 13.653, CV 0.02%]
+  throughput:      2.345 warp-instr/cycle/SM  = 75.0 thread-ops/cycle/SM
+  runtime:         0.435 ms (event-timed)
+  instructions:    ~58,500 per warp (static loop body 125 x trips)
+  loop body:       FFMAx66, FMULx15, FADDx15, MUFU.RSQx14, MUFU.EX2x12, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3003/ptxas]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       26  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.813  [p05 2.719, p95 2.813, CV 1.68%]
+  throughput:      2.844 warp-instr/cycle/SM  = 91.0 thread-ops/cycle/SM
+  runtime:         0.448 ms (event-timed)
+  instructions:    ~295,218 per warp (static loop body 189 x trips)
+  loop body:       FFMAx44, SHF.L.U32x43, IMADx37, SHFL.IDXx16, FMULx16, FADDx14, MUFU.EX2x8, MUFU.RSQx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3003/identity_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       26  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.686  [p05 2.686, p95 2.725, CV 0.67%]
+  throughput:      2.979 warp-instr/cycle/SM  = 95.3 thread-ops/cycle/SM
+  runtime:         0.437 ms (event-timed)
+  instructions:    ~295,218 per warp (static loop body 189 x trips)
+  loop body:       FFMAx44, SHF.L.U32x43, IMADx37, SHFL.IDXx16, FMULx16, FADDx14, MUFU.EX2x8, MUFU.RSQx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3003/sb_late]
+  GPU clock:       1967 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       26  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.713  [p05 2.704, p95 2.721, CV 0.22%]
+  throughput:      2.949 warp-instr/cycle/SM  = 94.4 thread-ops/cycle/SM
+  runtime:         0.434 ms (event-timed)
+  instructions:    ~295,218 per warp (static loop body 189 x trips)
+  loop body:       FFMAx44, SHF.L.U32x43, IMADx37, SHFL.IDXx16, FMULx16, FADDx14, MUFU.EX2x8, MUFU.RSQx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3003/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       26  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.722  [p05 2.679, p95 2.726, CV 0.74%]
+  throughput:      2.939 warp-instr/cycle/SM  = 94.0 thread-ops/cycle/SM
+  runtime:         0.435 ms (event-timed)
+  instructions:    ~295,218 per warp (static loop body 189 x trips)
+  loop body:       FFMAx44, SHF.L.U32x43, IMADx37, SHFL.IDXx16, FMULx16, FADDx14, MUFU.EX2x8, MUFU.RSQx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3003/split_sb_late]
+  GPU clock:       1967 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       26  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.714  [p05 2.709, p95 2.720, CV 0.14%]
+  throughput:      2.948 warp-instr/cycle/SM  = 94.3 thread-ops/cycle/SM
+  runtime:         0.440 ms (event-timed)
+  instructions:    ~295,218 per warp (static loop body 189 x trips)
+  loop body:       FFMAx44, SHF.L.U32x43, IMADx37, SHFL.IDXx16, FMULx16, FADDx14, MUFU.EX2x8, MUFU.RSQx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3004/ptxas]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       24  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.219  [p05 3.219, p95 3.219, CV 0.00%]
+  throughput:      2.485 warp-instr/cycle/SM  = 79.5 thread-ops/cycle/SM
+  runtime:         0.516 ms (event-timed)
+  instructions:    ~302,247 per warp (static loop body 129 x trips)
+  loop body:       SHF.L.U32x32, FFMAx31, IMADx26, MUFU.RSQx9, MUFU.EX2x8, FADDx7, FMULx7, SHFL.IDXx6, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3004/identity_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       24  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.379  [p05 3.379, p95 3.379, CV 0.00%]
+  throughput:      2.367 warp-instr/cycle/SM  = 75.8 thread-ops/cycle/SM
+  runtime:         0.537 ms (event-timed)
+  instructions:    ~302,247 per warp (static loop body 129 x trips)
+  loop body:       SHF.L.U32x32, FFMAx31, IMADx26, MUFU.RSQx9, MUFU.EX2x8, FADDx7, FMULx7, SHFL.IDXx6, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3004/sb_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       24  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.141  [p05 3.141, p95 3.196, CV 0.80%]
+  throughput:      2.547 warp-instr/cycle/SM  = 81.5 thread-ops/cycle/SM
+  runtime:         0.506 ms (event-timed)
+  instructions:    ~302,247 per warp (static loop body 129 x trips)
+  loop body:       SHF.L.U32x32, FFMAx31, IMADx26, MUFU.RSQx9, MUFU.EX2x8, FADDx7, FMULx7, SHFL.IDXx6, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3004/split_identity_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       24  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.379  [p05 3.379, p95 3.379, CV 0.00%]
+  throughput:      2.367 warp-instr/cycle/SM  = 75.8 thread-ops/cycle/SM
+  runtime:         0.540 ms (event-timed)
+  instructions:    ~302,247 per warp (static loop body 129 x trips)
+  loop body:       SHF.L.U32x32, FFMAx31, IMADx26, MUFU.RSQx9, MUFU.EX2x8, FADDx7, FMULx7, SHFL.IDXx6, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3004/split_sb_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       24  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.141  [p05 3.141, p95 3.196, CV 0.78%]
+  throughput:      2.547 warp-instr/cycle/SM  = 81.5 thread-ops/cycle/SM
+  runtime:         0.505 ms (event-timed)
+  instructions:    ~302,247 per warp (static loop body 129 x trips)
+  loop body:       SHF.L.U32x32, FFMAx31, IMADx26, MUFU.RSQx9, MUFU.EX2x8, FADDx7, FMULx7, SHFL.IDXx6, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3005/ptxas]
+  GPU clock:       1968 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           1
+  registers:       30  (spills 0/0, occupancy 33% = 16 warps/SM)
+  cycles/op:       1.501  [p05 1.500, p95 1.501, CV 0.04%]
+  throughput:      0.666 warp-instr/cycle/SM  = 21.3 thread-ops/cycle/SM
+  runtime:         0.249 ms (event-timed)
+  instructions:    ~297,180 per warp (static loop body 508 x trips)
+  loop body:       IMADx113, FFMAx111, SHF.L.U32x108, FMULx53, SHFL.IDXx35, FADDx34, MUFU.EX2x30, MUFU.RSQx20, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3005/identity_late]
+  GPU clock:       1970 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           1
+  registers:       30  (spills 0/0, occupancy 33% = 16 warps/SM)
+  cycles/op:       1.522  [p05 1.522, p95 1.522, CV 0.00%]
+  throughput:      0.657 warp-instr/cycle/SM  = 21.0 thread-ops/cycle/SM
+  runtime:         0.258 ms (event-timed)
+  instructions:    ~297,180 per warp (static loop body 508 x trips)
+  loop body:       IMADx113, FFMAx111, SHF.L.U32x108, FMULx53, SHFL.IDXx35, FADDx34, MUFU.EX2x30, MUFU.RSQx20, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3005/sb_late]
+  GPU clock:       1967 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           1
+  registers:       30  (spills 0/0, occupancy 33% = 16 warps/SM)
+  cycles/op:       2.004  [p05 2.004, p95 2.004, CV 0.01%]
+  throughput:      0.499 warp-instr/cycle/SM  = 16.0 thread-ops/cycle/SM
+  runtime:         0.325 ms (event-timed)
+  instructions:    ~297,180 per warp (static loop body 508 x trips)
+  loop body:       IMADx113, FFMAx111, SHF.L.U32x108, FMULx53, SHFL.IDXx35, FADDx34, MUFU.EX2x30, MUFU.RSQx20, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3005/split_identity_late]
+  GPU clock:       1969 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           1
+  registers:       35  (spills 0/0, occupancy 33% = 16 warps/SM)
+  cycles/op:       1.528  [p05 1.528, p95 1.528, CV 0.00%]
+  throughput:      0.654 warp-instr/cycle/SM  = 20.9 thread-ops/cycle/SM
+  runtime:         0.252 ms (event-timed)
+  instructions:    ~297,180 per warp (static loop body 508 x trips)
+  loop body:       IMADx113, FFMAx111, SHF.L.U32x108, FMULx53, SHFL.IDXx35, FADDx34, MUFU.EX2x30, MUFU.RSQx20, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3005/split_sb_late]
+  GPU clock:       1967 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           1
+  registers:       35  (spills 0/0, occupancy 33% = 16 warps/SM)
+  cycles/op:       2.004  [p05 2.004, p95 2.004, CV 0.00%]
+  throughput:      0.499 warp-instr/cycle/SM  = 16.0 thread-ops/cycle/SM
+  runtime:         0.327 ms (event-timed)
+  instructions:    ~297,180 per warp (static loop body 508 x trips)
+  loop body:       IMADx113, FFMAx111, SHF.L.U32x108, FMULx53, SHFL.IDXx35, FADDx34, MUFU.EX2x30, MUFU.RSQx20, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3006/ptxas]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       28  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       9.828  [p05 9.826, p95 10.653, CV 4.39%]
+  throughput:      3.256 warp-instr/cycle/SM  = 104.2 thread-ops/cycle/SM
+  runtime:         1.520 ms (event-timed)
+  instructions:    ~297,561 per warp (static loop body 127 x trips)
+  loop body:       SHF.L.U32x36, IMADx28, FFMAx20, SHFL.IDXx16, FADDx11, MUFU.RSQx6, FMULx5, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3006/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       28  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       9.827  [p05 9.825, p95 11.453, CV 5.46%]
+  throughput:      3.256 warp-instr/cycle/SM  = 104.2 thread-ops/cycle/SM
+  runtime:         1.525 ms (event-timed)
+  instructions:    ~297,561 per warp (static loop body 127 x trips)
+  loop body:       SHF.L.U32x36, IMADx28, FFMAx20, SHFL.IDXx16, FADDx11, MUFU.RSQx6, FMULx5, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3006/sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       28  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       9.672  [p05 9.671, p95 9.674, CV 2.67%]
+  throughput:      3.308 warp-instr/cycle/SM  = 105.9 thread-ops/cycle/SM
+  runtime:         1.497 ms (event-timed)
+  instructions:    ~297,561 per warp (static loop body 127 x trips)
+  loop body:       SHF.L.U32x36, IMADx28, FFMAx20, SHFL.IDXx16, FADDx11, MUFU.RSQx6, FMULx5, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3006/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       29  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       9.882  [p05 9.880, p95 10.893, CV 4.67%]
+  throughput:      3.238 warp-instr/cycle/SM  = 103.6 thread-ops/cycle/SM
+  runtime:         1.533 ms (event-timed)
+  instructions:    ~297,561 per warp (static loop body 127 x trips)
+  loop body:       SHF.L.U32x36, IMADx28, FFMAx20, SHFL.IDXx16, FADDx11, MUFU.RSQx6, FMULx5, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3006/split_sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       29  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       9.678  [p05 9.676, p95 9.680, CV 5.71%]
+  throughput:      3.307 warp-instr/cycle/SM  = 105.8 thread-ops/cycle/SM
+  runtime:         1.503 ms (event-timed)
+  instructions:    ~297,561 per warp (static loop body 127 x trips)
+  loop body:       SHF.L.U32x36, IMADx28, FFMAx20, SHFL.IDXx16, FADDx11, MUFU.RSQx6, FMULx5, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3007/ptxas]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           4
+  registers:       29  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       1.506  [p05 1.504, p95 1.506, CV 0.07%]
+  throughput:      2.655 warp-instr/cycle/SM  = 85.0 thread-ops/cycle/SM
+  runtime:         0.250 ms (event-timed)
+  instructions:    ~294,255 per warp (static loop body 503 x trips)
+  loop body:       FFMAx193, FMULx68, SHF.L.U32x55, IMADx55, FADDx48, MUFU.EX2x31, MUFU.RSQx31, SHFL.IDXx18, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3007/identity_late]
+  GPU clock:       1967 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           4
+  registers:       29  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       1.534  [p05 1.533, p95 1.534, CV 0.03%]
+  throughput:      2.608 warp-instr/cycle/SM  = 83.5 thread-ops/cycle/SM
+  runtime:         0.253 ms (event-timed)
+  instructions:    ~294,255 per warp (static loop body 503 x trips)
+  loop body:       FFMAx193, FMULx68, SHF.L.U32x55, IMADx55, FADDx48, MUFU.EX2x31, MUFU.RSQx31, SHFL.IDXx18, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3007/sb_late]
+  GPU clock:       1967 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           4
+  registers:       29  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       1.998  [p05 1.998, p95 1.998, CV 0.01%]
+  throughput:      2.002 warp-instr/cycle/SM  = 64.1 thread-ops/cycle/SM
+  runtime:         0.328 ms (event-timed)
+  instructions:    ~294,255 per warp (static loop body 503 x trips)
+  loop body:       FFMAx193, FMULx68, SHF.L.U32x55, IMADx55, FADDx48, MUFU.EX2x31, MUFU.RSQx31, SHFL.IDXx18, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3007/split_identity_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           4
+  registers:       36  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       1.538  [p05 1.538, p95 1.538, CV 0.01%]
+  throughput:      2.602 warp-instr/cycle/SM  = 83.3 thread-ops/cycle/SM
+  runtime:         0.254 ms (event-timed)
+  instructions:    ~294,255 per warp (static loop body 503 x trips)
+  loop body:       FFMAx193, FMULx68, SHF.L.U32x55, IMADx55, FADDx48, MUFU.EX2x31, MUFU.RSQx31, SHFL.IDXx18, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3007/split_sb_late]
+  GPU clock:       1969 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           4
+  registers:       36  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.019  [p05 2.019, p95 2.019, CV 0.01%]
+  throughput:      1.981 warp-instr/cycle/SM  = 63.4 thread-ops/cycle/SM
+  runtime:         0.331 ms (event-timed)
+  instructions:    ~294,255 per warp (static loop body 503 x trips)
+  loop body:       FFMAx193, FMULx68, SHF.L.U32x55, IMADx55, FADDx48, MUFU.EX2x31, MUFU.RSQx31, SHFL.IDXx18, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3008/ptxas]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 46 C)
+  iterations:      60,000 ops/thread
+  warps:           8
+  registers:       22  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       4.397  [p05 4.397, p95 4.421, CV 0.25%]
+  throughput:      1.820 warp-instr/cycle/SM  = 58.2 thread-ops/cycle/SM
+  runtime:         0.159 ms (event-timed)
+  instructions:    ~61,250 per warp (static loop body 49 x trips)
+  loop body:       FFMAx16, FADDx7, IMADx6, SHF.L.U32x5, SHFL.IDXx5, MUFU.RSQx3, FMULx2, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3008/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      60,000 ops/thread
+  warps:           8
+  registers:       22  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       4.376  [p05 4.376, p95 4.376, CV 0.00%]
+  throughput:      1.828 warp-instr/cycle/SM  = 58.5 thread-ops/cycle/SM
+  runtime:         0.154 ms (event-timed)
+  instructions:    ~61,250 per warp (static loop body 49 x trips)
+  loop body:       FFMAx16, FADDx7, IMADx6, SHF.L.U32x5, SHFL.IDXx5, MUFU.RSQx3, FMULx2, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3008/sb_late]
+  GPU clock:       1961 MHz in-kernel (NVML 1965 MHz, 46 C)
+  iterations:      60,000 ops/thread
+  warps:           8
+  registers:       22  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       4.584  [p05 4.584, p95 4.584, CV 0.00%]
+  throughput:      1.745 warp-instr/cycle/SM  = 55.8 thread-ops/cycle/SM
+  runtime:         0.160 ms (event-timed)
+  instructions:    ~61,250 per warp (static loop body 49 x trips)
+  loop body:       FFMAx16, FADDx7, IMADx6, SHF.L.U32x5, SHFL.IDXx5, MUFU.RSQx3, FMULx2, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3008/split_identity_late]
+  GPU clock:       1972 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      60,000 ops/thread
+  warps:           8
+  registers:       22  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       4.377  [p05 4.376, p95 4.445, CV 0.69%]
+  throughput:      1.828 warp-instr/cycle/SM  = 58.5 thread-ops/cycle/SM
+  runtime:         0.156 ms (event-timed)
+  instructions:    ~61,250 per warp (static loop body 49 x trips)
+  loop body:       FFMAx16, FADDx7, IMADx6, SHF.L.U32x5, SHFL.IDXx5, MUFU.RSQx3, FMULx2, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3008/split_sb_late]
+  GPU clock:       1961 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      60,000 ops/thread
+  warps:           8
+  registers:       22  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       4.584  [p05 4.584, p95 4.584, CV 0.00%]
+  throughput:      1.745 warp-instr/cycle/SM  = 55.8 thread-ops/cycle/SM
+  runtime:         0.164 ms (event-timed)
+  instructions:    ~61,250 per warp (static loop body 49 x trips)
+  loop body:       FFMAx16, FADDx7, IMADx6, SHF.L.U32x5, SHFL.IDXx5, MUFU.RSQx3, FMULx2, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3009/ptxas]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           16
+  registers:       24  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.322  [p05 5.321, p95 5.325, CV 0.03%]
+  throughput:      3.006 warp-instr/cycle/SM  = 96.2 thread-ops/cycle/SM
+  runtime:         0.839 ms (event-timed)
+  instructions:    ~301,466 per warp (static loop body 193 x trips)
+  loop body:       FFMAx52, IMADx48, SHF.L.U32x37, FMULx13, FADDx13, SHFL.IDXx11, MUFU.RSQx9, MUFU.EX2x7, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3009/identity_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           16
+  registers:       24  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.323  [p05 5.321, p95 5.324, CV 0.03%]
+  throughput:      3.006 warp-instr/cycle/SM  = 96.2 thread-ops/cycle/SM
+  runtime:         0.833 ms (event-timed)
+  instructions:    ~301,466 per warp (static loop body 193 x trips)
+  loop body:       FFMAx52, IMADx48, SHF.L.U32x37, FMULx13, FADDx13, SHFL.IDXx11, MUFU.RSQx9, MUFU.EX2x7, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3009/sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 46 C)
+  iterations:      299,904 ops/thread
+  warps:           16
+  registers:       24  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.440  [p05 5.439, p95 5.442, CV 0.02%]
+  throughput:      2.941 warp-instr/cycle/SM  = 94.1 thread-ops/cycle/SM
+  runtime:         0.850 ms (event-timed)
+  instructions:    ~301,466 per warp (static loop body 193 x trips)
+  loop body:       FFMAx52, IMADx48, SHF.L.U32x37, FMULx13, FADDx13, SHFL.IDXx11, MUFU.RSQx9, MUFU.EX2x7, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3009/split_identity_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           16
+  registers:       29  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.363  [p05 5.361, p95 5.364, CV 0.02%]
+  throughput:      2.983 warp-instr/cycle/SM  = 95.5 thread-ops/cycle/SM
+  runtime:         0.841 ms (event-timed)
+  instructions:    ~301,466 per warp (static loop body 193 x trips)
+  loop body:       FFMAx52, IMADx48, SHF.L.U32x37, FMULx13, FADDx13, SHFL.IDXx11, MUFU.RSQx9, MUFU.EX2x7, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3009/split_sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           16
+  registers:       29  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.488  [p05 5.485, p95 5.490, CV 0.03%]
+  throughput:      2.916 warp-instr/cycle/SM  = 93.3 thread-ops/cycle/SM
+  runtime:         0.858 ms (event-timed)
+  instructions:    ~301,466 per warp (static loop body 193 x trips)
+  loop body:       FFMAx52, IMADx48, SHF.L.U32x37, FMULx13, FADDx13, SHFL.IDXx11, MUFU.RSQx9, MUFU.EX2x7, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3010/ptxas]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           16
+  registers:       31  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.128  [p05 5.126, p95 5.128, CV 0.02%]
+  throughput:      3.120 warp-instr/cycle/SM  = 99.9 thread-ops/cycle/SM
+  runtime:         0.809 ms (event-timed)
+  instructions:    ~298,342 per warp (static loop body 382 x trips)
+  loop body:       SHF.L.U32x106, IMADx99, FFMAx73, SHFL.IDXx35, FMULx22, FADDx20, MUFU.RSQx17, MUFU.EX2x6, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3010/identity_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           16
+  registers:       31  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.121  [p05 5.120, p95 5.123, CV 0.02%]
+  throughput:      3.125 warp-instr/cycle/SM  = 100.0 thread-ops/cycle/SM
+  runtime:         0.801 ms (event-timed)
+  instructions:    ~298,342 per warp (static loop body 382 x trips)
+  loop body:       SHF.L.U32x106, IMADx99, FFMAx73, SHFL.IDXx35, FMULx22, FADDx20, MUFU.RSQx17, MUFU.EX2x6, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3010/sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 46 C)
+  iterations:      299,904 ops/thread
+  warps:           16
+  registers:       31  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.179  [p05 5.177, p95 5.181, CV 0.02%]
+  throughput:      3.089 warp-instr/cycle/SM  = 98.9 thread-ops/cycle/SM
+  runtime:         0.812 ms (event-timed)
+  instructions:    ~298,342 per warp (static loop body 382 x trips)
+  loop body:       SHF.L.U32x106, IMADx99, FFMAx73, SHFL.IDXx35, FMULx22, FADDx20, MUFU.RSQx17, MUFU.EX2x6, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3010/split_identity_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           16
+  registers:       31  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.122  [p05 5.121, p95 5.123, CV 0.01%]
+  throughput:      3.124 warp-instr/cycle/SM  = 100.0 thread-ops/cycle/SM
+  runtime:         0.801 ms (event-timed)
+  instructions:    ~298,342 per warp (static loop body 382 x trips)
+  loop body:       SHF.L.U32x106, IMADx99, FFMAx73, SHFL.IDXx35, FMULx22, FADDx20, MUFU.RSQx17, MUFU.EX2x6, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3010/split_sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           16
+  registers:       31  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.164  [p05 5.164, p95 5.165, CV 0.01%]
+  throughput:      3.098 warp-instr/cycle/SM  = 99.1 thread-ops/cycle/SM
+  runtime:         0.808 ms (event-timed)
+  instructions:    ~298,342 per warp (static loop body 382 x trips)
+  loop body:       SHF.L.U32x106, IMADx99, FFMAx73, SHFL.IDXx35, FMULx22, FADDx20, MUFU.RSQx17, MUFU.EX2x6, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3011/ptxas]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,968 ops/thread
+  warps:           16
+  registers:       21  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       6.707  [p05 6.704, p95 6.717, CV 0.07%]
+  throughput:      2.386 warp-instr/cycle/SM  = 76.3 thread-ops/cycle/SM
+  runtime:         0.224 ms (event-timed)
+  instructions:    ~62,779 per warp (static loop body 67 x trips)
+  loop body:       SHF.L.U32x15, IMADx13, FFMAx12, MUFU.RSQx6, FMULx6, MUFU.EX2x5, SHFL.IDXx4, FADDx3, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3011/identity_late]
+  GPU clock:       1962 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,968 ops/thread
+  warps:           16
+  registers:       21  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       6.635  [p05 6.631, p95 6.650, CV 0.08%]
+  throughput:      2.411 warp-instr/cycle/SM  = 77.2 thread-ops/cycle/SM
+  runtime:         0.222 ms (event-timed)
+  instructions:    ~62,779 per warp (static loop body 67 x trips)
+  loop body:       SHF.L.U32x15, IMADx13, FFMAx12, MUFU.RSQx6, FMULx6, MUFU.EX2x5, SHFL.IDXx4, FADDx3, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3011/sb_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 46 C)
+  iterations:      59,968 ops/thread
+  warps:           16
+  registers:       21  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       6.646  [p05 6.641, p95 6.655, CV 0.06%]
+  throughput:      2.407 warp-instr/cycle/SM  = 77.0 thread-ops/cycle/SM
+  runtime:         0.223 ms (event-timed)
+  instructions:    ~62,779 per warp (static loop body 67 x trips)
+  loop body:       SHF.L.U32x15, IMADx13, FFMAx12, MUFU.RSQx6, FMULx6, MUFU.EX2x5, SHFL.IDXx4, FADDx3, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3011/split_identity_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,968 ops/thread
+  warps:           16
+  registers:       21  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       6.634  [p05 6.620, p95 6.642, CV 0.11%]
+  throughput:      2.412 warp-instr/cycle/SM  = 77.2 thread-ops/cycle/SM
+  runtime:         0.222 ms (event-timed)
+  instructions:    ~62,779 per warp (static loop body 67 x trips)
+  loop body:       SHF.L.U32x15, IMADx13, FFMAx12, MUFU.RSQx6, FMULx6, MUFU.EX2x5, SHFL.IDXx4, FADDx3, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3011/split_sb_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,968 ops/thread
+  warps:           16
+  registers:       21  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       6.647  [p05 6.642, p95 6.649, CV 0.04%]
+  throughput:      2.407 warp-instr/cycle/SM  = 77.0 thread-ops/cycle/SM
+  runtime:         0.222 ms (event-timed)
+  instructions:    ~62,779 per warp (static loop body 67 x trips)
+  loop body:       SHF.L.U32x15, IMADx13, FFMAx12, MUFU.RSQx6, FMULx6, MUFU.EX2x5, SHFL.IDXx4, FADDx3, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3012/ptxas]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       23  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       2.662  [p05 2.662, p95 2.662, CV 0.00%]
+  throughput:      0.751 warp-instr/cycle/SM  = 24.0 thread-ops/cycle/SM
+  runtime:         0.426 ms (event-timed)
+  instructions:    ~296,780 per warp (static loop body 190 x trips)
+  loop body:       SHF.L.U32x58, IMADx56, FFMAx29, SHFL.IDXx14, FMULx10, MUFU.EX2x9, FADDx6, MUFU.RSQx5, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3012/identity_late]
+  GPU clock:       1963 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       23  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       2.641  [p05 2.641, p95 2.641, CV 0.00%]
+  throughput:      0.757 warp-instr/cycle/SM  = 24.2 thread-ops/cycle/SM
+  runtime:         0.422 ms (event-timed)
+  instructions:    ~296,780 per warp (static loop body 190 x trips)
+  loop body:       SHF.L.U32x58, IMADx56, FFMAx29, SHFL.IDXx14, FMULx10, MUFU.EX2x9, FADDx6, MUFU.RSQx5, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3012/sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       23  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       2.630  [p05 2.630, p95 2.630, CV 0.00%]
+  throughput:      0.760 warp-instr/cycle/SM  = 24.3 thread-ops/cycle/SM
+  runtime:         0.427 ms (event-timed)
+  instructions:    ~296,780 per warp (static loop body 190 x trips)
+  loop body:       SHF.L.U32x58, IMADx56, FFMAx29, SHFL.IDXx14, FMULx10, MUFU.EX2x9, FADDx6, MUFU.RSQx5, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3012/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       24  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       2.641  [p05 2.641, p95 2.641, CV 0.00%]
+  throughput:      0.757 warp-instr/cycle/SM  = 24.2 thread-ops/cycle/SM
+  runtime:         0.426 ms (event-timed)
+  instructions:    ~296,780 per warp (static loop body 190 x trips)
+  loop body:       SHF.L.U32x58, IMADx56, FFMAx29, SHFL.IDXx14, FMULx10, MUFU.EX2x9, FADDx6, MUFU.RSQx5, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3012/split_sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       24  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       2.630  [p05 2.630, p95 2.630, CV 0.00%]
+  throughput:      0.760 warp-instr/cycle/SM  = 24.3 thread-ops/cycle/SM
+  runtime:         0.426 ms (event-timed)
+  instructions:    ~296,780 per warp (static loop body 190 x trips)
+  loop body:       SHF.L.U32x58, IMADx56, FFMAx29, SHFL.IDXx14, FMULx10, MUFU.EX2x9, FADDx6, MUFU.RSQx5, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3013/ptxas]
+  GPU clock:       1970 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           8
+  registers:       31  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.165  [p05 3.145, p95 3.172, CV 0.35%]
+  throughput:      2.528 warp-instr/cycle/SM  = 80.9 thread-ops/cycle/SM
+  runtime:         0.118 ms (event-timed)
+  instructions:    ~59,904 per warp (static loop body 128 x trips)
+  loop body:       FFMAx42, FMULx18, IMADx16, MUFU.RSQx12, MUFU.EX2x12, SHF.L.U32x11, FADDx9, SHFL.IDXx5, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3013/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           8
+  registers:       31  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.158  [p05 3.158, p95 3.161, CV 0.04%]
+  throughput:      2.534 warp-instr/cycle/SM  = 81.1 thread-ops/cycle/SM
+  runtime:         0.120 ms (event-timed)
+  instructions:    ~59,904 per warp (static loop body 128 x trips)
+  loop body:       FFMAx42, FMULx18, IMADx16, MUFU.RSQx12, MUFU.EX2x12, SHF.L.U32x11, FADDx9, SHFL.IDXx5, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3013/sb_late]
+  GPU clock:       1969 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           8
+  registers:       31  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.131  [p05 3.119, p95 3.131, CV 0.19%]
+  throughput:      2.555 warp-instr/cycle/SM  = 81.8 thread-ops/cycle/SM
+  runtime:         0.117 ms (event-timed)
+  instructions:    ~59,904 per warp (static loop body 128 x trips)
+  loop body:       FFMAx42, FMULx18, IMADx16, MUFU.RSQx12, MUFU.EX2x12, SHF.L.U32x11, FADDx9, SHFL.IDXx5, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3013/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           8
+  registers:       32  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.158  [p05 3.158, p95 3.161, CV 0.04%]
+  throughput:      2.534 warp-instr/cycle/SM  = 81.1 thread-ops/cycle/SM
+  runtime:         0.116 ms (event-timed)
+  instructions:    ~59,904 per warp (static loop body 128 x trips)
+  loop body:       FFMAx42, FMULx18, IMADx16, MUFU.RSQx12, MUFU.EX2x12, SHF.L.U32x11, FADDx9, SHFL.IDXx5, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3013/split_sb_late]
+  GPU clock:       1969 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           8
+  registers:       32  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.131  [p05 3.119, p95 3.131, CV 0.17%]
+  throughput:      2.555 warp-instr/cycle/SM  = 81.8 thread-ops/cycle/SM
+  runtime:         0.117 ms (event-timed)
+  instructions:    ~59,904 per warp (static loop body 128 x trips)
+  loop body:       FFMAx42, FMULx18, IMADx16, MUFU.RSQx12, MUFU.EX2x12, SHF.L.U32x11, FADDx9, SHFL.IDXx5, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3014/ptxas]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           32
+  registers:       18  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       12.034  [p05 12.029, p95 12.037, CV 0.02%]
+  throughput:      2.659 warp-instr/cycle/SM  = 85.1 thread-ops/cycle/SM
+  runtime:         1.862 ms (event-timed)
+  instructions:    ~328,125 per warp (static loop body 35 x trips)
+  loop body:       IMADx15, SHF.L.U32x14, SHFL.IDXx3, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3014/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           32
+  registers:       18  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       12.049  [p05 12.043, p95 13.484, CV 4.12%]
+  throughput:      2.656 warp-instr/cycle/SM  = 85.0 thread-ops/cycle/SM
+  runtime:         1.862 ms (event-timed)
+  instructions:    ~328,125 per warp (static loop body 35 x trips)
+  loop body:       IMADx15, SHF.L.U32x14, SHFL.IDXx3, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3014/sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           32
+  registers:       18  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       11.992  [p05 11.987, p95 13.652, CV 4.34%]
+  throughput:      2.668 warp-instr/cycle/SM  = 85.4 thread-ops/cycle/SM
+  runtime:         1.853 ms (event-timed)
+  instructions:    ~328,125 per warp (static loop body 35 x trips)
+  loop body:       IMADx15, SHF.L.U32x14, SHFL.IDXx3, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3014/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           32
+  registers:       18  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       12.047  [p05 12.040, p95 13.833, CV 5.19%]
+  throughput:      2.656 warp-instr/cycle/SM  = 85.0 thread-ops/cycle/SM
+  runtime:         1.867 ms (event-timed)
+  instructions:    ~328,125 per warp (static loop body 35 x trips)
+  loop body:       IMADx15, SHF.L.U32x14, SHFL.IDXx3, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3014/split_sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           32
+  registers:       18  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       11.989  [p05 11.987, p95 13.795, CV 4.82%]
+  throughput:      2.669 warp-instr/cycle/SM  = 85.4 thread-ops/cycle/SM
+  runtime:         1.853 ms (event-timed)
+  instructions:    ~328,125 per warp (static loop body 35 x trips)
+  loop body:       IMADx15, SHF.L.U32x14, SHFL.IDXx3, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3015/ptxas]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       32  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.030  [p05 10.029, p95 11.674, CV 5.17%]
+  throughput:      3.190 warp-instr/cycle/SM  = 102.1 thread-ops/cycle/SM
+  runtime:         1.556 ms (event-timed)
+  instructions:    ~299,123 per warp (static loop body 383 x trips)
+  loop body:       FFMAx103, SHF.L.U32x90, IMADx79, FMULx32, FADDx28, SHFL.IDXx23, MUFU.EX2x13, MUFU.RSQx11, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3015/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       32  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.041  [p05 10.041, p95 10.043, CV 2.66%]
+  throughput:      3.187 warp-instr/cycle/SM  = 102.0 thread-ops/cycle/SM
+  runtime:         1.552 ms (event-timed)
+  instructions:    ~299,123 per warp (static loop body 383 x trips)
+  loop body:       FFMAx103, SHF.L.U32x90, IMADx79, FMULx32, FADDx28, SHFL.IDXx23, MUFU.EX2x13, MUFU.RSQx11, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3015/sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       32  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.074  [p05 10.073, p95 10.076, CV 0.01%]
+  throughput:      3.176 warp-instr/cycle/SM  = 101.6 thread-ops/cycle/SM
+  runtime:         1.563 ms (event-timed)
+  instructions:    ~299,123 per warp (static loop body 383 x trips)
+  loop body:       FFMAx103, SHF.L.U32x90, IMADx79, FMULx32, FADDx28, SHFL.IDXx23, MUFU.EX2x13, MUFU.RSQx11, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3015/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 46 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       34  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.068  [p05 10.067, p95 10.069, CV 0.01%]
+  throughput:      3.178 warp-instr/cycle/SM  = 101.7 thread-ops/cycle/SM
+  runtime:         1.558 ms (event-timed)
+  instructions:    ~299,123 per warp (static loop body 383 x trips)
+  loop body:       FFMAx103, SHF.L.U32x90, IMADx79, FMULx32, FADDx28, SHFL.IDXx23, MUFU.EX2x13, MUFU.RSQx11, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3015/split_sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       34  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       9.969  [p05 9.968, p95 11.938, CV 6.26%]
+  throughput:      3.210 warp-instr/cycle/SM  = 102.7 thread-ops/cycle/SM
+  runtime:         1.547 ms (event-timed)
+  instructions:    ~299,123 per warp (static loop body 383 x trips)
+  loop body:       FFMAx103, SHF.L.U32x90, IMADx79, FMULx32, FADDx28, SHFL.IDXx23, MUFU.EX2x13, MUFU.RSQx11, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3016/ptxas]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           4
+  registers:       27  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       1.844  [p05 1.844, p95 1.844, CV 0.00%]
+  throughput:      2.169 warp-instr/cycle/SM  = 69.4 thread-ops/cycle/SM
+  runtime:         0.302 ms (event-timed)
+  instructions:    ~304,590 per warp (static loop body 130 x trips)
+  loop body:       FFMAx61, FMULx18, MUFU.RSQx17, FADDx11, SHF.L.U32x8, IMADx6, MUFU.EX2x4, SHFL.IDXx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3016/identity_late]
+  GPU clock:       1961 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           4
+  registers:       27  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       1.868  [p05 1.868, p95 1.868, CV 0.00%]
+  throughput:      2.142 warp-instr/cycle/SM  = 68.5 thread-ops/cycle/SM
+  runtime:         0.305 ms (event-timed)
+  instructions:    ~304,590 per warp (static loop body 130 x trips)
+  loop body:       FFMAx61, FMULx18, MUFU.RSQx17, FADDx11, SHF.L.U32x8, IMADx6, MUFU.EX2x4, SHFL.IDXx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3016/sb_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           4
+  registers:       27  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.219  [p05 2.219, p95 2.219, CV 0.00%]
+  throughput:      1.802 warp-instr/cycle/SM  = 57.7 thread-ops/cycle/SM
+  runtime:         0.360 ms (event-timed)
+  instructions:    ~304,590 per warp (static loop body 130 x trips)
+  loop body:       FFMAx61, FMULx18, MUFU.RSQx17, FADDx11, SHF.L.U32x8, IMADx6, MUFU.EX2x4, SHFL.IDXx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3016/split_identity_late]
+  GPU clock:       1968 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           4
+  registers:       32  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       1.868  [p05 1.868, p95 1.868, CV 0.00%]
+  throughput:      2.142 warp-instr/cycle/SM  = 68.5 thread-ops/cycle/SM
+  runtime:         0.307 ms (event-timed)
+  instructions:    ~304,590 per warp (static loop body 130 x trips)
+  loop body:       FFMAx61, FMULx18, MUFU.RSQx17, FADDx11, SHF.L.U32x8, IMADx6, MUFU.EX2x4, SHFL.IDXx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3016/split_sb_late]
+  GPU clock:       1967 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           4
+  registers:       32  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.196  [p05 2.196, p95 2.196, CV 0.00%]
+  throughput:      1.822 warp-instr/cycle/SM  = 58.3 thread-ops/cycle/SM
+  runtime:         0.358 ms (event-timed)
+  instructions:    ~304,590 per warp (static loop body 130 x trips)
+  loop body:       FFMAx61, FMULx18, MUFU.RSQx17, FADDx11, SHF.L.U32x8, IMADx6, MUFU.EX2x4, SHFL.IDXx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3017/ptxas]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       29  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.531  [p05 2.524, p95 2.532, CV 0.15%]
+  throughput:      3.160 warp-instr/cycle/SM  = 101.1 thread-ops/cycle/SM
+  runtime:         0.410 ms (event-timed)
+  instructions:    ~304,590 per warp (static loop body 130 x trips)
+  loop body:       FFMAx48, FMULx18, SHF.L.U32x16, FADDx14, IMADx12, MUFU.EX2x8, MUFU.RSQx7, SHFL.IDXx4, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3017/identity_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       29  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.528  [p05 2.524, p95 2.532, CV 0.16%]
+  throughput:      3.165 warp-instr/cycle/SM  = 101.3 thread-ops/cycle/SM
+  runtime:         0.406 ms (event-timed)
+  instructions:    ~304,590 per warp (static loop body 130 x trips)
+  loop body:       FFMAx48, FMULx18, SHF.L.U32x16, FADDx14, IMADx12, MUFU.EX2x8, MUFU.RSQx7, SHFL.IDXx4, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3017/sb_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       29  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.696  [p05 2.696, p95 2.896, CV 3.63%]
+  throughput:      2.968 warp-instr/cycle/SM  = 95.0 thread-ops/cycle/SM
+  runtime:         0.446 ms (event-timed)
+  instructions:    ~304,590 per warp (static loop body 130 x trips)
+  loop body:       FFMAx48, FMULx18, SHF.L.U32x16, FADDx14, IMADx12, MUFU.EX2x8, MUFU.RSQx7, SHFL.IDXx4, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3017/split_identity_late]
+  GPU clock:       1967 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       37  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.586  [p05 2.586, p95 2.594, CV 0.53%]
+  throughput:      3.093 warp-instr/cycle/SM  = 99.0 thread-ops/cycle/SM
+  runtime:         0.419 ms (event-timed)
+  instructions:    ~304,590 per warp (static loop body 130 x trips)
+  loop body:       FFMAx48, FMULx18, SHF.L.U32x16, FADDx14, IMADx12, MUFU.EX2x8, MUFU.RSQx7, SHFL.IDXx4, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3017/split_sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       37  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.704  [p05 2.696, p95 2.704, CV 0.13%]
+  throughput:      2.959 warp-instr/cycle/SM  = 94.7 thread-ops/cycle/SM
+  runtime:         0.436 ms (event-timed)
+  instructions:    ~304,590 per warp (static loop body 130 x trips)
+  loop body:       FFMAx48, FMULx18, SHF.L.U32x16, FADDx14, IMADx12, MUFU.EX2x8, MUFU.RSQx7, SHFL.IDXx4, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3018/ptxas]
+  GPU clock:       1967 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       24  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       1.881  [p05 1.881, p95 1.881, CV 0.00%]
+  throughput:      1.063 warp-instr/cycle/SM  = 34.0 thread-ops/cycle/SM
+  runtime:         0.307 ms (event-timed)
+  instructions:    ~298,342 per warp (static loop body 191 x trips)
+  loop body:       FFMAx76, FADDx30, IMADx23, SHF.L.U32x21, MUFU.RSQx15, FMULx14, MUFU.EX2x5, SHFL.IDXx4, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3018/identity_late]
+  GPU clock:       1963 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       24  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       1.870  [p05 1.870, p95 1.870, CV 0.01%]
+  throughput:      1.069 warp-instr/cycle/SM  = 34.2 thread-ops/cycle/SM
+  runtime:         0.308 ms (event-timed)
+  instructions:    ~298,342 per warp (static loop body 191 x trips)
+  loop body:       FFMAx76, FADDx30, IMADx23, SHF.L.U32x21, MUFU.RSQx15, FMULx14, MUFU.EX2x5, SHFL.IDXx4, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3018/sb_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       24  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       1.907  [p05 1.907, p95 1.907, CV 0.00%]
+  throughput:      1.049 warp-instr/cycle/SM  = 33.6 thread-ops/cycle/SM
+  runtime:         0.313 ms (event-timed)
+  instructions:    ~298,342 per warp (static loop body 191 x trips)
+  loop body:       FFMAx76, FADDx30, IMADx23, SHF.L.U32x21, MUFU.RSQx15, FMULx14, MUFU.EX2x5, SHFL.IDXx4, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3018/split_identity_late]
+  GPU clock:       1963 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       24  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       1.870  [p05 1.870, p95 1.870, CV 0.01%]
+  throughput:      1.069 warp-instr/cycle/SM  = 34.2 thread-ops/cycle/SM
+  runtime:         0.311 ms (event-timed)
+  instructions:    ~298,342 per warp (static loop body 191 x trips)
+  loop body:       FFMAx76, FADDx30, IMADx23, SHF.L.U32x21, MUFU.RSQx15, FMULx14, MUFU.EX2x5, SHFL.IDXx4, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3018/split_sb_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       24  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       1.907  [p05 1.907, p95 1.907, CV 0.01%]
+  throughput:      1.049 warp-instr/cycle/SM  = 33.6 thread-ops/cycle/SM
+  runtime:         0.311 ms (event-timed)
+  instructions:    ~298,342 per warp (static loop body 191 x trips)
+  loop body:       FFMAx76, FADDx30, IMADx23, SHF.L.U32x21, MUFU.RSQx15, FMULx14, MUFU.EX2x5, SHFL.IDXx4, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3019/ptxas]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           8
+  registers:       23  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.639  [p05 3.602, p95 3.667, CV 0.57%]
+  throughput:      2.198 warp-instr/cycle/SM  = 70.3 thread-ops/cycle/SM
+  runtime:         0.577 ms (event-timed)
+  instructions:    ~309,375 per warp (static loop body 99 x trips)
+  loop body:       SHF.L.U32x33, IMADx20, FFMAx19, SHFL.IDXx11, MUFU.RSQx5, MUFU.EX2x3, FADDx3, FMULx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3019/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           8
+  registers:       23  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.604  [p05 3.600, p95 3.611, CV 0.11%]
+  throughput:      2.220 warp-instr/cycle/SM  = 71.0 thread-ops/cycle/SM
+  runtime:         0.573 ms (event-timed)
+  instructions:    ~309,375 per warp (static loop body 99 x trips)
+  loop body:       SHF.L.U32x33, IMADx20, FFMAx19, SHFL.IDXx11, MUFU.RSQx5, MUFU.EX2x3, FADDx3, FMULx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3019/sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           8
+  registers:       23  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.640  [p05 3.638, p95 3.641, CV 0.03%]
+  throughput:      2.198 warp-instr/cycle/SM  = 70.3 thread-ops/cycle/SM
+  runtime:         0.575 ms (event-timed)
+  instructions:    ~309,375 per warp (static loop body 99 x trips)
+  loop body:       SHF.L.U32x33, IMADx20, FFMAx19, SHFL.IDXx11, MUFU.RSQx5, MUFU.EX2x3, FADDx3, FMULx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3019/split_identity_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           8
+  registers:       23  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.604  [p05 3.600, p95 3.611, CV 0.11%]
+  throughput:      2.220 warp-instr/cycle/SM  = 71.0 thread-ops/cycle/SM
+  runtime:         0.571 ms (event-timed)
+  instructions:    ~309,375 per warp (static loop body 99 x trips)
+  loop body:       SHF.L.U32x33, IMADx20, FFMAx19, SHFL.IDXx11, MUFU.RSQx5, MUFU.EX2x3, FADDx3, FMULx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3019/split_sb_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           8
+  registers:       23  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.640  [p05 3.638, p95 3.641, CV 0.03%]
+  throughput:      2.198 warp-instr/cycle/SM  = 70.3 thread-ops/cycle/SM
+  runtime:         0.578 ms (event-timed)
+  instructions:    ~309,375 per warp (static loop body 99 x trips)
+  loop body:       SHF.L.U32x33, IMADx20, FFMAx19, SHFL.IDXx11, MUFU.RSQx5, MUFU.EX2x3, FADDx3, FMULx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3020/ptxas]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       24  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.047  [p05 3.047, p95 3.177, CV 1.58%]
+  throughput:      2.625 warp-instr/cycle/SM  = 84.0 thread-ops/cycle/SM
+  runtime:         0.487 ms (event-timed)
+  instructions:    ~298,342 per warp (static loop body 191 x trips)
+  loop body:       FFMAx70, FMULx27, IMADx25, FADDx20, SHF.L.U32x15, MUFU.RSQx13, MUFU.EX2x10, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3020/identity_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       24  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.151  [p05 3.151, p95 3.151, CV 0.00%]
+  throughput:      2.539 warp-instr/cycle/SM  = 81.2 thread-ops/cycle/SM
+  runtime:         0.501 ms (event-timed)
+  instructions:    ~298,342 per warp (static loop body 191 x trips)
+  loop body:       FFMAx70, FMULx27, IMADx25, FADDx20, SHF.L.U32x15, MUFU.RSQx13, MUFU.EX2x10, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3020/sb_late]
+  GPU clock:       1967 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       24  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.297  [p05 3.297, p95 3.300, CV 0.04%]
+  throughput:      2.426 warp-instr/cycle/SM  = 77.6 thread-ops/cycle/SM
+  runtime:         0.525 ms (event-timed)
+  instructions:    ~298,342 per warp (static loop body 191 x trips)
+  loop body:       FFMAx70, FMULx27, IMADx25, FADDx20, SHF.L.U32x15, MUFU.RSQx13, MUFU.EX2x10, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3020/split_identity_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       24  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.151  [p05 3.151, p95 3.151, CV 0.00%]
+  throughput:      2.539 warp-instr/cycle/SM  = 81.2 thread-ops/cycle/SM
+  runtime:         0.502 ms (event-timed)
+  instructions:    ~298,342 per warp (static loop body 191 x trips)
+  loop body:       FFMAx70, FMULx27, IMADx25, FADDx20, SHF.L.U32x15, MUFU.RSQx13, MUFU.EX2x10, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3020/split_sb_late]
+  GPU clock:       1967 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       24  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.297  [p05 3.297, p95 3.297, CV 0.00%]
+  throughput:      2.426 warp-instr/cycle/SM  = 77.6 thread-ops/cycle/SM
+  runtime:         0.523 ms (event-timed)
+  instructions:    ~298,342 per warp (static loop body 191 x trips)
+  loop body:       FFMAx70, FMULx27, IMADx25, FADDx20, SHF.L.U32x15, MUFU.RSQx13, MUFU.EX2x10, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3021/ptxas]
+  GPU clock:       1969 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           1
+  registers:       28  (spills 0/0, occupancy 33% = 16 warps/SM)
+  cycles/op:       1.646  [p05 1.646, p95 1.646, CV 0.00%]
+  throughput:      0.607 warp-instr/cycle/SM  = 19.4 thread-ops/cycle/SM
+  runtime:         0.273 ms (event-timed)
+  instructions:    ~306,250 per warp (static loop body 98 x trips)
+  loop body:       FFMAx37, FMULx16, FADDx13, SHF.L.U32x8, MUFU.EX2x7, IMADx6, MUFU.RSQx6, SHFL.IDXx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3021/identity_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           1
+  registers:       28  (spills 0/0, occupancy 33% = 16 warps/SM)
+  cycles/op:       1.636  [p05 1.636, p95 1.636, CV 0.00%]
+  throughput:      0.611 warp-instr/cycle/SM  = 19.6 thread-ops/cycle/SM
+  runtime:         0.269 ms (event-timed)
+  instructions:    ~306,250 per warp (static loop body 98 x trips)
+  loop body:       FFMAx37, FMULx16, FADDx13, SHF.L.U32x8, MUFU.EX2x7, IMADx6, MUFU.RSQx6, SHFL.IDXx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3021/sb_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           1
+  registers:       28  (spills 0/0, occupancy 33% = 16 warps/SM)
+  cycles/op:       1.771  [p05 1.771, p95 1.771, CV 0.00%]
+  throughput:      0.565 warp-instr/cycle/SM  = 18.1 thread-ops/cycle/SM
+  runtime:         0.291 ms (event-timed)
+  instructions:    ~306,250 per warp (static loop body 98 x trips)
+  loop body:       FFMAx37, FMULx16, FADDx13, SHF.L.U32x8, MUFU.EX2x7, IMADx6, MUFU.RSQx6, SHFL.IDXx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3021/split_identity_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           1
+  registers:       29  (spills 0/0, occupancy 33% = 16 warps/SM)
+  cycles/op:       1.636  [p05 1.636, p95 1.636, CV 0.00%]
+  throughput:      0.611 warp-instr/cycle/SM  = 19.6 thread-ops/cycle/SM
+  runtime:         0.269 ms (event-timed)
+  instructions:    ~306,250 per warp (static loop body 98 x trips)
+  loop body:       FFMAx37, FMULx16, FADDx13, SHF.L.U32x8, MUFU.EX2x7, IMADx6, MUFU.RSQx6, SHFL.IDXx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3021/split_sb_late]
+  GPU clock:       1963 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           1
+  registers:       29  (spills 0/0, occupancy 33% = 16 warps/SM)
+  cycles/op:       1.802  [p05 1.802, p95 1.802, CV 0.00%]
+  throughput:      0.555 warp-instr/cycle/SM  = 17.8 thread-ops/cycle/SM
+  runtime:         0.294 ms (event-timed)
+  instructions:    ~306,250 per warp (static loop body 98 x trips)
+  loop body:       FFMAx37, FMULx16, FADDx13, SHF.L.U32x8, MUFU.EX2x7, IMADx6, MUFU.RSQx6, SHFL.IDXx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3022/ptxas]
+  GPU clock:       1973 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           2
+  registers:       26  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       3.102  [p05 3.102, p95 3.102, CV 0.00%]
+  throughput:      0.645 warp-instr/cycle/SM  = 20.6 thread-ops/cycle/SM
+  runtime:         0.117 ms (event-timed)
+  instructions:    ~58,968 per warp (static loop body 126 x trips)
+  loop body:       FFMAx48, FADDx13, FMULx13, SHF.L.U32x11, IMADx11, SHFL.IDXx10, MUFU.EX2x10, MUFU.RSQx7, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3022/identity_late]
+  GPU clock:       1963 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           2
+  registers:       26  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       3.087  [p05 3.087, p95 3.087, CV 0.00%]
+  throughput:      0.648 warp-instr/cycle/SM  = 20.7 thread-ops/cycle/SM
+  runtime:         0.114 ms (event-timed)
+  instructions:    ~58,968 per warp (static loop body 126 x trips)
+  loop body:       FFMAx48, FADDx13, FMULx13, SHF.L.U32x11, IMADx11, SHFL.IDXx10, MUFU.EX2x10, MUFU.RSQx7, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3022/sb_late]
+  GPU clock:       1963 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           2
+  registers:       26  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       3.188  [p05 3.188, p95 3.188, CV 0.00%]
+  throughput:      0.627 warp-instr/cycle/SM  = 20.1 thread-ops/cycle/SM
+  runtime:         0.121 ms (event-timed)
+  instructions:    ~58,968 per warp (static loop body 126 x trips)
+  loop body:       FFMAx48, FADDx13, FMULx13, SHF.L.U32x11, IMADx11, SHFL.IDXx10, MUFU.EX2x10, MUFU.RSQx7, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3022/split_identity_late]
+  GPU clock:       1963 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           2
+  registers:       26  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       3.087  [p05 3.087, p95 3.087, CV 0.00%]
+  throughput:      0.648 warp-instr/cycle/SM  = 20.7 thread-ops/cycle/SM
+  runtime:         0.115 ms (event-timed)
+  instructions:    ~58,968 per warp (static loop body 126 x trips)
+  loop body:       FFMAx48, FADDx13, FMULx13, SHF.L.U32x11, IMADx11, SHFL.IDXx10, MUFU.EX2x10, MUFU.RSQx7, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3022/split_sb_late]
+  GPU clock:       1963 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           2
+  registers:       26  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       3.188  [p05 3.188, p95 3.188, CV 0.00%]
+  throughput:      0.627 warp-instr/cycle/SM  = 20.1 thread-ops/cycle/SM
+  runtime:         0.118 ms (event-timed)
+  instructions:    ~58,968 per warp (static loop body 126 x trips)
+  loop body:       FFMAx48, FADDx13, FMULx13, SHF.L.U32x11, IMADx11, SHFL.IDXx10, MUFU.EX2x10, MUFU.RSQx7, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3023/ptxas]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       26  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.958  [p05 2.957, p95 3.026, CV 1.13%]
+  throughput:      2.704 warp-instr/cycle/SM  = 86.5 thread-ops/cycle/SM
+  runtime:         0.480 ms (event-timed)
+  instructions:    ~294,437 per warp (static loop body 377 x trips)
+  loop body:       FFMAx144, FADDx61, FMULx39, MUFU.RSQx36, MUFU.EX2x29, IMADx28, SHF.L.U32x26, SHFL.IDXx10, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3023/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       26  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.006  [p05 2.986, p95 3.006, CV 0.23%]
+  throughput:      2.661 warp-instr/cycle/SM  = 85.2 thread-ops/cycle/SM
+  runtime:         0.480 ms (event-timed)
+  instructions:    ~294,437 per warp (static loop body 377 x trips)
+  loop body:       FFMAx144, FADDx61, FMULx39, MUFU.RSQx36, MUFU.EX2x29, IMADx28, SHF.L.U32x26, SHFL.IDXx10, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3023/sb_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       26  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.089  [p05 3.089, p95 3.090, CV 0.18%]
+  throughput:      2.589 warp-instr/cycle/SM  = 82.9 thread-ops/cycle/SM
+  runtime:         0.490 ms (event-timed)
+  instructions:    ~294,437 per warp (static loop body 377 x trips)
+  loop body:       FFMAx144, FADDx61, FMULx39, MUFU.RSQx36, MUFU.EX2x29, IMADx28, SHF.L.U32x26, SHFL.IDXx10, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3023/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       28  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.006  [p05 2.986, p95 3.006, CV 0.22%]
+  throughput:      2.661 warp-instr/cycle/SM  = 85.2 thread-ops/cycle/SM
+  runtime:         0.480 ms (event-timed)
+  instructions:    ~294,437 per warp (static loop body 377 x trips)
+  loop body:       FFMAx144, FADDx61, FMULx39, MUFU.RSQx36, MUFU.EX2x29, IMADx28, SHF.L.U32x26, SHFL.IDXx10, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3023/split_sb_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       28  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       3.104  [p05 3.103, p95 3.105, CV 0.02%]
+  throughput:      2.577 warp-instr/cycle/SM  = 82.5 thread-ops/cycle/SM
+  runtime:         0.493 ms (event-timed)
+  instructions:    ~294,437 per warp (static loop body 377 x trips)
+  loop body:       FFMAx144, FADDx61, FMULx39, MUFU.RSQx36, MUFU.EX2x29, IMADx28, SHF.L.U32x26, SHFL.IDXx10, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3024/ptxas]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           32
+  registers:       18  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.610  [p05 10.608, p95 12.488, CV 5.82%]
+  throughput:      3.016 warp-instr/cycle/SM  = 96.5 thread-ops/cycle/SM
+  runtime:         1.645 ms (event-timed)
+  instructions:    ~318,750 per warp (static loop body 34 x trips)
+  loop body:       SHF.L.U32x9, FFMAx8, IMADx6, FADDx3, FMULx2, MUFU.RSQx2, IADD3x1, SHFL.IDXx1, ISETP.GE.ANDx1, BRAx1
+
+[seed3024/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           32
+  registers:       18  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.620  [p05 10.619, p95 10.686, CV 2.99%]
+  throughput:      3.013 warp-instr/cycle/SM  = 96.4 thread-ops/cycle/SM
+  runtime:         1.646 ms (event-timed)
+  instructions:    ~318,750 per warp (static loop body 34 x trips)
+  loop body:       SHF.L.U32x9, FFMAx8, IMADx6, FADDx3, FMULx2, MUFU.RSQx2, IADD3x1, SHFL.IDXx1, ISETP.GE.ANDx1, BRAx1
+
+[seed3024/sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           32
+  registers:       18  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.673  [p05 10.672, p95 12.389, CV 7.67%]
+  throughput:      2.998 warp-instr/cycle/SM  = 95.9 thread-ops/cycle/SM
+  runtime:         1.655 ms (event-timed)
+  instructions:    ~318,750 per warp (static loop body 34 x trips)
+  loop body:       SHF.L.U32x9, FFMAx8, IMADx6, FADDx3, FMULx2, MUFU.RSQx2, IADD3x1, SHFL.IDXx1, ISETP.GE.ANDx1, BRAx1
+
+[seed3024/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           32
+  registers:       18  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.620  [p05 10.618, p95 12.451, CV 6.32%]
+  throughput:      3.013 warp-instr/cycle/SM  = 96.4 thread-ops/cycle/SM
+  runtime:         1.647 ms (event-timed)
+  instructions:    ~318,750 per warp (static loop body 34 x trips)
+  loop body:       SHF.L.U32x9, FFMAx8, IMADx6, FADDx3, FMULx2, MUFU.RSQx2, IADD3x1, SHFL.IDXx1, ISETP.GE.ANDx1, BRAx1
+
+[seed3024/split_sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           32
+  registers:       18  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.673  [p05 10.671, p95 10.675, CV 0.02%]
+  throughput:      2.998 warp-instr/cycle/SM  = 95.9 thread-ops/cycle/SM
+  runtime:         1.651 ms (event-timed)
+  instructions:    ~318,750 per warp (static loop body 34 x trips)
+  loop body:       SHF.L.U32x9, FFMAx8, IMADx6, FADDx3, FMULx2, MUFU.RSQx2, IADD3x1, SHFL.IDXx1, ISETP.GE.ANDx1, BRAx1
+
+[seed3025/ptxas]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           16
+  registers:       19  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       9.277  [p05 9.274, p95 9.280, CV 3.70%]
+  throughput:      1.725 warp-instr/cycle/SM  = 55.2 thread-ops/cycle/SM
+  runtime:         1.441 ms (event-timed)
+  instructions:    ~318,750 per warp (static loop body 51 x trips)
+  loop body:       IMADx20, SHF.L.U32x20, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3025/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           16
+  registers:       19  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       9.164  [p05 9.161, p95 10.100, CV 4.86%]
+  throughput:      1.746 warp-instr/cycle/SM  = 55.9 thread-ops/cycle/SM
+  runtime:         1.420 ms (event-timed)
+  instructions:    ~318,750 per warp (static loop body 51 x trips)
+  loop body:       IMADx20, SHF.L.U32x20, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3025/sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           16
+  registers:       19  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       9.163  [p05 9.161, p95 9.165, CV 0.01%]
+  throughput:      1.746 warp-instr/cycle/SM  = 55.9 thread-ops/cycle/SM
+  runtime:         1.418 ms (event-timed)
+  instructions:    ~318,750 per warp (static loop body 51 x trips)
+  loop body:       IMADx20, SHF.L.U32x20, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3025/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           16
+  registers:       19  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       9.164  [p05 9.161, p95 10.801, CV 5.61%]
+  throughput:      1.746 warp-instr/cycle/SM  = 55.9 thread-ops/cycle/SM
+  runtime:         1.420 ms (event-timed)
+  instructions:    ~318,750 per warp (static loop body 51 x trips)
+  loop body:       IMADx20, SHF.L.U32x20, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3025/split_sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           16
+  registers:       19  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       9.163  [p05 9.161, p95 10.174, CV 5.04%]
+  throughput:      1.746 warp-instr/cycle/SM  = 55.9 thread-ops/cycle/SM
+  runtime:         1.422 ms (event-timed)
+  instructions:    ~318,750 per warp (static loop body 51 x trips)
+  loop body:       IMADx20, SHF.L.U32x20, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3026/ptxas]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       28  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.436  [p05 10.435, p95 12.334, CV 5.86%]
+  throughput:      3.066 warp-instr/cycle/SM  = 98.1 thread-ops/cycle/SM
+  runtime:         1.617 ms (event-timed)
+  instructions:    ~296,780 per warp (static loop body 190 x trips)
+  loop body:       FFMAx62, SHF.L.U32x28, IMADx24, FADDx19, FMULx16, MUFU.RSQx14, MUFU.EX2x12, SHFL.IDXx12, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3026/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 46 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       28  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.443  [p05 10.441, p95 11.477, CV 4.53%]
+  throughput:      3.064 warp-instr/cycle/SM  = 98.1 thread-ops/cycle/SM
+  runtime:         1.619 ms (event-timed)
+  instructions:    ~296,780 per warp (static loop body 190 x trips)
+  loop body:       FFMAx62, SHF.L.U32x28, IMADx24, FADDx19, FMULx16, MUFU.RSQx14, MUFU.EX2x12, SHFL.IDXx12, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3026/sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       28  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.459  [p05 10.454, p95 12.515, CV 7.17%]
+  throughput:      3.059 warp-instr/cycle/SM  = 97.9 thread-ops/cycle/SM
+  runtime:         1.620 ms (event-timed)
+  instructions:    ~296,780 per warp (static loop body 190 x trips)
+  loop body:       FFMAx62, SHF.L.U32x28, IMADx24, FADDx19, FMULx16, MUFU.RSQx14, MUFU.EX2x12, SHFL.IDXx12, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3026/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       32  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.448  [p05 10.445, p95 12.346, CV 5.66%]
+  throughput:      3.063 warp-instr/cycle/SM  = 98.0 thread-ops/cycle/SM
+  runtime:         1.615 ms (event-timed)
+  instructions:    ~296,780 per warp (static loop body 190 x trips)
+  loop body:       FFMAx62, SHF.L.U32x28, IMADx24, FADDx19, FMULx16, MUFU.RSQx14, MUFU.EX2x12, SHFL.IDXx12, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3026/split_sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           32
+  registers:       32  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.469  [p05 10.466, p95 12.441, CV 6.21%]
+  throughput:      3.057 warp-instr/cycle/SM  = 97.8 thread-ops/cycle/SM
+  runtime:         1.620 ms (event-timed)
+  instructions:    ~296,780 per warp (static loop body 190 x trips)
+  loop body:       FFMAx62, SHF.L.U32x28, IMADx24, FADDx19, FMULx16, MUFU.RSQx14, MUFU.EX2x12, SHFL.IDXx12, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3027/ptxas]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 46 C)
+  iterations:      59,904 ops/thread
+  warps:           32
+  registers:       19  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       13.600  [p05 13.591, p95 13.603, CV 0.03%]
+  throughput:      2.353 warp-instr/cycle/SM  = 75.3 thread-ops/cycle/SM
+  runtime:         0.434 ms (event-timed)
+  instructions:    ~59,436 per warp (static loop body 127 x trips)
+  loop body:       FFMAx68, FMULx18, MUFU.RSQx14, FADDx12, MUFU.EX2x12, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3027/identity_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           32
+  registers:       19  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       13.613  [p05 13.606, p95 13.613, CV 0.02%]
+  throughput:      2.351 warp-instr/cycle/SM  = 75.2 thread-ops/cycle/SM
+  runtime:         0.439 ms (event-timed)
+  instructions:    ~59,436 per warp (static loop body 127 x trips)
+  loop body:       FFMAx68, FMULx18, MUFU.RSQx14, FADDx12, MUFU.EX2x12, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3027/sb_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           32
+  registers:       19  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       13.599  [p05 13.595, p95 13.601, CV 0.02%]
+  throughput:      2.353 warp-instr/cycle/SM  = 75.3 thread-ops/cycle/SM
+  runtime:         0.440 ms (event-timed)
+  instructions:    ~59,436 per warp (static loop body 127 x trips)
+  loop body:       FFMAx68, FMULx18, MUFU.RSQx14, FADDx12, MUFU.EX2x12, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3027/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           32
+  registers:       21  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       13.610  [p05 13.606, p95 13.616, CV 0.03%]
+  throughput:      2.351 warp-instr/cycle/SM  = 75.2 thread-ops/cycle/SM
+  runtime:         0.436 ms (event-timed)
+  instructions:    ~59,436 per warp (static loop body 127 x trips)
+  loop body:       FFMAx68, FMULx18, MUFU.RSQx14, FADDx12, MUFU.EX2x12, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3027/split_sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      59,904 ops/thread
+  warps:           32
+  registers:       21  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       13.636  [p05 13.634, p95 13.638, CV 0.02%]
+  throughput:      2.347 warp-instr/cycle/SM  = 75.1 thread-ops/cycle/SM
+  runtime:         0.441 ms (event-timed)
+  instructions:    ~59,436 per warp (static loop body 127 x trips)
+  loop body:       FFMAx68, FMULx18, MUFU.RSQx14, FADDx12, MUFU.EX2x12, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3028/ptxas]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,776 ops/thread
+  warps:           32
+  registers:       29  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       9.696  [p05 9.696, p95 10.666, CV 5.37%]
+  throughput:      3.300 warp-instr/cycle/SM  = 105.6 thread-ops/cycle/SM
+  runtime:         1.504 ms (event-timed)
+  instructions:    ~298,605 per warp (static loop body 255 x trips)
+  loop body:       FFMAx93, FMULx37, IMADx30, FADDx29, SHF.L.U32x27, MUFU.EX2x15, MUFU.RSQx14, SHFL.IDXx7, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3028/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,776 ops/thread
+  warps:           32
+  registers:       29  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       9.718  [p05 9.717, p95 10.556, CV 4.43%]
+  throughput:      3.293 warp-instr/cycle/SM  = 105.4 thread-ops/cycle/SM
+  runtime:         1.503 ms (event-timed)
+  instructions:    ~298,605 per warp (static loop body 255 x trips)
+  loop body:       FFMAx93, FMULx37, IMADx30, FADDx29, SHF.L.U32x27, MUFU.EX2x15, MUFU.RSQx14, SHFL.IDXx7, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3028/sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,776 ops/thread
+  warps:           32
+  registers:       29  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       9.776  [p05 9.774, p95 11.743, CV 7.06%]
+  throughput:      3.273 warp-instr/cycle/SM  = 104.7 thread-ops/cycle/SM
+  runtime:         1.519 ms (event-timed)
+  instructions:    ~298,605 per warp (static loop body 255 x trips)
+  loop body:       FFMAx93, FMULx37, IMADx30, FADDx29, SHF.L.U32x27, MUFU.EX2x15, MUFU.RSQx14, SHFL.IDXx7, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3028/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,776 ops/thread
+  warps:           32
+  registers:       31  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       9.721  [p05 9.718, p95 11.637, CV 6.63%]
+  throughput:      3.292 warp-instr/cycle/SM  = 105.3 thread-ops/cycle/SM
+  runtime:         1.507 ms (event-timed)
+  instructions:    ~298,605 per warp (static loop body 255 x trips)
+  loop body:       FFMAx93, FMULx37, IMADx30, FADDx29, SHF.L.U32x27, MUFU.EX2x15, MUFU.RSQx14, SHFL.IDXx7, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3028/split_sb_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,776 ops/thread
+  warps:           32
+  registers:       31  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       9.858  [p05 9.856, p95 11.691, CV 7.07%]
+  throughput:      3.246 warp-instr/cycle/SM  = 103.9 thread-ops/cycle/SM
+  runtime:         1.527 ms (event-timed)
+  instructions:    ~298,605 per warp (static loop body 255 x trips)
+  loop body:       FFMAx93, FMULx37, IMADx30, FADDx29, SHF.L.U32x27, MUFU.EX2x15, MUFU.RSQx14, SHFL.IDXx7, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3029/ptxas]
+  GPU clock:       1968 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       24  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       1.694  [p05 1.693, p95 1.694, CV 0.01%]
+  throughput:      1.181 warp-instr/cycle/SM  = 37.8 thread-ops/cycle/SM
+  runtime:         0.281 ms (event-timed)
+  instructions:    ~299,904 per warp (static loop body 192 x trips)
+  loop body:       FFMAx57, SHF.L.U32x32, FADDx28, IMADx24, MUFU.EX2x17, FMULx15, MUFU.RSQx8, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3029/identity_late]
+  GPU clock:       1962 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       24  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       1.688  [p05 1.688, p95 1.688, CV 0.00%]
+  throughput:      1.185 warp-instr/cycle/SM  = 37.9 thread-ops/cycle/SM
+  runtime:         0.277 ms (event-timed)
+  instructions:    ~299,904 per warp (static loop body 192 x trips)
+  loop body:       FFMAx57, SHF.L.U32x32, FADDx28, IMADx24, MUFU.EX2x17, FMULx15, MUFU.RSQx8, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3029/sb_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       24  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       1.933  [p05 1.933, p95 1.933, CV 0.00%]
+  throughput:      1.035 warp-instr/cycle/SM  = 33.1 thread-ops/cycle/SM
+  runtime:         0.317 ms (event-timed)
+  instructions:    ~299,904 per warp (static loop body 192 x trips)
+  loop body:       FFMAx57, SHF.L.U32x32, FADDx28, IMADx24, MUFU.EX2x17, FMULx15, MUFU.RSQx8, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3029/split_identity_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       24  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       1.688  [p05 1.688, p95 1.688, CV 0.01%]
+  throughput:      1.185 warp-instr/cycle/SM  = 37.9 thread-ops/cycle/SM
+  runtime:         0.280 ms (event-timed)
+  instructions:    ~299,904 per warp (static loop body 192 x trips)
+  loop body:       FFMAx57, SHF.L.U32x32, FADDx28, IMADx24, MUFU.EX2x17, FMULx15, MUFU.RSQx8, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3029/split_sb_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           2
+  registers:       24  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       1.933  [p05 1.933, p95 1.933, CV 0.00%]
+  throughput:      1.035 warp-instr/cycle/SM  = 33.1 thread-ops/cycle/SM
+  runtime:         0.317 ms (event-timed)
+  instructions:    ~299,904 per warp (static loop body 192 x trips)
+  loop body:       FFMAx57, SHF.L.U32x32, FADDx28, IMADx24, MUFU.EX2x17, FMULx15, MUFU.RSQx8, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3030/ptxas]
+  GPU clock:       1968 MHz in-kernel (NVML 1965 MHz, 46 C)
+  iterations:      60,000 ops/thread
+  warps:           4
+  registers:       20  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.407  [p05 5.407, p95 5.407, CV 0.00%]
+  throughput:      0.740 warp-instr/cycle/SM  = 23.7 thread-ops/cycle/SM
+  runtime:         0.185 ms (event-timed)
+  instructions:    ~65,625 per warp (static loop body 35 x trips)
+  loop body:       FFMAx11, IMADx9, SHFL.IDXx4, SHF.L.U32x3, MUFU.RSQx2, FADDx1, IADD3x1, FMULx1, ISETP.GE.ANDx1, MUFU.EX2x1, BRAx1
+
+[seed3030/identity_late]
+  GPU clock:       1970 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      60,000 ops/thread
+  warps:           4
+  registers:       20  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.313  [p05 5.313, p95 5.313, CV 0.00%]
+  throughput:      0.753 warp-instr/cycle/SM  = 24.1 thread-ops/cycle/SM
+  runtime:         0.185 ms (event-timed)
+  instructions:    ~65,625 per warp (static loop body 35 x trips)
+  loop body:       FFMAx11, IMADx9, SHFL.IDXx4, SHF.L.U32x3, MUFU.RSQx2, FADDx1, IADD3x1, FMULx1, ISETP.GE.ANDx1, MUFU.EX2x1, BRAx1
+
+[seed3030/sb_late]
+  GPU clock:       1959 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      60,000 ops/thread
+  warps:           4
+  registers:       20  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.282  [p05 5.282, p95 5.282, CV 0.00%]
+  throughput:      0.757 warp-instr/cycle/SM  = 24.2 thread-ops/cycle/SM
+  runtime:         0.180 ms (event-timed)
+  instructions:    ~65,625 per warp (static loop body 35 x trips)
+  loop body:       FFMAx11, IMADx9, SHFL.IDXx4, SHF.L.U32x3, MUFU.RSQx2, FADDx1, IADD3x1, FMULx1, ISETP.GE.ANDx1, MUFU.EX2x1, BRAx1
+
+[seed3030/split_identity_late]
+  GPU clock:       1970 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      60,000 ops/thread
+  warps:           4
+  registers:       20  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.313  [p05 5.313, p95 5.313, CV 0.00%]
+  throughput:      0.753 warp-instr/cycle/SM  = 24.1 thread-ops/cycle/SM
+  runtime:         0.187 ms (event-timed)
+  instructions:    ~65,625 per warp (static loop body 35 x trips)
+  loop body:       FFMAx11, IMADx9, SHFL.IDXx4, SHF.L.U32x3, MUFU.RSQx2, FADDx1, IADD3x1, FMULx1, ISETP.GE.ANDx1, MUFU.EX2x1, BRAx1
+
+[seed3030/split_sb_late]
+  GPU clock:       1959 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      60,000 ops/thread
+  warps:           4
+  registers:       20  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.282  [p05 5.282, p95 5.282, CV 0.00%]
+  throughput:      0.757 warp-instr/cycle/SM  = 24.2 thread-ops/cycle/SM
+  runtime:         0.181 ms (event-timed)
+  instructions:    ~65,625 per warp (static loop body 35 x trips)
+  loop body:       FFMAx11, IMADx9, SHFL.IDXx4, SHF.L.U32x3, MUFU.RSQx2, FADDx1, IADD3x1, FMULx1, ISETP.GE.ANDx1, MUFU.EX2x1, BRAx1
+
+[seed3031/ptxas]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           32
+  registers:       30  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       9.541  [p05 9.540, p95 11.441, CV 6.54%]
+  throughput:      3.354 warp-instr/cycle/SM  = 107.3 thread-ops/cycle/SM
+  runtime:         1.475 ms (event-timed)
+  instructions:    ~289,575 per warp (static loop body 495 x trips)
+  loop body:       FFMAx150, IMADx83, SHF.L.U32x78, FMULx52, FADDx48, SHFL.IDXx31, MUFU.RSQx26, MUFU.EX2x23, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3031/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           32
+  registers:       30  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       9.542  [p05 9.540, p95 11.496, CV 7.81%]
+  throughput:      3.354 warp-instr/cycle/SM  = 107.3 thread-ops/cycle/SM
+  runtime:         1.481 ms (event-timed)
+  instructions:    ~289,575 per warp (static loop body 495 x trips)
+  loop body:       FFMAx150, IMADx83, SHF.L.U32x78, FMULx52, FADDx48, SHFL.IDXx31, MUFU.RSQx26, MUFU.EX2x23, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3031/sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           32
+  registers:       30  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       9.598  [p05 9.592, p95 10.385, CV 4.14%]
+  throughput:      3.334 warp-instr/cycle/SM  = 106.7 thread-ops/cycle/SM
+  runtime:         1.488 ms (event-timed)
+  instructions:    ~289,575 per warp (static loop body 495 x trips)
+  loop body:       FFMAx150, IMADx83, SHF.L.U32x78, FMULx52, FADDx48, SHFL.IDXx31, MUFU.RSQx26, MUFU.EX2x23, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3031/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           32
+  registers:       30  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       9.541  [p05 9.540, p95 10.602, CV 5.16%]
+  throughput:      3.354 warp-instr/cycle/SM  = 107.3 thread-ops/cycle/SM
+  runtime:         1.477 ms (event-timed)
+  instructions:    ~289,575 per warp (static loop body 495 x trips)
+  loop body:       FFMAx150, IMADx83, SHF.L.U32x78, FMULx52, FADDx48, SHFL.IDXx31, MUFU.RSQx26, MUFU.EX2x23, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3031/split_sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           32
+  registers:       30  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       9.598  [p05 9.592, p95 11.449, CV 6.87%]
+  throughput:      3.334 warp-instr/cycle/SM  = 106.7 thread-ops/cycle/SM
+  runtime:         1.486 ms (event-timed)
+  instructions:    ~289,575 per warp (static loop body 495 x trips)
+  loop body:       FFMAx150, IMADx83, SHF.L.U32x78, FMULx52, FADDx48, SHFL.IDXx31, MUFU.RSQx26, MUFU.EX2x23, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3032/ptxas]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           2
+  registers:       21  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       4.198  [p05 4.198, p95 4.198, CV 0.00%]
+  throughput:      0.476 warp-instr/cycle/SM  = 15.2 thread-ops/cycle/SM
+  runtime:         0.666 ms (event-timed)
+  instructions:    ~290,625 per warp (static loop body 93 x trips)
+  loop body:       FFMAx25, SHF.L.U32x21, IMADx19, FADDx9, SHFL.IDXx8, MUFU.EX2x3, FMULx3, MUFU.RSQx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3032/identity_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           2
+  registers:       21  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       4.177  [p05 4.177, p95 4.177, CV 0.00%]
+  throughput:      0.479 warp-instr/cycle/SM  = 15.3 thread-ops/cycle/SM
+  runtime:         0.656 ms (event-timed)
+  instructions:    ~290,625 per warp (static loop body 93 x trips)
+  loop body:       FFMAx25, SHF.L.U32x21, IMADx19, FADDx9, SHFL.IDXx8, MUFU.EX2x3, FMULx3, MUFU.RSQx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3032/sb_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           2
+  registers:       21  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       4.261  [p05 4.261, p95 4.261, CV 0.00%]
+  throughput:      0.469 warp-instr/cycle/SM  = 15.0 thread-ops/cycle/SM
+  runtime:         0.670 ms (event-timed)
+  instructions:    ~290,625 per warp (static loop body 93 x trips)
+  loop body:       FFMAx25, SHF.L.U32x21, IMADx19, FADDx9, SHFL.IDXx8, MUFU.EX2x3, FMULx3, MUFU.RSQx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3032/split_identity_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           2
+  registers:       21  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       4.177  [p05 4.177, p95 4.177, CV 0.00%]
+  throughput:      0.479 warp-instr/cycle/SM  = 15.3 thread-ops/cycle/SM
+  runtime:         0.657 ms (event-timed)
+  instructions:    ~290,625 per warp (static loop body 93 x trips)
+  loop body:       FFMAx25, SHF.L.U32x21, IMADx19, FADDx9, SHFL.IDXx8, MUFU.EX2x3, FMULx3, MUFU.RSQx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3032/split_sb_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           2
+  registers:       21  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       4.261  [p05 4.261, p95 4.261, CV 0.00%]
+  throughput:      0.469 warp-instr/cycle/SM  = 15.0 thread-ops/cycle/SM
+  runtime:         0.670 ms (event-timed)
+  instructions:    ~290,625 per warp (static loop body 93 x trips)
+  loop body:       FFMAx25, SHF.L.U32x21, IMADx19, FADDx9, SHFL.IDXx8, MUFU.EX2x3, FMULx3, MUFU.RSQx2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3033/ptxas]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           16
+  registers:       30  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.072  [p05 5.070, p95 5.074, CV 0.03%]
+  throughput:      3.154 warp-instr/cycle/SM  = 100.9 thread-ops/cycle/SM
+  runtime:         0.793 ms (event-timed)
+  instructions:    ~297,765 per warp (static loop body 509 x trips)
+  loop body:       FFMAx159, IMADx90, SHF.L.U32x79, FMULx47, FADDx45, MUFU.RSQx34, MUFU.EX2x28, SHFL.IDXx23, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3033/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 46 C)
+  iterations:      299,520 ops/thread
+  warps:           16
+  registers:       30  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.070  [p05 5.069, p95 5.071, CV 0.02%]
+  throughput:      3.156 warp-instr/cycle/SM  = 101.0 thread-ops/cycle/SM
+  runtime:         0.793 ms (event-timed)
+  instructions:    ~297,765 per warp (static loop body 509 x trips)
+  loop body:       FFMAx159, IMADx90, SHF.L.U32x79, FMULx47, FADDx45, MUFU.RSQx34, MUFU.EX2x28, SHFL.IDXx23, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3033/sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           16
+  registers:       30  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.317  [p05 5.315, p95 5.321, CV 0.04%]
+  throughput:      3.009 warp-instr/cycle/SM  = 96.3 thread-ops/cycle/SM
+  runtime:         0.829 ms (event-timed)
+  instructions:    ~297,765 per warp (static loop body 509 x trips)
+  loop body:       FFMAx159, IMADx90, SHF.L.U32x79, FMULx47, FADDx45, MUFU.RSQx34, MUFU.EX2x28, SHFL.IDXx23, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3033/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           16
+  registers:       36  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.090  [p05 5.088, p95 5.092, CV 0.04%]
+  throughput:      3.144 warp-instr/cycle/SM  = 100.6 thread-ops/cycle/SM
+  runtime:         0.796 ms (event-timed)
+  instructions:    ~297,765 per warp (static loop body 509 x trips)
+  loop body:       FFMAx159, IMADx90, SHF.L.U32x79, FMULx47, FADDx45, MUFU.RSQx34, MUFU.EX2x28, SHFL.IDXx23, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3033/split_sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,520 ops/thread
+  warps:           16
+  registers:       36  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       5.090  [p05 5.089, p95 5.092, CV 0.02%]
+  throughput:      3.143 warp-instr/cycle/SM  = 100.6 thread-ops/cycle/SM
+  runtime:         0.800 ms (event-timed)
+  instructions:    ~297,765 per warp (static loop body 509 x trips)
+  loop body:       FFMAx159, IMADx90, SHF.L.U32x79, FMULx47, FADDx45, MUFU.RSQx34, MUFU.EX2x28, SHFL.IDXx23, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3034/ptxas]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,808 ops/thread
+  warps:           32
+  registers:       26  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.309  [p05 10.306, p95 11.905, CV 5.12%]
+  throughput:      3.104 warp-instr/cycle/SM  = 99.3 thread-ops/cycle/SM
+  runtime:         1.597 ms (event-timed)
+  instructions:    ~291,480 per warp (static loop body 280 x trips)
+  loop body:       FFMAx116, FADDx42, FMULx29, MUFU.RSQx23, SHF.L.U32x22, IMADx19, MUFU.EX2x18, SHFL.IDXx7, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3034/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,808 ops/thread
+  warps:           32
+  registers:       26  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.308  [p05 10.306, p95 11.173, CV 4.21%]
+  throughput:      3.104 warp-instr/cycle/SM  = 99.3 thread-ops/cycle/SM
+  runtime:         1.596 ms (event-timed)
+  instructions:    ~291,480 per warp (static loop body 280 x trips)
+  loop body:       FFMAx116, FADDx42, FMULx29, MUFU.RSQx23, SHF.L.U32x22, IMADx19, MUFU.EX2x18, SHFL.IDXx7, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3034/sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,808 ops/thread
+  warps:           32
+  registers:       26  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.404  [p05 10.401, p95 12.239, CV 5.75%]
+  throughput:      3.076 warp-instr/cycle/SM  = 98.4 thread-ops/cycle/SM
+  runtime:         1.612 ms (event-timed)
+  instructions:    ~291,480 per warp (static loop body 280 x trips)
+  loop body:       FFMAx116, FADDx42, FMULx29, MUFU.RSQx23, SHF.L.U32x22, IMADx19, MUFU.EX2x18, SHFL.IDXx7, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3034/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,808 ops/thread
+  warps:           32
+  registers:       30  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.311  [p05 10.309, p95 12.311, CV 6.52%]
+  throughput:      3.104 warp-instr/cycle/SM  = 99.3 thread-ops/cycle/SM
+  runtime:         1.596 ms (event-timed)
+  instructions:    ~291,480 per warp (static loop body 280 x trips)
+  loop body:       FFMAx116, FADDx42, FMULx29, MUFU.RSQx23, SHF.L.U32x22, IMADx19, MUFU.EX2x18, SHFL.IDXx7, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3034/split_sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,808 ops/thread
+  warps:           32
+  registers:       30  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       10.549  [p05 10.545, p95 12.452, CV 6.44%]
+  throughput:      3.034 warp-instr/cycle/SM  = 97.1 thread-ops/cycle/SM
+  runtime:         1.632 ms (event-timed)
+  instructions:    ~291,480 per warp (static loop body 280 x trips)
+  loop body:       FFMAx116, FADDx42, FMULx29, MUFU.RSQx23, SHF.L.U32x22, IMADx19, MUFU.EX2x18, SHFL.IDXx7, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3035/ptxas]
+  GPU clock:       1963 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,808 ops/thread
+  warps:           4
+  registers:       27  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       1.790  [p05 1.790, p95 1.790, CV 0.00%]
+  throughput:      2.234 warp-instr/cycle/SM  = 71.5 thread-ops/cycle/SM
+  runtime:         0.296 ms (event-timed)
+  instructions:    ~291,480 per warp (static loop body 280 x trips)
+  loop body:       FFMAx122, FMULx34, FADDx27, MUFU.RSQx23, MUFU.EX2x22, SHF.L.U32x21, IMADx19, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3035/identity_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,808 ops/thread
+  warps:           4
+  registers:       27  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       1.800  [p05 1.800, p95 1.800, CV 0.00%]
+  throughput:      2.223 warp-instr/cycle/SM  = 71.1 thread-ops/cycle/SM
+  runtime:         0.294 ms (event-timed)
+  instructions:    ~291,480 per warp (static loop body 280 x trips)
+  loop body:       FFMAx122, FMULx34, FADDx27, MUFU.RSQx23, MUFU.EX2x22, SHF.L.U32x21, IMADx19, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3035/sb_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 46 C)
+  iterations:      299,808 ops/thread
+  warps:           4
+  registers:       27  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       1.885  [p05 1.885, p95 1.885, CV 0.00%]
+  throughput:      2.122 warp-instr/cycle/SM  = 67.9 thread-ops/cycle/SM
+  runtime:         0.308 ms (event-timed)
+  instructions:    ~291,480 per warp (static loop body 280 x trips)
+  loop body:       FFMAx122, FMULx34, FADDx27, MUFU.RSQx23, MUFU.EX2x22, SHF.L.U32x21, IMADx19, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3035/split_identity_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,808 ops/thread
+  warps:           4
+  registers:       31  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       1.800  [p05 1.800, p95 1.800, CV 0.01%]
+  throughput:      2.223 warp-instr/cycle/SM  = 71.1 thread-ops/cycle/SM
+  runtime:         0.294 ms (event-timed)
+  instructions:    ~291,480 per warp (static loop body 280 x trips)
+  loop body:       FFMAx122, FMULx34, FADDx27, MUFU.RSQx23, MUFU.EX2x22, SHF.L.U32x21, IMADx19, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3035/split_sb_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,808 ops/thread
+  warps:           4
+  registers:       31  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       1.873  [p05 1.873, p95 1.874, CV 0.03%]
+  throughput:      2.135 warp-instr/cycle/SM  = 68.3 thread-ops/cycle/SM
+  runtime:         0.309 ms (event-timed)
+  instructions:    ~291,480 per warp (static loop body 280 x trips)
+  loop body:       FFMAx122, FMULx34, FADDx27, MUFU.RSQx23, MUFU.EX2x22, SHF.L.U32x21, IMADx19, SHFL.IDXx8, IADD3x1, ISETP.GE.ANDx1, CALL.REL.NOINCx1, BRAx1
+
+[seed3036/ptxas]
+  GPU clock:       1968 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           4
+  registers:       28  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       1.774  [p05 1.774, p95 1.774, CV 0.00%]
+  throughput:      2.255 warp-instr/cycle/SM  = 72.2 thread-ops/cycle/SM
+  runtime:         0.292 ms (event-timed)
+  instructions:    ~297,561 per warp (static loop body 127 x trips)
+  loop body:       FFMAx37, SHF.L.U32x23, IMADx19, FADDx12, FMULx12, MUFU.RSQx8, MUFU.EX2x7, SHFL.IDXx6, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3036/identity_late]
+  GPU clock:       1968 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           4
+  registers:       28  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       1.774  [p05 1.774, p95 1.774, CV 0.01%]
+  throughput:      2.255 warp-instr/cycle/SM  = 72.2 thread-ops/cycle/SM
+  runtime:         0.295 ms (event-timed)
+  instructions:    ~297,561 per warp (static loop body 127 x trips)
+  loop body:       FFMAx37, SHF.L.U32x23, IMADx19, FADDx12, FMULx12, MUFU.RSQx8, MUFU.EX2x7, SHFL.IDXx6, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3036/sb_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           4
+  registers:       28  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       1.938  [p05 1.938, p95 1.938, CV 0.00%]
+  throughput:      2.064 warp-instr/cycle/SM  = 66.0 thread-ops/cycle/SM
+  runtime:         0.317 ms (event-timed)
+  instructions:    ~297,561 per warp (static loop body 127 x trips)
+  loop body:       FFMAx37, SHF.L.U32x23, IMADx19, FADDx12, FMULx12, MUFU.RSQx8, MUFU.EX2x7, SHFL.IDXx6, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3036/split_identity_late]
+  GPU clock:       1968 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           4
+  registers:       28  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       1.774  [p05 1.774, p95 1.774, CV 0.00%]
+  throughput:      2.255 warp-instr/cycle/SM  = 72.2 thread-ops/cycle/SM
+  runtime:         0.290 ms (event-timed)
+  instructions:    ~297,561 per warp (static loop body 127 x trips)
+  loop body:       FFMAx37, SHF.L.U32x23, IMADx19, FADDx12, FMULx12, MUFU.RSQx8, MUFU.EX2x7, SHFL.IDXx6, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3036/split_sb_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           4
+  registers:       28  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       1.938  [p05 1.938, p95 1.938, CV 0.00%]
+  throughput:      2.064 warp-instr/cycle/SM  = 66.0 thread-ops/cycle/SM
+  runtime:         0.315 ms (event-timed)
+  instructions:    ~297,561 per warp (static loop body 127 x trips)
+  loop body:       FFMAx37, SHF.L.U32x23, IMADx19, FADDx12, FMULx12, MUFU.RSQx8, MUFU.EX2x7, SHFL.IDXx6, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3037/ptxas]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       28  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.758  [p05 2.717, p95 2.766, CV 0.58%]
+  throughput:      2.901 warp-instr/cycle/SM  = 92.8 thread-ops/cycle/SM
+  runtime:         0.440 ms (event-timed)
+  instructions:    ~304,590 per warp (static loop body 130 x trips)
+  loop body:       IMADx38, SHF.L.U32x30, FFMAx27, SHFL.IDXx12, FMULx6, MUFU.EX2x6, MUFU.RSQx5, FADDx3, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3037/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       28  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.711  [p05 2.691, p95 2.758, CV 0.98%]
+  throughput:      2.951 warp-instr/cycle/SM  = 94.4 thread-ops/cycle/SM
+  runtime:         0.437 ms (event-timed)
+  instructions:    ~304,590 per warp (static loop body 130 x trips)
+  loop body:       IMADx38, SHF.L.U32x30, FFMAx27, SHFL.IDXx12, FMULx6, MUFU.EX2x6, MUFU.RSQx5, FADDx3, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3037/sb_late]
+  GPU clock:       1964 MHz in-kernel (NVML 1965 MHz, 46 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       28  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.856  [p05 2.831, p95 2.860, CV 0.39%]
+  throughput:      2.801 warp-instr/cycle/SM  = 89.6 thread-ops/cycle/SM
+  runtime:         0.458 ms (event-timed)
+  instructions:    ~304,590 per warp (static loop body 130 x trips)
+  loop body:       IMADx38, SHF.L.U32x30, FFMAx27, SHFL.IDXx12, MUFU.EX2x6, FMULx6, MUFU.RSQx5, FADDx3, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3037/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 46 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       30  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.750  [p05 2.691, p95 2.750, CV 0.95%]
+  throughput:      2.909 warp-instr/cycle/SM  = 93.1 thread-ops/cycle/SM
+  runtime:         0.437 ms (event-timed)
+  instructions:    ~304,590 per warp (static loop body 130 x trips)
+  loop body:       IMADx38, SHF.L.U32x30, FFMAx27, SHFL.IDXx12, FMULx6, MUFU.EX2x6, MUFU.RSQx5, FADDx3, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3037/split_sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      299,904 ops/thread
+  warps:           8
+  registers:       30  (spills 0/0, occupancy 100% = 48 warps/SM)
+  cycles/op:       2.797  [p05 2.797, p95 2.805, CV 0.13%]
+  throughput:      2.860 warp-instr/cycle/SM  = 91.5 thread-ops/cycle/SM
+  runtime:         0.452 ms (event-timed)
+  instructions:    ~304,590 per warp (static loop body 130 x trips)
+  loop body:       IMADx38, SHF.L.U32x30, FFMAx27, SHFL.IDXx12, MUFU.EX2x6, FMULx6, MUFU.RSQx5, FADDx3, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3038/ptxas]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      60,000 ops/thread
+  warps:           1
+  registers:       20  (spills 0/0, occupancy 33% = 16 warps/SM)
+  cycles/op:       4.594  [p05 4.594, p95 4.594, CV 0.00%]
+  throughput:      0.218 warp-instr/cycle/SM  = 7.0 thread-ops/cycle/SM
+  runtime:         0.160 ms (event-timed)
+  instructions:    ~65,625 per warp (static loop body 35 x trips)
+  loop body:       SHF.L.U32x8, FFMAx6, IMADx5, SHFL.IDXx3, FMULx3, FADDx3, MUFU.RSQx2, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3038/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      60,000 ops/thread
+  warps:           1
+  registers:       20  (spills 0/0, occupancy 33% = 16 warps/SM)
+  cycles/op:       4.594  [p05 4.594, p95 4.594, CV 0.00%]
+  throughput:      0.218 warp-instr/cycle/SM  = 7.0 thread-ops/cycle/SM
+  runtime:         0.161 ms (event-timed)
+  instructions:    ~65,625 per warp (static loop body 35 x trips)
+  loop body:       SHF.L.U32x8, FFMAx6, IMADx5, SHFL.IDXx3, FMULx3, FADDx3, MUFU.RSQx2, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3038/sb_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      60,000 ops/thread
+  warps:           1
+  registers:       20  (spills 0/0, occupancy 33% = 16 warps/SM)
+  cycles/op:       4.563  [p05 4.563, p95 4.563, CV 0.00%]
+  throughput:      0.219 warp-instr/cycle/SM  = 7.0 thread-ops/cycle/SM
+  runtime:         0.161 ms (event-timed)
+  instructions:    ~65,625 per warp (static loop body 35 x trips)
+  loop body:       SHF.L.U32x8, FFMAx6, IMADx5, SHFL.IDXx3, FMULx3, FADDx3, MUFU.RSQx2, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3038/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      60,000 ops/thread
+  warps:           1
+  registers:       20  (spills 0/0, occupancy 33% = 16 warps/SM)
+  cycles/op:       4.594  [p05 4.594, p95 4.594, CV 0.00%]
+  throughput:      0.218 warp-instr/cycle/SM  = 7.0 thread-ops/cycle/SM
+  runtime:         0.163 ms (event-timed)
+  instructions:    ~65,625 per warp (static loop body 35 x trips)
+  loop body:       SHF.L.U32x8, FFMAx6, IMADx5, SHFL.IDXx3, FMULx3, FADDx3, MUFU.RSQx2, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3038/split_sb_late]
+  GPU clock:       1966 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      60,000 ops/thread
+  warps:           1
+  registers:       20  (spills 0/0, occupancy 33% = 16 warps/SM)
+  cycles/op:       4.563  [p05 4.563, p95 4.563, CV 0.00%]
+  throughput:      0.219 warp-instr/cycle/SM  = 7.0 thread-ops/cycle/SM
+  runtime:         0.160 ms (event-timed)
+  instructions:    ~65,625 per warp (static loop body 35 x trips)
+  loop body:       SHF.L.U32x8, FFMAx6, IMADx5, SHFL.IDXx3, FMULx3, FADDx3, MUFU.RSQx2, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3039/ptxas]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           2
+  registers:       18  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       6.000  [p05 6.000, p95 6.000, CV 0.00%]
+  throughput:      0.333 warp-instr/cycle/SM  = 10.7 thread-ops/cycle/SM
+  runtime:         0.938 ms (event-timed)
+  instructions:    ~306,250 per warp (static loop body 49 x trips)
+  loop body:       FFMAx23, FADDx11, MUFU.RSQx5, FMULx5, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3039/identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           2
+  registers:       18  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       5.917  [p05 5.917, p95 5.917, CV 0.00%]
+  throughput:      0.338 warp-instr/cycle/SM  = 10.8 thread-ops/cycle/SM
+  runtime:         0.923 ms (event-timed)
+  instructions:    ~306,250 per warp (static loop body 49 x trips)
+  loop body:       FFMAx23, FADDx11, MUFU.RSQx5, FMULx5, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3039/sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           2
+  registers:       18  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       5.917  [p05 5.917, p95 5.917, CV 0.00%]
+  throughput:      0.338 warp-instr/cycle/SM  = 10.8 thread-ops/cycle/SM
+  runtime:         0.925 ms (event-timed)
+  instructions:    ~306,250 per warp (static loop body 49 x trips)
+  loop body:       FFMAx23, FADDx11, MUFU.RSQx5, FMULx5, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3039/split_identity_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 45 C)
+  iterations:      300,000 ops/thread
+  warps:           2
+  registers:       18  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       5.917  [p05 5.917, p95 5.917, CV 0.00%]
+  throughput:      0.338 warp-instr/cycle/SM  = 10.8 thread-ops/cycle/SM
+  runtime:         0.923 ms (event-timed)
+  instructions:    ~306,250 per warp (static loop body 49 x trips)
+  loop body:       FFMAx23, FADDx11, MUFU.RSQx5, FMULx5, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+[seed3039/split_sb_late]
+  GPU clock:       1965 MHz in-kernel (NVML 1965 MHz, 46 C)
+  iterations:      300,000 ops/thread
+  warps:           2
+  registers:       18  (spills 0/0, occupancy 67% = 32 warps/SM)
+  cycles/op:       5.917  [p05 5.917, p95 5.917, CV 0.00%]
+  throughput:      0.338 warp-instr/cycle/SM  = 10.8 thread-ops/cycle/SM
+  runtime:         0.923 ms (event-timed)
+  instructions:    ~306,250 per warp (static loop body 49 x trips)
+  loop body:       FFMAx23, FADDx11, MUFU.RSQx5, FMULx5, MUFU.EX2x2, IADD3x1, ISETP.GE.ANDx1, BRAx1
+
+SASS (timed loop body, control: Stall Yield Wbar Rbar wait-mask reuse):
+
+counters:        unavailable: Nsight Compute (ncu) not installed
+WARNINGS:
+  ! [seed3001/ptxas] cycle-count CV 3.4% > 2%
+  ! [seed3001/identity_late] cycle-count CV 5.0% > 2%
+  ! [seed3001/sb_late] cycle-count CV 4.2% > 2%
+  ! [seed3001/split_identity_late] cycle-count CV 5.2% > 2%
+  ! [seed3001/split_sb_late] cycle-count CV 4.3% > 2%
+  ! [seed3006/ptxas] cycle-count CV 4.4% > 2%
+  ! [seed3006/identity_late] cycle-count CV 5.5% > 2%
+  ! [seed3006/sb_late] cycle-count CV 2.7% > 2%
+  ! [seed3006/split_identity_late] cycle-count CV 4.7% > 2%
+  ! [seed3006/split_sb_late] cycle-count CV 5.7% > 2%
+  ! [seed3014/identity_late] cycle-count CV 4.1% > 2%
+  ! [seed3014/sb_late] cycle-count CV 4.3% > 2%
+  ! [seed3014/split_identity_late] cycle-count CV 5.2% > 2%
+  ! [seed3014/split_sb_late] cycle-count CV 4.8% > 2%
+  ! [seed3015/ptxas] cycle-count CV 5.2% > 2%
+  ! [seed3015/identity_late] cycle-count CV 2.7% > 2%
+  ! [seed3015/split_sb_late] cycle-count CV 6.3% > 2%
+  ! [seed3017/sb_late] cycle-count CV 3.6% > 2%
+  ! [seed3024/ptxas] cycle-count CV 5.8% > 2%
+  ! [seed3024/identity_late] cycle-count CV 3.0% > 2%
+  ! [seed3024/sb_late] cycle-count CV 7.7% > 2%
+  ! [seed3024/split_identity_late] cycle-count CV 6.3% > 2%
+  ! [seed3025/ptxas] cycle-count CV 3.7% > 2%
+  ! [seed3025/identity_late] cycle-count CV 4.9% > 2%
+  ! [seed3025/split_identity_late] cycle-count CV 5.6% > 2%
+  ! [seed3025/split_sb_late] cycle-count CV 5.0% > 2%
+  ! [seed3026/ptxas] cycle-count CV 5.9% > 2%
+  ! [seed3026/identity_late] cycle-count CV 4.5% > 2%
+  ! [seed3026/sb_late] cycle-count CV 7.2% > 2%
+  ! [seed3026/split_identity_late] cycle-count CV 5.7% > 2%
+  ! [seed3026/split_sb_late] cycle-count CV 6.2% > 2%
+  ! [seed3028/ptxas] cycle-count CV 5.4% > 2%
+  ! [seed3028/identity_late] cycle-count CV 4.4% > 2%
+  ! [seed3028/sb_late] cycle-count CV 7.1% > 2%
+  ! [seed3028/split_identity_late] cycle-count CV 6.6% > 2%
+  ! [seed3028/split_sb_late] cycle-count CV 7.1% > 2%
+  ! [seed3031/ptxas] cycle-count CV 6.5% > 2%
+  ! [seed3031/identity_late] cycle-count CV 7.8% > 2%
+  ! [seed3031/sb_late] cycle-count CV 4.1% > 2%
+  ! [seed3031/split_identity_late] cycle-count CV 5.2% > 2%
+  ! [seed3031/split_sb_late] cycle-count CV 6.9% > 2%
+  ! [seed3034/ptxas] cycle-count CV 5.1% > 2%
+  ! [seed3034/identity_late] cycle-count CV 4.2% > 2%
+  ! [seed3034/sb_late] cycle-count CV 5.7% > 2%
+  ! [seed3034/split_identity_late] cycle-count CV 6.5% > 2%
+  ! [seed3034/split_sb_late] cycle-count CV 6.4% > 2%
+artifacts:       C:\Users\LukeB\.pcslurm\worktrees\claude-joint-ra-20261114-022549-943008\job-ra-rand-b-20261114-025008-613366\results\20261114-030057_resched_rand_b
+====================================================================================================

@@ -1,0 +1,6 @@
+scan_block     ptxas:ok 249.9us x1.000 identity_late:ok 257.0us x0.972 sb_late:ok 248.8us x1.004 split_identity_late:ok 249.9us x1.000 split_sb_late:ok 250.9us x0.996
+geomean ptxas/identity_late: 0.9721 over 1 cases
+geomean ptxas/sb_late: 1.0041 over 1 cases
+geomean ptxas/split_identity_late: 1.0000 over 1 cases
+geomean ptxas/split_sb_late: 0.9959 over 1 cases
+wrote C:\Users\LukeB\.pcslurm\worktrees\claude-joint-ra-20261114-022549-943008\job-ra-scan-20261114-030451-152280\data\suite\ra_scan.json
