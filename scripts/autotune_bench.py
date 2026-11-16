@@ -195,10 +195,43 @@ def measure(rounds):
     print("measure done", flush=True)
 
 
+def profile():
+    """Where does one measurement's wall time go? (timing-harness diagnosis, no results recorded)"""
+    import torch
+    import batched_gemv_bench as BB
+    from qwen_e2e import check, cu
+    from lab import qwen_batched as QB
+    torch.zeros(1, device="cuda")
+    check(cu.cuInit(0))
+    check(cu.cuCtxSetCurrent(check(cu.cuDevicePrimaryCtxRetain(check(cu.cuDeviceGet(0))))))
+    k = BB.Kern(QB.gemm_q4i8_ms_source(*DEFAULT[:4], "resid", *DEFAULT[4:]))
+    for s, N, K, P in (SHAPES[2], SHAPES[5]):
+        W = torch.randint(-2**31, 2**31 - 1, (N, K // 8), dtype=torch.int64, device="cuda").to(torch.int32)
+        Sc = (torch.rand(N, K // 32, device="cuda") * 0.02).half()
+        Wp, Sp = QB.pack_q4_i8(W, Sc)
+        Xq = torch.zeros(P, K, dtype=torch.int8, device="cuda"); Xd = torch.zeros(P, K // 32, device="cuda")
+        Xs = torch.zeros(2 * P, K // 32, dtype=torch.int32, device="cuda"); Y = torch.zeros(P, N, device="cuda")
+        args = [Wp.data_ptr(), Sp.data_ptr(), Xq.data_ptr(), Xd.data_ptr(), Xs.data_ptr(), Y.data_ptr(), 0,
+                ctypes.c_int32(N), ctypes.c_int32(K), ctypes.c_int32(P)]
+        fn = lambda: k.launch((P + 63) // 64, 128, args, N // 64)  # noqa: E731
+        for _ in range(3):
+            t0 = time.perf_counter(); us = BB.timeit(fn, 20); t1 = time.perf_counter()
+            fn(); torch.cuda.synchronize(); t2 = time.perf_counter()
+            g = torch.cuda.CUDAGraph()
+            with torch.cuda.graph(g):
+                for _ in range(20):
+                    fn()
+            torch.cuda.synchronize(); t3 = time.perf_counter()
+            print(f"{s}: kernel {us:.1f} us; timeit wall {t1 - t0:.3f} s; one launch+sync {t2 - t1:.4f} s; "
+                  f"graph capture {t3 - t2:.3f} s", flush=True)
+
+
 if __name__ == "__main__":
     kv = dict(a.split("=", 1) for a in sys.argv[2:] if "=" in a)
     cmd = sys.argv[1]
     if cmd == "predict":
         predict(int(kv.get("j", 8)))
+    elif cmd == "profile":
+        profile()
     elif cmd == "measure":
         measure(int(kv.get("rounds", 3)))
