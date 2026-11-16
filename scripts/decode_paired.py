@@ -29,6 +29,14 @@ BS = [1, 2, 4, 8, 16, 32]
 OUT = ROOT / "data" / "decode_paired"
 
 
+def py(script, *args):
+    """Run a script under this python with the venv's packages appended (scripts/_site.py): pcslurm's
+    python has torch, the venv has cuda-python, and qwen_e2e imports both."""
+    code = ("import runpy, sys; sys.path.insert(0, 'scripts'); import _site; "
+            f"sys.argv = [{script!r}] + {list(args)!r}; runpy.run_path({script!r}, run_name='__main__')")
+    return [sys.executable, "-c", code]
+
+
 def run(cmd, timeout=1800):
     t = time.time()
     p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
@@ -37,14 +45,14 @@ def run(cmd, timeout=1800):
 
 
 def ours_b1(_):
-    txt, dt = run([sys.executable, "scripts/qwen_gguf.py"])
+    txt, dt = run(py("scripts/qwen_gguf.py"))
     v = [float(x) for x in re.findall(r"ours\(gguf\)\s+([\d.]+)", txt)]
     # qwen_gguf prints 3 runs; the first includes graph capture warm-up effects, take the median of all 3
     return {"tg_b1": statistics.median(v) if v else None, "runs": v, "sec": dt}, txt
 
 
 def ours_batched(_):
-    txt, dt = run([sys.executable, "scripts/qwen_batched_decode.py", ",".join(map(str, BS))])
+    txt, dt = run(py("scripts/qwen_batched_decode.py", ",".join(map(str, BS))))
     r = {"sec": dt}
     for m in re.finditer(r"B=\s*(\d+):\s+([\d.]+) tok/s.*rows identical: (\w+)", txt):
         r[f"tg_b{m[1]}"] = float(m[2])
