@@ -151,3 +151,11 @@ residual sums), so the comparison tested nothing. Timings are kept as measured. 
 (`hwtune_bigtile.py check`) reruns the same comparison with the residual sums set to zero and reports
 whether the reference is finite. Scoring then drops only tiles that mismatch in that check; if the
 reference is still non-finite, scoring proceeds with no correctness filter and says so.
+
+## Addendum 5 (after the score, before any correctness result): a real correctness check
+
+Zeroing the residual sums did not help: the reference was still NaN (job 2241), because the
+harness's Xq/Xd/Xs are not a valid quantized activation. `check` now feeds a random bf16 activation
+through the production quantizer (`QUANT_Q8`, as `scripts/prefill_gemm_bench.py`) and compares every
+tile with an fp32 reference X @ dequant(W). A tile fails if max |err| / max |ref| >= 1e-2. If any tile
+fails, the score is recomputed without the failing tiles, and that recomputed score is the result.

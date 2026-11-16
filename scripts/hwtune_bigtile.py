@@ -79,7 +79,7 @@ def measure(rounds, check_only=False):
     check(cu.cuInit(0))
     check(cu.cuCtxSetCurrent(check(cu.cuDevicePrimaryCtxRetain(check(cu.cuDeviceGet(0))))))
     torch.manual_seed(0)
-    data = {}
+    data, TRUE = {}, {}
     for g, N, K in SHAPES:
         W = torch.randint(-2**31, 2**31 - 1, (N, K // 8), dtype=torch.int64, device="cuda").to(torch.int32)
         Sc = (torch.rand(N, K // 32, device="cuda") * 0.02).half()
@@ -87,8 +87,17 @@ def measure(rounds, check_only=False):
         Xq = torch.randint(-127, 128, (P, K), dtype=torch.int8, device="cuda")
         Xd = torch.rand(P, K // 32, device="cuda") * 0.01
         Xs = torch.randint(-2**20, 2**20, (2 * P, K // 32), dtype=torch.int32, device="cuda")
-        if check_only:  # addendum 4: finite inputs (zero residual sums) so outputs are comparable
-            Xs.zero_()
+        if check_only:  # addendum 5: real activations through the quantizer (as prefill_gemm_bench)
+            X = torch.randn(P, K, device="cuda").to(torch.bfloat16)
+            BB.Kern(QB.QUANT_Q8).launch((P * K // 32 + 7) // 8, 256, [X.data_ptr(), Xq.data_ptr(), Xd.data_ptr(),
+                                                                     Xs.data_ptr(), ctypes.c_int32(P), ctypes.c_int32(K)])
+            parts = []
+            for r0 in range(0, N, 1024):
+                w = W[r0:r0 + 1024].to(torch.int64) & 0xFFFFFFFF
+                q = torch.stack([(w >> (4 * i)) & 15 for i in range(8)], -1).reshape(-1, K).float() - 8
+                parts.append(X.float() @ (q * Sc[r0:r0 + 1024].float().repeat_interleave(32, 1)).t())
+            TRUE[g] = torch.cat(parts, 1)
+            del X, w, q, parts
         Y = torch.zeros(P, N, device="cuda")
         data[g] = (N, K, [Wp.data_ptr(), Sp.data_ptr(), Xq.data_ptr(), Xd.data_ptr(), Xs.data_ptr(), Y.data_ptr(), 0,
                           ctypes.c_int32(N), ctypes.c_int32(K), ctypes.c_int32(P)], (Wp, Sp, Xq, Xd, Xs, Y))
@@ -114,7 +123,13 @@ def measure(rounds, check_only=False):
                 ref = y
                 if check_only:
                     print(f"{g}: reference finite {bool(torch.isfinite(ref).all())}, max |y| {float(ref.abs().max()):.3g}", flush=True)
-            elif not torch.allclose(y, ref, rtol=1e-3, atol=1e-2):
+            if check_only:
+                e = float((y - TRUE[g]).abs().max() / TRUE[g].abs().max())
+                if t == DEFAULT:
+                    print(f"{g}: default tile rel err vs fp32 reference {e:.2e}", flush=True)
+                if not e < 1e-2:
+                    bad.append((list(t), g, e))
+            elif t != DEFAULT and not torch.allclose(y, ref, rtol=1e-3, atol=1e-2):
                 bad.append((list(t), g, float((y - ref).abs().max())))
         print(f"checked {g}: {len(bad)} mismatches so far", flush=True)
     if check_only:
