@@ -1,0 +1,8 @@
+B=  1:    476.9 tok/s  (2.097 ms/step)  rows identical: True  matches single-sequence decode for 74/128 tokens
+B=  2:    945.4 tok/s  (2.115 ms/step)  rows identical: True  matches single-sequence decode for 74/128 tokens
+B=  4:   1858.9 tok/s  (2.152 ms/step)  rows identical: True  matches single-sequence decode for 74/128 tokens
+B=  8:   3491.1 tok/s  (2.292 ms/step)  rows identical: True  matches single-sequence decode for 74/128 tokens
+B= 16:   5667.3 tok/s  (2.823 ms/step)  rows identical: True  matches single-sequence decode for 73/128 tokens
+B= 32:   7277.9 tok/s  (4.397 ms/step)  rows identical: True  matches single-sequence decode for 73/128 tokens
+text: GPUs are good at matrix multiplication because they are designed to perform parallel computations, which allows them to process large amounts of data simultaneously. This makes them highly efficient at performing matrix operations, such as matrix multiplication, which is a fundamental operation in m
+

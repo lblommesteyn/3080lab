@@ -1,0 +1,63 @@
+round 0 old_batched   tg_b1=333.4 tg_b2=613.6 tg_b4=960.6 tg_b8=1417.0 tg_b16=2461.6 tg_b32=3617.4
+round 0 ours_batched  tg_b1=476.9 tg_b2=946.3 tg_b4=1858.2 tg_b8=3472.9 tg_b16=5664.5 tg_b32=7278.6
+round 0 ours_dup      tg_b1=513.7
+round 0 ours          tg_b1=513.6
+round 0 new_bench     tg_b1_fa0=367.0 tg_b1_fa1=386.1
+round 0 old_bench     tg_b1_fa0=356.5 tg_b1_fa1=372.9
+round 0 new_batched   tg_b1=334.8 tg_b2=574.2 tg_b4=978.7 tg_b8=1473.8 tg_b16=2622.4 tg_b32=3841.8
+round 1 ours_batched  tg_b1=476.9 tg_b2=945.4 tg_b4=1858.9 tg_b8=3491.1 tg_b16=5667.3 tg_b32=7277.9
+round 1 ours_dup      tg_b1=514.5
+round 1 ours          tg_b1=514.4
+round 1 new_bench     tg_b1_fa0=367.8 tg_b1_fa1=382.4
+round 1 old_bench     tg_b1_fa0=353.5 tg_b1_fa1=373.8
+round 1 new_batched   tg_b1=370.8 tg_b2=657.7 tg_b4=1040.6 tg_b8=1489.2 tg_b16=2594.6 tg_b32=3798.7
+round 1 old_batched   tg_b1=348.1 tg_b2=641.4 tg_b4=992.5 tg_b8=1457.5 tg_b16=2529.0 tg_b32=3724.3
+round 2 ours_dup      tg_b1=515.4
+round 2 ours          tg_b1=514.9
+round 2 new_bench     tg_b1_fa0=369.4 tg_b1_fa1=387.9
+round 2 old_bench     tg_b1_fa0=355.5 tg_b1_fa1=373.9
+round 2 new_batched   tg_b1=369.0 tg_b2=663.9 tg_b4=1019.0 tg_b8=1492.9 tg_b16=2646.0 tg_b32=3684.7
+round 2 old_batched   tg_b1=360.1 tg_b2=645.4 tg_b4=980.7 tg_b8=1459.5 tg_b16=2560.1 tg_b32=3680.3
+round 2 ours_batched  tg_b1=475.9 tg_b2=948.2 tg_b4=1863.6 tg_b8=3469.1 tg_b16=5651.8 tg_b32=7288.4
+round 3 ours          tg_b1=512.5
+round 3 new_bench     tg_b1_fa0=365.7 tg_b1_fa1=383.6
+round 3 old_bench     tg_b1_fa0=353.0 tg_b1_fa1=371.6
+round 3 new_batched   tg_b1=369.3 tg_b2=651.4 tg_b4=1027.5 tg_b8=1485.2 tg_b16=2633.8 tg_b32=3723.9
+round 3 old_batched   tg_b1=361.7 tg_b2=644.2 tg_b4=973.8 tg_b8=1449.8 tg_b16=2517.7 tg_b32=3727.2
+round 3 ours_batched  tg_b1=474.4 tg_b2=942.2 tg_b4=1856.4 tg_b8=3483.4 tg_b16=5645.0 tg_b32=7281.1
+round 3 ours_dup      tg_b1=511.5
+round 4 new_bench     tg_b1_fa0=364.6 tg_b1_fa1=378.7
+round 4 old_bench     tg_b1_fa0=349.9 tg_b1_fa1=368.6
+round 4 new_batched   tg_b1=362.7 tg_b2=645.8 tg_b4=1005.7 tg_b8=1472.0 tg_b16=2583.3 tg_b32=3747.5
+round 4 old_batched   tg_b1=344.0 tg_b2=610.8 tg_b4=993.3 tg_b8=1462.4 tg_b16=2549.2 tg_b32=3738.8
+round 4 ours_batched  tg_b1=473.7 tg_b2=947.7 tg_b4=1857.2 tg_b8=3481.3 tg_b16=5703.8 tg_b32=7278.9
+round 4 ours_dup      tg_b1=513.7
+round 4 ours          tg_b1=513.5
+round 5 old_bench     tg_b1_fa0=354.9 tg_b1_fa1=372.9
+round 5 new_batched   tg_b1=370.9 tg_b2=659.9 tg_b4=1023.8 tg_b8=1490.1 tg_b16=2653.8 tg_b32=3846.2
+round 5 old_batched   tg_b1=354.8 tg_b2=642.8 tg_b4=993.7 tg_b8=1466.8 tg_b16=2559.3 tg_b32=3732.9
+round 5 ours_batched  tg_b1=475.5 tg_b2=948.7 tg_b4=1865.4 tg_b8=3468.3 tg_b16=5689.5 tg_b32=7279.9
+round 5 ours_dup      tg_b1=513.0
+round 5 ours          tg_b1=512.9
+round 5 new_bench     tg_b1_fa0=370.1 tg_b1_fa1=387.8
+6 rounds, GPU at start: 1 %, 2197 MiB, 1905 MHz, 43
+
+| workload | ours (median tok/s) | vs | llama.cpp (median tok/s) | ratio median [min, max] | mean log ratio 95% CI (as x) |
+|---|---:|---|---:|---:|---:|
+| B = 1 | 514 | b11485 fa1 | 373 | **1.38x** [1.38, 1.39] | [1.38, 1.39] |
+| B = 1 (batched) | 476 | b11485  | 351 | **1.36x** [1.31, 1.43] | [1.33, 1.39] |
+| B = 2 (batched) | 947 | b11485  | 642 | **1.47x** [1.46, 1.55] | [1.47, 1.52] |
+| B = 4 (batched) | 1859 | b11485  | 987 | **1.89x** [1.87, 1.93] | [1.88, 1.91] |
+| B = 8 (batched) | 3477 | b11485  | 1459 | **2.39x** [2.36, 2.45] | [2.38, 2.42] |
+| B = 16 (batched) | 5666 | b11485  | 2539 | **2.24x** [2.21, 2.30] | [2.22, 2.27] |
+| B = 32 (batched) | 7279 | b11485  | 3726 | **1.95x** [1.95, 2.01] | [1.95, 1.99] |
+| B = 1 | 514 | b12428 fa1 | 385 | **1.33x** [1.32, 1.36] | [1.33, 1.35] |
+| B = 1 (batched) | 476 | b12428  | 369 | **1.29x** [1.28, 1.42] | [1.28, 1.36] |
+| B = 2 (batched) | 947 | b12428  | 655 | **1.44x** [1.43, 1.65] | [1.44, 1.54] |
+| B = 4 (batched) | 1859 | b12428  | 1021 | **1.83x** [1.79, 1.90] | [1.81, 1.86] |
+| B = 8 (batched) | 3477 | b12428  | 1487 | **2.34x** [2.32, 2.36] | [2.33, 2.36] |
+| B = 16 (batched) | 5666 | b12428  | 2628 | **2.15x** [2.14, 2.21] | [2.14, 2.18] |
+| B = 32 (batched) | 7279 | b12428  | 3773 | **1.93x** [1.89, 1.98] | [1.90, 1.95] |
+
+A/A (ours_dup / ours, B = 1): median 1.000, range [0.998, 1.001] over 6 rounds
+batched rows identical in every round: True

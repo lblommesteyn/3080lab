@@ -33,15 +33,20 @@ the oracle's whole headroom is 0.5-0.6%, below measurement noise, and no predict
 general block scheduler reproduces ptxas but does not beat it, and the notebook explains why.
 Details: [optimization selection](docs/reports/optimization-selection.md).
 
-**3. Qwen2.5-1.5B on llama.cpp's own Q4_0 weights: 1.41x decode, up to 2.40x batched, up to 2.00x prefill**
-against llama.cpp b11485 on the same GPU (Oct 14). These used a best-of-repeated-runs rule on both sides;
-a paired re-measurement with central estimates is in [LLM inference](docs/reports/llm-inference.md).
+**3. Qwen2.5-1.5B on llama.cpp's own Q4_0 weights: 1.33x decode, up to 2.34x batched** against the newest
+llama.cpp (b12428, Nov 16) on the same GPU. Medians of 6 rotated, paired rounds with an A/A control
+(A/A within 0.2%); the range is the min-max ratio over rounds. Details and the older build:
+[LLM inference](docs/reports/llm-inference.md).
 
-| workload | ours | llama.cpp b11485 | ratio |
+| sequences decoded together | ours (tok/s) | llama.cpp b12428 (tok/s) | ratio [range] |
 |---|---:|---:|---:|
-| decode, 1 sequence (tok/s) | 514.0 | 365.8 | 1.41x |
-| batched decode, 2 / 8 / 32 sequences (tok/s) | 950 / 3395 / 7135 | 625 / 1416 / 3597 | 1.52 / 2.40 / 1.98x |
-| prefill, 128 / 2048-token prompt (tok/s) | 21,888 / 28,114 | 10,937 / 17,639 | 2.00 / 1.59x |
+| 1 | 514 | 385 | 1.33x [1.32, 1.36] |
+| 2 | 947 | 655 | 1.44x [1.43, 1.65] |
+| 8 | 3,477 | 1,487 | 2.34x [2.32, 2.36] |
+| 32 | 7,279 | 3,773 | 1.93x [1.89, 1.98] |
+
+Prefill (2.00x at a 128-token prompt, 1.59x at 2,048, against b11485) has not been re-measured this way
+and still uses the Oct 14 best-of rule.
 
 ## Reports
 

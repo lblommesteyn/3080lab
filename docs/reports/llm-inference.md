@@ -181,7 +181,35 @@ Data: `data/night_oct11/`, `data/night_oct13/`, `data/decode_oct12/`, `data/fuse
 
 ## Paired re-measurement (Nov 16)
 
-Pending: job 2233, scripts/decode_paired.py.
+Job 2239, `scripts/decode_paired.py`, raw data in `data/decode_paired/` (`raw.json`, per-arm output
+`r<round>_<arm>.txt`, `summary.md`). Decode only; prefill was not re-measured.
+
+Method: 6 rounds; every round runs all 7 arms once (ours B = 1, a second identical ours B = 1 as A/A
+control, ours batched, and `llama-bench` / `llama-batched-bench` from b11485 and from b12428, the newest
+release on Nov 16). Arm order is rotated one position per round. The statistic is the per-round ratio;
+the table gives its median, min-max over rounds, and a bootstrap 95% interval of the mean log ratio.
+llama.cpp B = 1 is run with flash attention off and on and scored with the faster (on). Same Q4_0 GGUF.
+GPU at start: 1% utilization, 2,197 MiB used, 1,905 MHz.
+
+| sequences | ours (tok/s) | b11485 | ratio [min, max] | b12428 | ratio [min, max] |
+|---|---:|---:|---:|---:|---:|
+| 1 (`qwen_gguf.py` vs `llama-bench -n 256`) | 514 | 373 | **1.38x** [1.38, 1.39] | 385 | **1.33x** [1.32, 1.36] |
+| 2 (batched) | 947 | 642 | **1.47x** [1.46, 1.55] | 655 | **1.44x** [1.43, 1.65] |
+| 4 | 1,859 | 987 | **1.89x** [1.87, 1.93] | 1,021 | **1.83x** [1.79, 1.90] |
+| 8 | 3,477 | 1,459 | **2.39x** [2.36, 2.45] | 1,487 | **2.34x** [2.32, 2.36] |
+| 16 | 5,666 | 2,539 | **2.24x** [2.21, 2.30] | 2,628 | **2.15x** [2.14, 2.21] |
+| 32 | 7,279 | 3,726 | **1.95x** [1.95, 2.01] | 3,773 | **1.93x** [1.89, 1.98] |
+
+A/A (second ours B = 1 run over the first): median 1.000, range [0.998, 1.001]. Batched rows were
+identical to each other in every round. Our numbers move less than 1% between rounds; llama.cpp's
+batched B = 1-2 spread is the widest (up to 15% in one round).
+
+What changed against the Oct 14 best-of table: the central estimates against the same b11485 build are
+within 0.02-0.05x of the best-of ratios (1.41 to 1.38 at B = 1, 2.40 to 2.39 at B = 8), so the best-of rule
+did not inflate the headline materially. llama.cpp improved 2-4% from b11485 to b12428, which takes 0.02-0.09x
+off each ratio. Our batched engine at B = 1 (476 tok/s) is 7% slower than our dedicated B = 1 path (514).
+
+Caveats: one model, one GPU, decode only. llama.cpp was not tuned beyond flash attention on/off.
 
 ## Notebook sections
 
