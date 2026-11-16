@@ -19,7 +19,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-sys.path.append(r"C:\Users\LukeB\dev\3080lab\.venv\Lib\site-packages")
+import _site  # noqa: E402,F401  (venv packages under a bare python)
 from lab.optsel import FEATURES  # noqa: E402
 
 TAU = 0.01

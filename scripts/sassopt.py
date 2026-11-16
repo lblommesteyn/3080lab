@@ -36,7 +36,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-sys.path.append(r"C:\Users\LukeB\dev\3080lab\.venv\Lib\site-packages")
+import _site  # noqa: E402,F401  (venv packages under a bare python)
 import torch  # noqa: E402,F401  (CUDA DLLs nvrtc needs)
 
 from lab import resched, sass, toolchain, verify  # noqa: E402

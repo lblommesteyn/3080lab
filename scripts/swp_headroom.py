@@ -24,7 +24,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-sys.path.append(r"C:\Users\LukeB\dev\3080lab\.venv\Lib\site-packages")
+import _site  # noqa: E402,F401  (venv packages under a bare python)
 import torch  # noqa: E402,F401
 from lab import resched, sass, suite, toolchain  # noqa: E402
 from lab import operands as opnd  # noqa: E402

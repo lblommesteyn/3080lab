@@ -2,7 +2,8 @@
 import sys, re, math, json
 from pathlib import Path
 WT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(WT)); sys.path.append(r"C:\Users\LukeB\dev\3080lab\.venv\Lib\site-packages")
+sys.path.insert(0, str(WT))
+import _site  # noqa: E402,F401
 import torch  # noqa
 from lab import resched, sass, toolchain, model
 from lab.experiments.randk import ReschedRandom

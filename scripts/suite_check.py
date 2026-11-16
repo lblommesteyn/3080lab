@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-sys.path.append(r"C:\Users\LukeB\dev\3080lab\.venv\Lib\site-packages")
+import _site  # noqa: E402,F401  (venv packages under a bare python)
 import torch  # noqa: E402,F401  (puts the CUDA DLLs nvrtc needs on the search path)
 
 from lab import resched, sass, toolchain  # noqa: E402

@@ -22,7 +22,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import torch  # noqa: E402,F401  (puts the CUDA DLLs nvrtc needs on the search path)
-sys.path.append(r"C:\Users\LukeB\dev\3080lab\.venv\Lib\site-packages")
+import _site  # noqa: E402,F401  (venv packages under a bare python)
 from eval_gemm_model import MEASURED, P, SHAPES  # noqa: E402
 
 from lab import gemm_model as GM  # noqa: E402
