@@ -1,0 +1,6 @@
+qwen2.5-7b/o/P256: kernel 115.8 us; timeit wall 0.936 s; one launch+sync 0.0002 s; graph capture 0.032 s
+qwen2.5-7b/o/P256: kernel 116.0 us; timeit wall 0.937 s; one launch+sync 0.0002 s; graph capture 0.033 s
+qwen2.5-7b/o/P256: kernel 115.4 us; timeit wall 0.944 s; one launch+sync 0.0002 s; graph capture 0.030 s
+qwen2.5-7b/gu/P1024: kernel 3053.6 us; timeit wall 16.426 s; one launch+sync 0.0031 s; graph capture 0.032 s
+qwen2.5-7b/gu/P1024: kernel 3077.2 us; timeit wall 16.442 s; one launch+sync 0.0031 s; graph capture 0.032 s
+qwen2.5-7b/gu/P1024: kernel 3073.9 us; timeit wall 16.524 s; one launch+sync 0.0031 s; graph capture 0.048 s

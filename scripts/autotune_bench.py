@@ -93,6 +93,33 @@ def predict(j):
           f"min {min(per_shape.values())} max {max(per_shape.values())}", flush=True)
 
 
+def timeit(fn, reps=20):
+    """batched_gemv_bench.timeit with a synchronized warm-up (addendum 2): replays until 0.3 s of real time
+    has passed, waiting for each, then the median of 7 timed replays of a 20-launch CUDA graph."""
+    import torch
+    s0 = torch.cuda.Stream()
+    with torch.cuda.stream(s0):
+        fn()
+    torch.cuda.synchronize()
+    g = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(g):
+        for _ in range(reps):
+            fn()
+    t_end = time.perf_counter() + 0.3
+    while time.perf_counter() < t_end:
+        g.replay()
+        torch.cuda.synchronize()
+    out = []
+    for _ in range(7):
+        s, e = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+        s.record()
+        g.replay()
+        e.record()
+        torch.cuda.synchronize()
+        out.append(s.elapsed_time(e) / reps * 1e3)
+    return statistics.median(out)
+
+
 def measure(rounds):
     import torch
     import batched_gemv_bench as BB
@@ -181,7 +208,7 @@ def measure(rounds):
                                          N // (16 * MT * WM))
             w0 = time.perf_counter()
             try:
-                us = BB.timeit(fn, 20)
+                us = timeit(fn, 20)
             except Exception as ex:  # noqa: BLE001
                 us = None
                 print(f"timing failed {s} {t}: {ex}", flush=True)
@@ -215,7 +242,7 @@ def profile():
                 ctypes.c_int32(N), ctypes.c_int32(K), ctypes.c_int32(P)]
         fn = lambda: k.launch((P + 63) // 64, 128, args, N // 64)  # noqa: E731
         for _ in range(3):
-            t0 = time.perf_counter(); us = BB.timeit(fn, 20); t1 = time.perf_counter()
+            t0 = time.perf_counter(); us = timeit(fn, 20); t1 = time.perf_counter()
             fn(); torch.cuda.synchronize(); t2 = time.perf_counter()
             g = torch.cuda.CUDAGraph()
             with torch.cuda.graph(g):

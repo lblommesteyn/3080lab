@@ -102,3 +102,16 @@ for s = 0..19. TPE and model-seeded TPE use `TPESampler(seed=s)`, with observati
 `random.Random(10000 + s)`. Bootstrap uses `random.Random(0)`: 10,000 resamples for the k = 0 and m5
 ratios, and 2,000 for the per-budget regret intervals. Correctness: all 32 x 212 candidates passed
 (job 2243 log), so no tile is excluded.
+
+## Addendum 2 (Nov 16 ~19:00; job 2243 cancelled during round 0, no timing written or read)
+
+Job 2243 passed the correctness check (all 32 x 212; `job2243_cancelled/check.json`), but then measured at
+more than 3 s per (tile, workload). The profile in job 2244 (`job2243_cancelled/autotune-profile-2244.log`)
+shows why. The repo harness's warm-up calls `g.replay()` in a loop for 0.3 s of *CPU* time without waiting
+for the GPU, so it queues hundreds of replays. For a 3 ms kernel that is 16 s of GPU work per measurement,
+which would make about 20 h per round.
+
+Change: `autotune_bench.timeit` is the same harness, except that it synchronizes after each warm-up replay,
+so the warm-up lasts 0.3 s of real time. The CUDA graph of 20 launches and the median of 7 timed replays
+are unchanged. Nothing else changes; the measurement job is resubmitted from the start, including the
+correctness check.
