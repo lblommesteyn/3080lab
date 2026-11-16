@@ -142,3 +142,12 @@ Decision rule, per model: SUPPORTED if (a) geomean regret beats random at every 
 it beats random at k = 4 on at least 3 of 4 shapes, and (c) model(1) beats both zero-measurement
 heuristics. The goal's answer is "yes" if either model is SUPPORTED here; also reported: the random
 budget needed to match model(4), and each shape's round-to-round noise of the best tile.
+
+## Addendum 4 (after timing finished, before any score): correctness check was void
+
+The `measure` job (2240) reported all 211 non-default tiles mismatching on all 4 shapes; every recorded
+max error is NaN. The default tile's own output was non-finite under the random inputs (raw int32
+residual sums), so the comparison tested nothing. Timings are kept as measured. A separate check job
+(`hwtune_bigtile.py check`) reruns the same comparison with the residual sums set to zero and reports
+whether the reference is finite. Scoring then drops only tiles that mismatch in that check; if the
+reference is still non-finite, scoring proceeds with no correctness filter and says so.

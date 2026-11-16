@@ -66,7 +66,7 @@ def predict(j):
     print(f"{len(cfgs)} configs, {len(rows)} built and predicted", flush=True)
 
 
-def measure(rounds):
+def measure(rounds, check_only=False):
     import torch
     import batched_gemv_bench as BB
     from qwen_e2e import check, cu
@@ -87,6 +87,8 @@ def measure(rounds):
         Xq = torch.randint(-127, 128, (P, K), dtype=torch.int8, device="cuda")
         Xd = torch.rand(P, K // 32, device="cuda") * 0.01
         Xs = torch.randint(-2**20, 2**20, (2 * P, K // 32), dtype=torch.int32, device="cuda")
+        if check_only:  # addendum 4: finite inputs (zero residual sums) so outputs are comparable
+            Xs.zero_()
         Y = torch.zeros(P, N, device="cuda")
         data[g] = (N, K, [Wp.data_ptr(), Sp.data_ptr(), Xq.data_ptr(), Xd.data_ptr(), Xs.data_ptr(), Y.data_ptr(), 0,
                           ctypes.c_int32(N), ctypes.c_int32(K), ctypes.c_int32(P)], (Wp, Sp, Xq, Xd, Xs, Y))
@@ -110,9 +112,15 @@ def measure(rounds):
             y = bufs[5].clone()
             if t == DEFAULT:
                 ref = y
+                if check_only:
+                    print(f"{g}: reference finite {bool(torch.isfinite(ref).all())}, max |y| {float(ref.abs().max()):.3g}", flush=True)
             elif not torch.allclose(y, ref, rtol=1e-3, atol=1e-2):
                 bad.append((list(t), g, float((y - ref).abs().max())))
         print(f"checked {g}: {len(bad)} mismatches so far", flush=True)
+    if check_only:
+        (OUT / "check.json").write_text(json.dumps({"mismatches": bad, "tiles": len(tiles)}, indent=1))
+        print(f"wrote check.json: {len(bad)} mismatches", flush=True)
+        return
     times = {t: {g: [] for g, _, _ in SHAPES} for t in tiles}
     for rnd in range(rounds):
         order = list(tiles)
@@ -203,5 +211,7 @@ if __name__ == "__main__":
         predict(int(kv.get("j", 8)))
     elif cmd == "measure":
         measure(int(kv.get("rounds", 3)))
+    elif cmd == "check":
+        measure(0, check_only=True)
     else:
         score()
