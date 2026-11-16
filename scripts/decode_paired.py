@@ -14,6 +14,7 @@ attention on and off; the summary uses whichever has the higher median (generous
 """
 import json
 import math
+import os
 import random
 import re
 import statistics
@@ -39,8 +40,9 @@ def py(script, *args):
 
 def run(cmd, timeout=1800):
     t = time.time()
+    env = dict(os.environ, PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True")  # batched head packing OOMs
     p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
-                       cwd=ROOT)
+                       cwd=ROOT, env=env)
     return p.stdout + "\n" + p.stderr, time.time() - t
 
 
