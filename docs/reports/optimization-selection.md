@@ -184,3 +184,14 @@ From [the notebook](../notebook.md):
 - `3080lab optimize` (decision accuracy and regret)
 - Oct 18-21: "Can the hardware model pick optimizations? (Nov 14)", "Cross-kernel optimizer", "Blind
   tile ranking"
+
+## Follow-up (Nov 16): against a heuristic and autotuning
+
+Does hardware-informed optimization find wins on unseen kernels that a straightforward heuristic or
+ordinary autotuning misses? Pre-registered in `data/hwtune/PROTOCOL.md`, results in
+`data/hwtune/RESULTS.md`. No, not consistently. On held-out int4 GEMVs the split-sector rewrite adds
+1.003x over the autotuned configuration (0 of 12 shapes beyond noise): its 1.074x over ptxas lives on
+configurations an autotuner would not keep. The cost model reaches the best GEMV configuration in two
+measurements, but so does a two-measurement rule read off the dev suite. For fusion and graphs the
+launch model ties the rule "fuse what is legal, then graph". On 18 blind GEMM tiles the copy-cap model
+beats random search by 1.3% at two measurements and loses to it at four.

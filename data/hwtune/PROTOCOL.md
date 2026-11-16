@@ -111,3 +111,8 @@ Space per shape: the 21 measured tiles (all with predictions; asserted). Policie
 Metric: geomean over the 4 shapes of t(policy) / t(best of 21). Decision rule: H2 supported on tiles if
 either model's k = 1 and k = 2 both have lower regret than autotune at the same k AND lower regret than
 both zero-measurement rules. Otherwise refuted.
+
+Deviation (found by the assertion, before any tile number was printed): the 3 `anchors`, including the
+default tile, have no predictions; they were the models' calibration points. The space is therefore
+the 18 `test` tiles. `default` stays as a zero-measurement policy (measured in the same run), scored
+against the best of the 18; it can be below 1.000.

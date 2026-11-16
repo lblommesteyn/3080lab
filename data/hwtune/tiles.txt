@@ -1,0 +1,15 @@
+18 blind test tiles x 4 shapes; regret = t / t(best of 18); max_occupancy picks [4, 2, 2, 2, 2, 2, 1]
+policy               qkv       o      gu    down  geomean
+default            1.440   0.983   1.168   1.096    1.160
+max_occupancy      1.150   1.081   1.226   1.167    1.155
+old(1)             1.123   1.174   1.193   1.034    1.129
+old(2)             1.023   1.071   1.193   1.034    1.078
+old(4)             1.023   1.071   1.193   1.034    1.078
+queue(1)           1.023   1.071   1.213   1.105    1.101
+queue(2)           1.023   1.071   1.213   1.105    1.101
+queue(4)           1.023   1.071   1.213   1.103    1.100
+autotune(1)        1.092   1.124   1.191   1.140    1.136
+autotune(2)        1.057   1.081   1.134   1.094    1.091
+autotune(4)        1.029   1.050   1.079   1.058    1.054
+
+H2 on the tile space: SUPPORTED

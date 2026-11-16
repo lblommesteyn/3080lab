@@ -1,0 +1,63 @@
+# Does hardware-informed optimization find wins a heuristic or autotuning misses? (Nov 16 2026)
+
+**Answer: no, not consistently.** Across four optimization spaces on kernels the models were not
+built on, the hardware-informed side either found nothing outside an autotuner's reach (H1) or saved
+measurements only where a simple rule saved the same ones (H2). The one pre-registered "supported"
+result (GEMM tiles) is a 1.3% edge at two measurements that is gone by four, and its one-measurement
+edge flips sign in one of three timing rounds.
+
+Protocol, pre-registered and amended only before each new number: `PROTOCOL.md`. Scripts:
+`scripts/hwtune_gemv.py`, `hwtune_h2.py`, `hwtune_fusion.py`, `hwtune_tiles.py`. No new GPU runs;
+every time is from earlier measured runs, every prediction was written before its timing run.
+
+## H1: candidates outside the autotuning space
+
+| space (held out) | autotuned best vs heuristic | + hardware-informed rewrite vs autotuned best | shapes improved beyond noise |
+|---|---:|---:|---:|
+| int4 GEMV, suites B + C (12 shapes, 4-9 configs each) | 1.131x | **1.003x** | **0 / 12** |
+| SASS transforms, random kernels + PolyBench (`data/optsel/`) | n/a | oracle headroom 0.47-0.64% | below A/A noise |
+
+The split-sector rewrite's held-out 1.074x over ptxas comes from configurations an autotuner would
+not keep (u_major R8U2 and R4U2, which have split pairs). The autotuned best is almost always R4U1,
+which has no split pairs, so there is nothing left for the rewrite to fix.
+
+## H2: fewer measurements to reach the best
+
+Regret = time of the chosen configuration / time of the best in the space (geomean; 1.000 = optimal).
+
+| space | heuristic (0 measured) | model top-1 (0) | random (1) | model top-2 (2) | random (2) | rule learned on dev (2) |
+|---|---:|---:|---:|---:|---:|---:|
+| int4 GEMV, held out | 1.131 | 1.071 | 1.334 | 1.010 | 1.147 | **1.010** |
+| fusion / graph, held-out family | 1.226x (always fused_graph)* | 1.229x* | 1.108x* | 1.232x* | 1.188x* | n/a |
+| fusion / graph, unseen 1/4 size | 1.619x* | 1.609x* | 1.282x* | 1.632x* | 1.508x* | n/a |
+| GEMM tiles, 18 blind tiles x 4 shapes | 1.155 (max occupancy), 1.160 (default) | 1.129 | 1.136 | 1.078 | 1.091 | n/a |
+
+\* speedup over base (higher is better), not regret; oracle 1.233x and 1.642x.
+
+* GEMV: the model's top-1 equals the coalescing heuristic's pick on 10 of 12 shapes. Its top-2 is
+  within 1.04% of exhaustive search, but "measure the heuristic's pick and the smallest-R, U = 1
+  configuration", a rule read off the dev suite A only, gives the identical 1.0104 and the same 11/12.
+  Pre-registered verdict: REFUTED (threshold 1.010).
+* Fusion: the model beats random trials but ties the fixed rule "fuse what is legal, then capture a
+  graph" at every budget that matters.
+* Tiles: pre-registered verdict SUPPORTED for the copy-cap model (k = 1: 1.129 vs 1.136; k = 2: 1.078 vs
+  1.091), but with 4 shapes the k = 1 edge reverses in timing round 1 of 3 (1.145 vs 1.143), and at
+  k = 4 random search (1.054) beats both models (1.078, 1.100). The queue model fails at k = 2.
+
+## What this says
+
+The hardware models are good at explaining *why* a configuration wins (split sectors, launch gaps,
+occupancy), and that explanation is what a good heuristic encodes. They are not accurate enough to
+rank close candidates (rank correlation 0.4-0.7, prediction errors 5-30% against differences of
+1-10% among good options), so once a heuristic and two or four measurements are allowed, they add
+nothing measurable. The remaining place a model could pay is a space too large to sample where its
+errors are smaller than the spread of candidates; none of the spaces here is that.
+
+## Limits
+
+* Spaces are small (4-21 candidates). Exhaustive autotuning was affordable everywhere.
+* Only one GPU and one model generation per family; tile result rests on 4 shapes.
+* Pre-registration was amended twice (each before the next number) and had one deviation (anchor
+  tiles lacked predictions); all three are recorded in `PROTOCOL.md`.
+* Exploratory analyses (dev-learned rule, per-round tile check) were not pre-registered and are
+  labelled as such.
