@@ -116,3 +116,29 @@ Deviation (found by the assertion, before any tile number was printed): the 3 `a
 default tile, have no predictions; they were the models' calibration points. The space is therefore
 the 18 `test` tiles. `default` stays as a zero-measurement policy (measured in the same run), scored
 against the best of the 18; it can be below 1.000.
+
+## Addendum 3 (after addendum 2's tile result, before any timing of this stage): the whole tile space
+
+Results so far: no space shows a consistent hardware-informed win; the 18-tile test passed its rule by
+1.3% at k = 2 but random search overtakes at k = 4 and the k = 1 edge flips across rounds. Every space
+was small. The remaining hypothesis is the one a model is built for: a space too large to search.
+
+Space: every prefill GEMM tile of `scripts/rank_fresh.py`'s grid that builds without spills and
+divides the shapes (212 of 357), on Llama-3-8B's four linear layers at a 512-token prompt (qkv
+6144x4096, o 4096x4096, gate_up 28672x4096, down 4096x14336). Neither model (`lab/gemm_model.py`,
+constants fitted on Qwen2.5-1.5B timings) nor any heuristic has seen these shapes. Predictions:
+`data/hwtune/bigtile/preds.json`, committed with this addendum, before `measure` runs.
+
+Measurement (`scripts/hwtune_bigtile.py measure`, job via pcslurm): 3 rounds, tile order shuffled per
+round, CUDA-graph timing of 20 launches (same harness as rank_fresh); per (tile, shape) the median of
+the 3 rounds. Every tile's output is compared with the default tile's on the same inputs (rtol 1e-3,
+atol 1e-2); mismatching tiles are dropped and counted.
+
+Policies, per shape: `default` tile, `max_occupancy` tile (0 measurements); `old(k)`, `queue(k)`: measure
+the model's k best-predicted tiles, keep the fastest; `random(k)`: expected best of k random tiles
+(20,000 draws, seed 0); k in {1, 2, 4, 8, 16}.
+
+Decision rule, per model: SUPPORTED if (a) geomean regret beats random at every k in {1, 2, 4, 8}, (b)
+it beats random at k = 4 on at least 3 of 4 shapes, and (c) model(1) beats both zero-measurement
+heuristics. The goal's answer is "yes" if either model is SUPPORTED here; also reported: the random
+budget needed to match model(4), and each shape's round-to-round noise of the best tile.
