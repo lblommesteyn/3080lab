@@ -65,10 +65,10 @@ Regret = time of the chosen configuration / time of the best in the space (geome
 Round-to-round noise of the best tile: 0.1-1.7%. Spearman, predicted vs measured: 0.71-0.83 (copy-cap).
 No random budget up to 16 matches the copy-cap model's zero-measurement pick.
 
-Caveat: the output check was void. Under the harness's random inputs, the default tile's
-output is non-finite (also with zero residuals, job 2241), so tile correctness was not
-verified here. These are the same kernel generator and inputs as `rank_fresh`. Timing should not
-depend on the values, but a wrong-yet-fast tile cannot be ruled out (addendum 4).
+Correctness (addendum 5, job 2242): the check used a real activation through the production quantizer.
+All 212 tiles match an fp32 reference on all 4 shapes, with max relative error about 5e-3 and
+threshold 1e-2. No tile was dropped, so the table above is the final score. (The first check, addendum
+4, was void: the harness's synthetic activations make every output NaN.)
 
 ## What this says
 
