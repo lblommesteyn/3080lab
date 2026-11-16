@@ -91,3 +91,14 @@ vs TPE. A success claim may not rest on the random-search comparison.
 
 Changing the model, the space, the shapes, the seeds, or the rules after timing starts, except by a
 dated addendum that says why and that is reported in the write-up.
+
+## Addendum 1 (Nov 16, during timing round 0, before any timing result was read): exact seeds, code
+
+The simulator `scripts/autotune_sim.py` is committed with this addendum, before any timing file exists.
+It was tested only on synthetic data (in a scratch directory, not committed). Exact seed scheme, which
+replaces the shorthand above: random search uses `random.Random(i)` for workload index i (for both
+draws and observations), 5,000 runs. Model-ranked observation noise uses `random.Random(7919 * s + i)`
+for s = 0..19. TPE and model-seeded TPE use `TPESampler(seed=s)`, with observations and the fallback from
+`random.Random(10000 + s)`. Bootstrap uses `random.Random(0)`: 10,000 resamples for the k = 0 and m5
+ratios, and 2,000 for the per-budget regret intervals. Correctness: all 32 x 212 candidates passed
+(job 2243 log), so no tile is excluded.
