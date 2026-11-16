@@ -1,0 +1,29 @@
+suite:shape     n heuristic               t_heur autotune best             t_auto hw reach                            t_hw hw/auto win
+A:dn15          5 R8U2/lane_contig/default   21.42 R4U1/u_major/default       18.43 R4U1/u_major/default               18.43   1.000 
+A:dn7           5 R8U2/lane_contig/default   59.39 R4U1/u_major/default       57.63 R4U1/u_major/default+rewrite       57.57   1.001 
+A:gu15          9 R8U2/lane_contig/default   24.35 R8U2/lane_contig/default   24.35 R8U2/lane_contig/default           24.35   1.000 
+A:gu7           5 R8U2/lane_contig/default   54.93 R8U2/lane_contig/default   54.93 R8U2/lane_contig/default           54.93   1.000 
+A:kv7           5 R8U2/lane_contig/default    9.22 R4U2/r_major/default        6.34 R4U2/r_major/default                6.34   1.000 
+A:o15           5 R8U2/lane_contig/default    5.72 R4U1/u_major/default        4.64 R4U1/u_major/default                4.64   1.000 
+A:qo7           9 R8U2/lane_contig/default   13.31 R4U1/u_major/default       13.31 R4U1/u_major/default               13.31   1.000 
+A:sq4k          9 R8U2/lane_contig/default   15.36 R4U1/u_major/default       14.56 R4U1/u_major/default               14.56   1.000 
+A:up11k         5 R8U2/lane_contig/default   40.65 R4U1/u_major/default       38.66 R4U1/u_major/default+rewrite       38.58   1.002 
+B:dn3           5 R8U2/lane_contig/default   26.85 R4U1/u_major/default       23.01 R4U1/u_major/default               23.01   1.000 
+B:dn8           9 R8U2/lane_contig/default   47.79 R4U1/u_major/default       46.68 R4U1/u_major/default               46.68   1.000 
+B:gu3           9 R8U2/lane_contig/default   36.86 R4U1/u_major/default       35.67 R4U1/u_major/default+rewrite       35.60   1.002 
+B:gu8           5 R8U2/lane_contig/default   90.62 R4U1/u_major/default       90.06 R4U1/u_major/default+rewrite       89.97   1.001 
+B:qo3           5 R8U2/lane_contig/default    6.14 R4U1/u_major/default        5.66 R4U1/u_major/default+rewrite        5.58   1.015 
+B:sq1k          5 R8U2/lane_contig/default    5.26 R4U1/u_major/default        2.73 R4U1/u_major/default+rewrite        2.70   1.011 
+B:sq2k          5 R8U2/lane_contig/default    6.14 R4U1/u_major/default        5.86 R4U1/u_major/default                5.86   1.000 
+C:dn8           4 R16U2/lane_contig/default   59.65 R16U2/lane_contig/default   59.65 R16U2/lane_contig/default          59.65   1.000 
+C:gu15          4 R16U2/lane_contig/default   33.85 R16U1/u_major/default      27.31 R16U1/u_major/default+rewrite      27.26   1.002 
+C:gu3           4 R16U2/lane_contig/default   43.01 R16U1/u_major/default      38.60 R16U1/u_major/default+rewrite      38.45   1.004 
+C:qo7           4 R16U2/lane_contig/default   19.48 R8U4/u_major/default       17.21 R8U4/u_major/default               17.21   1.000 
+C:up11k         4 R16U2/lane_contig/default   42.21 R16U1/u_major/default      40.90 R16U1/u_major/default+rewrite      40.86   1.001 
+
+A (post hoc)  shapes  9  autotune(all) vs heuristic 1.101  autotune(2) vs heuristic 0.993  heuristic+rewrite vs heuristic 1.004  hw_reach vs heuristic 1.102  hw_reach vs autotune(all) 1.000  wins 0/9
+B (held out)  shapes  7  autotune(all) vs heuristic 1.154  autotune(2) vs heuristic 0.995  heuristic+rewrite vs heuristic 1.001  hw_reach vs heuristic 1.158  hw_reach vs autotune(all) 1.004  wins 0/7
+C (held out)  shapes  5  autotune(all) vs heuristic 1.100  autotune(2) vs heuristic 0.974  heuristic+rewrite vs heuristic 1.000  hw_reach vs heuristic 1.102  hw_reach vs autotune(all) 1.001  wins 0/5
+B+C           shapes 12  autotune(all) vs heuristic 1.131  autotune(2) vs heuristic 0.986  heuristic+rewrite vs heuristic 1.000  hw_reach vs heuristic 1.135  hw_reach vs autotune(all) 1.003  wins 0/12
+
+H1 on held-out GEMV (geomean >= 1.02 and wins >= half): REFUTED

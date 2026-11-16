@@ -60,3 +60,29 @@ No refitting; numbers are read from `data/optsel/eval_frozen.json` and `demo_eva
 ## Stage 3 (only if stage 1 or 2 leaves H1 or H2 open): new kernels on the GPU
 
 Defined after stages 1-2 are reported, in an addendum to this file, before any run.
+
+## Addendum 1 (after stage 1 H1, before any H2 number): H2 on GEMV is testable
+
+Stage 1 H1 result: REFUTED on held-out GEMV (`data/hwtune/gemv.txt`, committed with this addendum).
+
+The protocol above said H2 could not be tested on GEMV. That was wrong: `scripts/opt_bench.py build`
+saved, for every configuration, cost model v3's predicted whole-kernel runtime of the ptxas cubin
+(`results/opt_bench/<id>.report_v3.json`, field `original.t_ns`, with the launch's trip count). File
+times show these predictions were written before the timing runs (suite B predictions 03:19-03:23,
+B timed from 06:32; suite C predictions 06:08-06:24, C timed from 06:34; Oct 9 2026). Model v3 was
+revised on suite A only, so B and C are blind for it. The raw prediction files are copied to
+`data/hwtune/preds_v3.json`.
+
+Policies added, per shape (times = measured ptxas times from stage 1):
+
+* `model(1)`: the configuration with the lowest predicted time, zero measurements.
+* `model(2)`: measure the model's two lowest-predicted configurations, keep the faster.
+* compared with `heuristic` (zero measurements), `autotune(1)` and `autotune(2)` (expected over random
+  draws), and `autotune(all)`.
+
+Metrics: geomean of t(policy) / t(autotune(all)) (regret, >= 1), Spearman of predicted vs measured
+time per shape, and the number of shapes where model(1) picks the measured best.
+
+Decision rule: H2 is supported on held-out GEMV (B+C) if model(1) has lower geomean regret than both
+the heuristic and autotune(2) (that is, zero measurements guided by the model beat two random
+measurements), and model(2) regret <= 1.01. Otherwise refuted.
