@@ -445,6 +445,8 @@ def pack_q6_mma(L, Hb, SC, D):
       SCp int8  [T, C, 8, 8]   sub-block scales: row g k-steps 0-3, then row g+8
       Dp  fp16  [T, K/256, 8, 2] super-block scales of rows g, g+8"""
     import torch
+    dev = L.device                  # pack on the CPU: integer-only, so byte-identical, and the GPU
+    L, Hb, SC, D = (x.cpu() for x in (L, Hb, SC, D))   # temporaries (1.7 GiB) OOM beside a busy desktop
     N = L.shape[0]
     K = L.shape[1] * 8
     T, C = N // 16, K // 64
@@ -459,7 +461,7 @@ def pack_q6_mma(L, Hb, SC, D):
     SCp = torch.cat([sc[:, :8], sc[:, 8:]], -1).permute(0, 2, 1, 3).contiguous()    # [T, C, 8, 8]
     d = D.reshape(T, 16, K // 256)
     Dp = torch.stack([d[:, :8], d[:, 8:]], -1).permute(0, 2, 1, 3).contiguous()     # [T, K/256, 8, 2]
-    return Lp, Hp, SCp, Dp
+    return tuple(x.to(dev) for x in (Lp, Hp, SCp, Dp))
 
 
 def gemv_v2_source(WM: int, WK: int, MT: int, B: int, epi: str = "store", PF: int = 1, KS: int = 1,
