@@ -86,3 +86,28 @@ time per shape, and the number of shapes where model(1) picks the measured best.
 Decision rule: H2 is supported on held-out GEMV (B+C) if model(1) has lower geomean regret than both
 the heuristic and autotune(2) (that is, zero measurements guided by the model beat two random
 measurements), and model(2) regret <= 1.01. Otherwise refuted.
+
+## Addendum 2 (after the GEMV H2 and fusion numbers, before any tile number): a large space
+
+Results so far (committed with this addendum): GEMV H2 REFUTED by the pre-registered rule (model(2)
+regret 1.0104 > 1.010); an exploratory two-measurement rule learned on suite A alone ties the model
+exactly. Fusion: the model's top-1 (1.229 / 1.609) ties "always fused_graph" (1.226 / 1.619).
+
+All spaces above have 4-9 candidates, where exhaustive autotuning is cheap. The prefill GEMM tile
+space is larger: `data/rank_fresh/preds.json` holds blind predictions of two cost models (`old`
+copy-cap, `queue`) for 195 tiles, written Oct 18 00:43; `measured.json` times 21 of them on 4 Qwen
+GEMM shapes (qkv, o, gu, down), written Oct 18 19:07. 18 are `test` tiles, 3 are `anchors`.
+
+Space per shape: the 21 measured tiles (all with predictions; asserted). Policies:
+
+* `default`: the production tile `[2, 2, 2, 4, 2, 3, 3]` (anchors[0]), zero measurements.
+* `max_occupancy`: the tile with the most resident warps per SM (ties: more blocks per SM, then the
+  first listed), zero measurements.
+* `model(k)` for each of `old` and `queue`: measure the k lowest-predicted tiles, keep the fastest
+  (k = 1, 2, 4).
+* `autotune(k)`: k random tiles, expected value (exact over subsets for k <= 2, 20,000 Monte Carlo
+  draws with seed 0 above).
+
+Metric: geomean over the 4 shapes of t(policy) / t(best of 21). Decision rule: H2 supported on tiles if
+either model's k = 1 and k = 2 both have lower regret than autotune at the same k AND lower regret than
+both zero-measurement rules. Otherwise refuted.

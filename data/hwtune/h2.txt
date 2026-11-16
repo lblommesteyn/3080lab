@@ -1,0 +1,29 @@
+A:dn15   n=5 heur 1.162 model1 1.000 model2 1.000 auto1 1.105 auto2 1.057 rho +0.10 pred_err 22%  model picks R4U1/u_major/default, best R4U1/u_major/default
+A:dn7    n=5 heur 1.031 model1 1.031 model2 1.000 auto1 1.101 auto2 1.053 rho +0.50 pred_err 12%  model picks R8U2/lane_contig/default, best R4U1/u_major/default
+A:gu15   n=9 heur 1.000 model1 1.000 model2 1.000 auto1 1.490 auto2 1.185 rho +0.55 pred_err 30%  model picks R8U2/lane_contig/default, best R8U2/lane_contig/default
+A:gu7    n=5 heur 1.000 model1 1.000 model2 1.000 auto1 1.315 auto2 1.121 rho +1.00 pred_err 20%  model picks R8U2/lane_contig/default, best R8U2/lane_contig/default
+A:kv7    n=5 heur 1.454 model1 1.099 model2 1.000 auto1 1.238 auto2 1.101 rho +0.60 pred_err 17%  model picks R4U1/u_major/default, best R4U2/r_major/default
+A:o15    n=5 heur 1.233 model1 1.000 model2 1.000 auto1 1.149 auto2 1.069 rho +0.10 pred_err 33%  model picks R4U1/u_major/default, best R4U1/u_major/default
+A:qo7    n=9 heur 1.000 model1 1.000 model2 1.000 auto1 1.179 auto2 1.095 rho +0.08 pred_err 10%  model picks R8U2/lane_contig/default, best R4U1/u_major/default
+A:sq4k   n=9 heur 1.055 model1 1.055 model2 1.000 auto1 1.297 auto2 1.165 rho +0.15 pred_err 11%  model picks R8U2/lane_contig/default, best R4U1/u_major/default
+A:up11k  n=5 heur 1.051 model1 1.051 model2 1.000 auto1 1.348 auto2 1.138 rho +0.90 pred_err 6%  model picks R8U2/lane_contig/default, best R4U1/u_major/default
+B:dn3    n=5 heur 1.167 model1 1.167 model2 1.000 auto1 1.142 auto2 1.086 rho +0.20 pred_err 15%  model picks R8U2/lane_contig/default, best R4U1/u_major/default
+B:dn8    n=9 heur 1.024 model1 1.024 model2 1.000 auto1 1.326 auto2 1.165 rho +0.13 pred_err 11%  model picks R8U2/lane_contig/default, best R4U1/u_major/default
+B:gu3    n=9 heur 1.033 model1 1.033 model2 1.000 auto1 1.650 auto2 1.317 rho +0.93 pred_err 7%  model picks R8U2/lane_contig/default, best R4U1/u_major/default
+B:gu8    n=5 heur 1.006 model1 1.006 model2 1.000 auto1 1.454 auto2 1.201 rho +0.90 pred_err 4%  model picks R8U2/lane_contig/default, best R4U1/u_major/default
+B:qo3    n=5 heur 1.085 model1 1.085 model2 1.000 auto1 1.104 auto2 1.051 rho +0.60 pred_err 31%  model picks R8U2/lane_contig/default, best R4U1/u_major/default
+B:sq1k   n=5 heur 1.927 model1 1.000 model2 1.000 auto1 1.555 auto2 1.303 rho +0.70 pred_err 32%  model picks R4U1/u_major/default, best R4U1/u_major/default
+B:sq2k   n=5 heur 1.048 model1 1.048 model2 1.000 auto1 1.073 auto2 1.029 rho +0.60 pred_err 31%  model picks R8U2/lane_contig/default, best R4U1/u_major/default
+C:dn8    n=4 heur 1.000 model1 1.000 model2 1.000 auto1 1.274 auto2 1.105 rho +0.80 pred_err 7%  model picks R16U2/lane_contig/default, best R16U2/lane_contig/default
+C:gu15   n=4 heur 1.239 model1 1.239 model2 1.000 auto1 1.394 auto2 1.144 rho +0.60 pred_err 16%  model picks R16U2/lane_contig/default, best R16U1/u_major/default
+C:gu3    n=4 heur 1.114 model1 1.114 model2 1.000 auto1 1.467 auto2 1.171 rho +0.80 pred_err 6%  model picks R16U2/lane_contig/default, best R16U1/u_major/default
+C:qo7    n=4 heur 1.132 model1 1.132 model2 1.132 auto1 1.247 auto2 1.086 rho +0.40 pred_err 27%  model picks R16U2/lane_contig/default, best R8U4/u_major/default
+C:up11k  n=4 heur 1.032 model1 1.032 model2 1.000 auto1 1.460 auto2 1.148 rho +0.80 pred_err 8%  model picks R16U2/lane_contig/default, best R16U1/u_major/default
+
+regret = t(policy) / t(autotune(all)), geomean over shapes (1.000 = always the best)
+A (post hoc)  heuristic 1.101  model(1) 1.026  model(2) 1.000  autotune(1) 1.241  autotune(2) 1.109  mean rho +0.44  model(1) exact 5/9
+B (held out)  heuristic 1.154  model(1) 1.051  model(2) 1.000  autotune(1) 1.312  autotune(2) 1.159  mean rho +0.58  model(1) exact 1/7
+C (held out)  heuristic 1.100  model(1) 1.100  model(2) 1.025  autotune(1) 1.365  autotune(2) 1.130  mean rho +0.68  model(1) exact 1/5
+B+C           heuristic 1.131  model(1) 1.071  model(2) 1.010  autotune(1) 1.334  autotune(2) 1.147  mean rho +0.62  model(1) exact 2/12
+
+H2 on held-out GEMV: REFUTED

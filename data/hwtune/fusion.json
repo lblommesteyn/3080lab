@@ -1,0 +1,26 @@
+{
+ "polybench_fusion (held out)": {
+  "always graph": 1.1594307347777626,
+  "always fused": 1.0598708377611181,
+  "always fused_graph": 1.2260138799394007,
+  "autotune(1)": 1.1078941893305336,
+  "autotune(2)": 1.1881136620439194,
+  "autotune(3)": 1.2304576448337015,
+  "autotune(4)": 1.232656508679084,
+  "hw_model top-1": 1.2286195902716597,
+  "hw_model top-2": 1.2315744363474477,
+  "oracle": 1.232656508679084
+ },
+ "demo 1/4 size (never measured)": {
+  "always graph": 1.47893874600036,
+  "always fused": 1.128201959559786,
+  "always fused_graph": 1.618961361275744,
+  "autotune(1)": 1.282015807440415,
+  "autotune(2)": 1.5078800173000768,
+  "autotune(3)": 1.631256588699517,
+  "autotune(4)": 1.6424484702669528,
+  "hw_model top-1": 1.6094615739964093,
+  "hw_model top-2": 1.6319749101480088,
+  "oracle": 1.6424484702669528
+ }
+}

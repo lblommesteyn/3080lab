@@ -1,0 +1,23 @@
+## polybench_fusion, full size (held-out family): 12 programs; speedup over base, geomean (oracle = autotune(4))
+  always graph           1.159
+  always fused           1.060
+  always fused_graph     1.226
+  autotune(1)            1.108
+  autotune(2)            1.188
+  autotune(3)            1.230
+  autotune(4)            1.233
+  hw_model top-1         1.229
+  hw_model top-2         1.232
+  oracle                 1.233
+
+## PolyBench at 1/4 size (unseen size, job 2222): 12 programs; speedup over base, geomean (oracle = autotune(4))
+  always graph           1.479
+  always fused           1.128
+  always fused_graph     1.619
+  autotune(1)            1.282
+  autotune(2)            1.508
+  autotune(3)            1.631
+  autotune(4)            1.642
+  hw_model top-1         1.609
+  hw_model top-2         1.632
+  oracle                 1.642
