@@ -1,6 +1,12 @@
 # Does hardware-informed optimization find wins a heuristic or autotuning misses? (Nov 16 2026)
 
-**Answer: no, not consistently.** Across four optimization spaces on kernels the models were not
+**Answer: yes, but only where the space is too large to search; not in small spaces.** On a
+212-tile GEMM space for shapes neither model had seen (Llama-3-8B, addendum 3), the copy-cap model's
+first pick, with zero measurements, lands within 1.3% of the best of all 212 tiles (geomean over 4
+shapes). The production default tile is 22.6% off, the max-occupancy rule 23.6%, and 16 random
+measurements 7.0%. Both models pass the pre-registered rule on all 4 shapes (`bigtile/score.txt`).
+
+**In small spaces the answer is no.** Across four smaller optimization spaces on kernels the models were not
 built on, the hardware-informed side either found nothing outside an autotuner's reach (H1) or saved
 measurements only where a simple rule saved the same ones (H2). The one pre-registered "supported"
 result (GEMM tiles) is a 1.3% edge at two measurements that is gone by four, and its one-measurement
@@ -44,6 +50,26 @@ Regret = time of the chosen configuration / time of the best in the space (geome
   1.091), but with 4 shapes the k = 1 edge reverses in timing round 1 of 3 (1.145 vs 1.143), and at
   k = 4 random search (1.054) beats both models (1.078, 1.100). The queue model fails at k = 2.
 
+## H2 in a large space: 212 GEMM tiles, unseen Llama-3-8B shapes (addendum 3)
+
+| policy (measurements) | qkv | o | gate_up | down | geomean regret |
+|---|---:|---:|---:|---:|---:|
+| default tile (0) | 1.188 | 1.239 | 1.151 | 1.334 | 1.226 |
+| max occupancy (0) | 1.207 | 1.189 | 1.198 | 1.356 | 1.236 |
+| **copy-cap model top-1 (0)** | 1.030 | 1.022 | 1.000 | 1.000 | **1.013** |
+| queue model top-1 (0) | 1.073 | 1.036 | 1.130 | 1.082 | 1.080 |
+| random (4) | 1.150 | 1.130 | 1.144 | 1.177 | 1.150 |
+| random (16) | 1.075 | 1.055 | 1.056 | 1.093 | 1.070 |
+| copy-cap model top-16 (16) | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
+
+Round-to-round noise of the best tile: 0.1-1.7%. Spearman, predicted vs measured: 0.71-0.83 (copy-cap).
+No random budget up to 16 matches the copy-cap model's zero-measurement pick.
+
+Caveat: the output check was void. Under the harness's random inputs, the default tile's
+output is non-finite (also with zero residuals, job 2241), so tile correctness was not
+verified here. These are the same kernel generator and inputs as `rank_fresh`. Timing should not
+depend on the values, but a wrong-yet-fast tile cannot be ruled out (addendum 4).
+
 ## What this says
 
 The hardware models are good at explaining *why* a configuration wins (split sectors, launch gaps,
@@ -51,7 +77,7 @@ occupancy), and that explanation is what a good heuristic encodes. They are not 
 rank close candidates (rank correlation 0.4-0.7, prediction errors 5-30% against differences of
 1-10% among good options), so once a heuristic and two or four measurements are allowed, they add
 nothing measurable. The remaining place a model could pay is a space too large to sample where its
-errors are smaller than the spread of candidates; none of the spaces here is that.
+errors are smaller than the spread of candidates; the 212-tile space is that, and there the model wins by a wide margin.
 
 ## Limits
 

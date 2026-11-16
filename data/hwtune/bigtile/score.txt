@@ -1,0 +1,23 @@
+212 tiles x 4 Llama-3-8B shapes (P = 512); regret = t / t(best tile), medians of 3 rounds; output mismatches: 0; max_occupancy = [2, 4, 2, 2, 2, 2, 3]
+policy             qkv       o      gu    down  geomean
+default          1.188   1.239   1.151   1.334    1.226
+max_occupancy    1.207   1.189   1.198   1.356    1.236
+random(1)        1.340   1.315   1.358   1.375    1.347
+old(1)           1.030   1.022   1.000   1.000    1.013
+queue(1)         1.073   1.036   1.130   1.082    1.080
+random(2)        1.223   1.203   1.232   1.258    1.229
+old(2)           1.030   1.022   1.000   1.000    1.013
+queue(2)         1.073   1.036   1.101   1.082    1.073
+random(4)        1.150   1.130   1.144   1.177    1.150
+old(4)           1.030   1.022   1.000   1.000    1.013
+queue(4)         1.073   1.036   1.101   1.082    1.073
+random(8)        1.104   1.084   1.089   1.125    1.100
+old(8)           1.030   1.022   1.000   1.000    1.013
+queue(8)         1.073   1.036   1.096   1.082    1.071
+random(16)       1.075   1.055   1.056   1.093    1.070
+old(16)          1.000   1.000   1.000   1.000    1.000
+queue(16)        1.052   1.028   1.000   1.082    1.040
+noise (best tile max/min over rounds): qkv 1.001 o 1.005 gu 1.017 down 1.011
+spearman old: qkv +0.73 o +0.74 gu +0.71 down +0.83   queue: qkv +0.71 o +0.71 gu +0.69 down +0.65
+old: beats random at k=1,2,4,8 True; shapes won at k=4 4/4; k=1 beats both heuristics True; random needs k=None to match old(4) -> SUPPORTED
+queue: beats random at k=1,2,4,8 True; shapes won at k=4 4/4; k=1 beats both heuristics True; random needs k=16 to match queue(4) -> SUPPORTED

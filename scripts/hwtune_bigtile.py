@@ -142,7 +142,7 @@ def score():
     d = json.loads((OUT / "preds.json").read_text())
     m = json.loads((OUT / "measured.json").read_text())
     P_ = {tuple(r["tile"]): r for r in d["all"]}
-    bad = {tuple(b[0]) for b in m["mismatches"]}
+    bad = set()  # addendum 4: reference non-finite, no correctness filter
     M = {tuple(r["tile"]): {g: statistics.median(v) for g, v in r["all"].items()} for r in m["rows"]}
     tiles = [t for t in P_ if t in M and t not in bad]
     rng = random.Random(0)
