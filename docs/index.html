@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3080lab</title>
+<meta name="description" content="What one RTX 3080 taught me about GPUs: measuring the machine below CUDA, rewriting the compiler's output, and running an LLM faster than llama.cpp.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=JetBrains+Mono:wght@400;500&family=Caveat:wght@500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #fbf6ee; --paper-2: #f4ecdf; --card: #fffaf2; --ink: #2d2723; --ink-2: #5b524a; --muted: #8a7f74;
+  --rule: #e6dccd; --accent: #c4572f; --accent-soft: #f3d9cb; --sage: #5f7f63; --sage-soft: #dfe8dc;
+  --blue: #3f6b8f; --blue-soft: #dbe6ee; --gold: #b8892e; --code: #f1e8da;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1f1b18; --paper-2: #272220; --card: #2a2421; --ink: #efe6da; --ink-2: #c9bcad; --muted: #9a8d80;
+    --rule: #3a332e; --accent: #e07a52; --accent-soft: #4a2e24; --sage: #8fb293; --sage-soft: #2c382d;
+    --blue: #86aed0; --blue-soft: #253340; --gold: #d9ae5a; --code: #2e2824;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1f1b18; --paper-2: #272220; --card: #2a2421; --ink: #efe6da; --ink-2: #c9bcad; --muted: #9a8d80;
+  --rule: #3a332e; --accent: #e07a52; --accent-soft: #4a2e24; --sage: #8fb293; --sage-soft: #2c382d;
+  --blue: #86aed0; --blue-soft: #253340; --gold: #d9ae5a; --code: #2e2824;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font: 19px/1.65 "Newsreader", Georgia, serif; font-optical-sizing: auto;
+}
+main { max-width: 720px; margin: 0 auto; padding: 0 16px 96px; }
+.wide { max-width: 900px; margin-left: auto; margin-right: auto; }
+h1, h2, h3 { font-family: "Fraunces", Georgia, serif; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.4rem, 7vw, 3.6rem); margin: 0 0 8px; }
+h2 { font-size: 1.75rem; margin: 72px 0 8px; }
+h2 .num { color: var(--accent); font-style: italic; font-weight: 400; margin-right: 6px; }
+h3 { font-size: 1.2rem; margin: 36px 0 4px; }
+p { margin: 0 0 18px; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+code, .mono { font-family: "JetBrains Mono", monospace; font-size: 0.82em; }
+code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
+em { font-style: italic; }
+hr { border: 0; text-align: center; margin: 64px 0; }
+hr::before { content: "\2726  \2726  \2726"; color: var(--muted); letter-spacing: 8px; font-size: 14px; }
+.hand { font-family: "Caveat", cursive; color: var(--accent); font-size: 1.35em; line-height: 1.1; }
+
+header.hero { padding: 72px 0 24px; }
+.kicker { font-family: "JetBrains Mono", monospace; font-size: 13px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.dek { font-size: 1.25rem; color: var(--ink-2); font-style: italic; margin-top: 12px; }
+.byline { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-top: 22px; font-size: 15px; color: var(--muted); }
+.byline a { color: var(--ink-2); }
+.pill { border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; background: var(--card); text-decoration: none; }
+.pill:hover { border-color: var(--accent); }
+
+.card { background: var(--card); border: 1px solid var(--rule); border-radius: 14px; padding: 20px 22px; margin: 26px 0; }
+.note { background: var(--paper-2); border-left: 3px solid var(--gold); border-radius: 0 10px 10px 0; padding: 14px 18px; margin: 24px 0; font-size: 17px; }
+.note b { font-family: "Fraunces", serif; }
+.toc { list-style: none; padding: 0; margin: 0; columns: 2; column-gap: 28px; font-size: 16px; }
+.toc li { margin: 3px 0; break-inside: avoid; }
+.toc a { text-decoration: none; color: var(--ink-2); }
+.toc a:hover { color: var(--accent); }
+.toc .n { color: var(--accent); font-style: italic; margin-right: 6px; }
+@media (max-width: 560px) { .toc { columns: 1; } }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 28px 0; }
+.stat { background: var(--card); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 16px; }
+.stat .v { font-family: "Fraunces", serif; font-size: 2rem; font-weight: 600; color: var(--accent); line-height: 1.1; }
+.stat .l { font-size: 14px; color: var(--ink-2); line-height: 1.35; margin-top: 4px; }
+@media (max-width: 560px) { .stats { grid-template-columns: 1fr; } }
+
+figure { margin: 30px 0; }
+figcaption { font-size: 15px; color: var(--muted); margin-top: 8px; line-height: 1.45; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart text { font-family: "JetBrains Mono", monospace; font-size: 11px; fill: var(--ink-2); }
+.chart .axis { stroke: var(--rule); }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 14px; color: var(--ink-2); margin-bottom: 8px; }
+.legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+.tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--paper); font: 13px/1.4 "JetBrains Mono", monospace; padding: 6px 9px; border-radius: 6px; opacity: 0; transition: opacity .12s; z-index: 10; max-width: 260px; }
+
+table { border-collapse: collapse; width: 100%; font-size: 16px; margin: 18px 0; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); }
+th { font-family: "Fraunces", serif; font-weight: 600; font-size: 15px; color: var(--ink-2); }
+td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+.tablewrap { overflow-x: auto; }
+
+/* control word explorer */
+.bits { display: grid; grid-template-columns: 4fr 1fr 3fr 3fr 6fr 4fr; gap: 4px; margin: 14px 0 10px; }
+.bits button { font: 500 13px "JetBrains Mono", monospace; border: 1px solid var(--rule); background: var(--paper-2); color: var(--ink); border-radius: 8px; padding: 12px 2px; cursor: pointer; }
+.bits button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.bits button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bitexp { min-height: 96px; font-size: 17px; }
+.bitexp b { font-family: "Fraunces", serif; }
+
+/* stepper */
+.stepper { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.stepper button { font: 14px "JetBrains Mono", monospace; border: 1px solid var(--rule); background: var(--card); color: var(--ink); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.stepper button:hover { border-color: var(--accent); }
+.stepper .lbl { font: 13px "JetBrains Mono", monospace; color: var(--muted); }
+
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.budget-out { font: 15px "JetBrains Mono", monospace; color: var(--ink-2); }
+
+.dont { list-style: none; padding: 0; }
+.dont li { padding: 10px 0 10px 30px; border-bottom: 1px dashed var(--rule); position: relative; font-size: 17px; }
+.dont li::before { content: "\2717"; position: absolute; left: 4px; color: var(--muted); }
+.dont li b { font-family: "Fraunces", serif; font-weight: 600; }
+
+.steps { counter-reset: s; list-style: none; padding: 0; }
+.steps li { counter-increment: s; padding-left: 40px; position: relative; margin: 12px 0; }
+.steps li::before { content: counter(s); position: absolute; left: 0; top: 1px; width: 26px; height: 26px; border-radius: 50%; background: var(--sage-soft); color: var(--sage); font: 600 14px/26px "Fraunces", serif; text-align: center; }
+
+.pending { border: 1.5px dashed var(--gold); background: transparent; }
+footer { margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--rule); font-size: 15px; color: var(--muted); }
+.theme-toggle { position: fixed; top: 14px; right: 14px; border: 1px solid var(--rule); background: var(--card); color: var(--ink-2); border-radius: 999px; width: 38px; height: 38px; cursor: pointer; font-size: 16px; z-index: 5; }
+.gpu-doodle { display: block; margin: 8px 0 0; width: 100%; max-width: 420px; height: auto; }
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeBtn" aria-label="Toggle dark mode">&#9790;</button>
+<div class="tip" id="tip"></div>
+<main>
+
+<header class="hero">
+  <div class="kicker">3080lab &middot; Fall 2026</div>
+  <h1>What one graphics card taught me</h1>
+  <p class="dek">I spent a few months measuring a single RTX 3080 below CUDA, below PTX, down to the bits the
+    compiler hides. Then I used what I found to rewrite its machine code and run a language model faster
+    than llama.cpp. This is the whole story: the wins, the parts that only tied, and the ideas that didn't work.</p>
+  <svg class="gpu-doodle" viewBox="0 0 420 120" role="img" aria-label="A hand-drawn graphics card">
+    <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ink-2)">
+      <path d="M14 26 Q12 20 20 19 L392 17 Q402 17 402 27 L404 86 Q404 95 395 95 L22 97 Q13 97 13 88 Z"/>
+      <circle cx="120" cy="57" r="27"/><circle cx="120" cy="57" r="5"/>
+      <path d="M120 30 Q132 45 120 57 Q108 69 120 84 M93 57 Q108 45 120 57 Q132 69 147 57"/>
+      <circle cx="290" cy="57" r="27"/><circle cx="290" cy="57" r="5"/>
+      <path d="M290 30 Q302 45 290 57 Q278 69 290 84 M263 57 Q278 45 290 57 Q302 69 317 57"/>
+      <path d="M40 97 L40 108 L370 108 L370 97" stroke-dasharray="4 5"/>
+      <path d="M185 35 L225 35 M185 47 L225 47 M185 59 L225 59 M185 71 L225 71 M185 83 L225 83"/>
+    </g>
+    <text x="290" y="14" font-family="Caveat, cursive" font-size="19" fill="var(--accent)">GA102, sm_86</text>
+  </svg>
+  <div class="byline">
+    <span>by <a href="https://github.com/lblommesteyn">Luke Blommesteyn</a></span>
+    <a class="pill" href="https://github.com/lblommesteyn/3080lab">code on GitHub</a>
+    <a class="pill" href="https://github.com/lblommesteyn/3080lab/blob/master/docs/notebook.md">the lab notebook</a>
+  </div>
+</header>
+
+<div class="stats">
+  <div class="stat"><div class="v">1.33&times;</div><div class="l">faster single-stream decode than llama.cpp, same weights, same card</div></div>
+  <div class="stat"><div class="v">2.34&times;</div><div class="l">faster when decoding 8 sequences at once</div></div>
+  <div class="stat"><div class="v">1.074&times;</div><div class="l">from rewriting compiled GPU code on kernels it never saw</div></div>
+</div>
+
+<div class="card">
+  <ul class="toc">
+    <li><a href="#why"><span class="n">0</span>Why do this at all?</a></li>
+    <li><a href="#measure"><span class="n">1</span>Measuring the machine</a></li>
+    <li><a href="#rewrite"><span class="n">2</span>Rewriting the compiler's homework</a></li>
+    <li><a href="#llm"><span class="n">3</span>A whole language model</a></li>
+    <li><a href="#choose"><span class="n">4</span>Can the model choose?</a></li>
+    <li><a href="#autotune"><span class="n">5</span>Model vs. autotuning</a></li>
+    <li><a href="#didnt"><span class="n">6</span>Things that didn't work</a></li>
+    <li><a href="#how"><span class="n">7</span>How I tried not to fool myself</a></li>
+  </ul>
+</div>
+
+<h2 id="why"><span class="num">0</span>Why do this at all?</h2>
+<p>GPU programming has a strange layer cake. You write CUDA, NVIDIA's compiler turns it into PTX, and then a
+  closed-source assembler called <code>ptxas</code> turns that into <em>SASS</em>, the real machine code. NVIDIA
+  doesn't document SASS. It doesn't publish how long instructions take, which hazards the hardware
+  catches for you, or how the register file is wired.</p>
+<p>So the question I started with was simple: <b>can one person measure the machine well enough to predict
+  how fast code runs, and then write faster code than the compiler?</b> One card, sitting in my desktop, one
+  question at a time.</p>
+<p>The short answer turned out to be "sometimes, and it's very specific about when." The rest of this page is
+  the long answer.</p>
+<div class="note"><b>No CUDA toolkit.</b> Everything here runs on pip wheels: NVRTC to compile, <code>ptxas</code>
+  and <code>nvdisasm</code> to assemble and disassemble, and the driver API to load raw cubins. That last part
+  matters: if you can load a cubin, you can load one you edited by hand.</div>
+
+<hr>
+
+<h2 id="measure"><span class="num">1</span>Measuring the machine</h2>
+<p>Every instruction in SASS is 128 bits. Most of those bits say <em>what</em> to compute. But 21 of them,
+  bits 105 to 125, are a little note from the compiler to the hardware about <em>when</em>. I decoded them by
+  patching cubins and watching what broke. Tap a field:</p>
+
+<div class="card" id="cw">
+  <div class="mono" style="font-size:13px;color:var(--muted)">control word, bits [105:125]</div>
+  <div class="bits" role="group" aria-label="Control word fields">
+    <button data-k="stall" aria-pressed="true">stall&nbsp;4</button>
+    <button data-k="yield" aria-pressed="false">y&nbsp;1</button>
+    <button data-k="wbar" aria-pressed="false">wbar&nbsp;3</button>
+    <button data-k="rbar" aria-pressed="false">rbar&nbsp;3</button>
+    <button data-k="wait" aria-pressed="false">wait&nbsp;mask&nbsp;6</button>
+    <button data-k="reuse" aria-pressed="false">reuse&nbsp;4</button>
+  </div>
+  <div class="bitexp" id="bitexp" aria-live="polite"></div>
+</div>
+
+<p>The stall field is where I got my first real surprise. I assumed the hardware would protect me if the
+  compiler's number was too small, the way a CPU's pipeline interlocks do. So I took a chain of dependent
+  multiply-adds and patched the stall below 4 cycles.</p>
+<p><b>It gave wrong answers in 20 out of 20 trials.</b> The hardware doesn't check. For fixed-latency
+  instructions, those four bits are the only thing standing between your program and garbage. It's a lot of
+  trust to put in a compiler, and it means anyone rewriting SASS has to get the timing exactly right.</p>
+
+<h3>The register file has two doors</h3>
+<p>A multiply-add reads three registers. The register file turned out to have 2 banks with one read port each,
+  so if all three operands live in the same bank, the instruction has to wait. There's a small <em>reuse
+  cache</em> to help, and the compiler sets those reuse bits, but it doesn't always get it right.</p>
+<p>Just renumbering registers, with no change to the math, made one instruction mix <b>1.48&times; faster</b>
+  than what <code>ptxas</code> produced. That was the moment this stopped being a hobby and became a lab.</p>
+
+<h3>Memory, honestly measured</h3>
+<div class="stats" style="margin-top:12px">
+  <div class="stat"><div class="v">~715</div><div class="l">GB/s where DRAM bandwidth actually saturates</div></div>
+  <div class="stat"><div class="v">570</div><div class="l">cycles (292 ns) for a DRAM load under load</div></div>
+  <div class="stat"><div class="v">32 B</div><div class="l">sectors, and splitting them turned out to matter a lot</div></div>
+</div>
+<p>That last one sets up the next chapter. Memory moves in 32-byte sectors. If two loads each grab half of the
+  same sector at different times, you pay for it twice. It sounds small. It isn't.</p>
+<p class="mono" style="font-size:14px">&rarr; <a href="https://github.com/lblommesteyn/3080lab/blob/master/docs/reports/microarchitecture.md">full microarchitecture report</a></p>
+
+<hr>
+
+<h2 id="rewrite"><span class="num">2</span>Rewriting the compiler's homework</h2>
+<p>With the rules in hand, I wrote a tool that opens a compiled kernel, reads every load's address
+  symbolically, and finds pairs that split a sector between them. Then it moves the late half up next to its
+  partner, fixes every control bit, re-checks every hazard, and runs the result bit-for-bit against the
+  original.</p>
+
+<figure class="card">
+  <div class="mono" style="font-size:13px;color:var(--muted);margin-bottom:6px">one warp's loads over time</div>
+  <svg id="sectorSvg" viewBox="0 0 640 170" role="img" aria-label="Two loads splitting a sector, before and after the rewrite" style="width:100%;height:auto"></svg>
+  <div class="stepper">
+    <button id="secBtn">show after &rarr;</button>
+    <span class="lbl" id="secLbl">before: ptxas order, the sector is fetched twice</span>
+  </div>
+  <figcaption>The 7B gate+up GEMV with this fix went from 94.3 to 62.7 &micro;s, <b>1.50&times;</b>.</figcaption>
+</figure>
+
+<p>One kernel is an anecdote, so I froze the tool and ran it blind on 120 int4 GEMV kernels, most of which it
+  had never seen:</p>
+<div class="tablewrap"><table>
+  <tr><th>suite</th><th class="r">kernels</th><th class="r">geomean speedup</th><th class="r">wrong answers</th></tr>
+  <tr><td>A (used while building)</td><td class="r">56</td><td class="r">1.036&times;</td><td class="r">0</td></tr>
+  <tr><td>B (never seen)</td><td class="r">43</td><td class="r"><b>1.074&times;</b></td><td class="r">0</td></tr>
+  <tr><td>C (high register pressure)</td><td class="r">20</td><td class="r">1.055&times;</td><td class="r">0</td></tr>
+</table></div>
+<p>I also wrote a general instruction scheduler, hoping to beat <code>ptxas</code> everywhere. It reached
+  <b>parity</b>, 1.003&times;, and no further. An oracle that picks the best of three orderings for each kernel
+  only reaches 1.005&times;. The compiler is very good at ordering instructions. Where it leaves speed on the
+  table is in places it doesn't model, like sector splitting.</p>
+<p class="mono" style="font-size:14px">&rarr; <a href="https://github.com/lblommesteyn/3080lab/blob/master/docs/reports/sass-optimization.md">SASS optimization report</a> &middot; <a href="https://github.com/lblommesteyn/3080lab/blob/master/docs/verification.md">what the checks guarantee, and what they don't</a></p>
+
+<hr>
+
+<h2 id="llm"><span class="num">3</span>A whole language model</h2>
+<p>Microbenchmarks are fun, but I wanted to know if any of this adds up to something real. So I took Qwen2.5-1.5B,
+  loaded <em>llama.cpp's own</em> Q4_0 weight file byte for byte, and wrote an engine around it: about 200 fused
+  kernels captured in one CUDA graph, int4 GEMVs, tensor-core batched GEMVs, int8 tensor-core prefill and
+  flash attention.</p>
+<p>Then I raced it against the newest llama.cpp (b12428) on the same card, in paired, rotated rounds with an
+  A/A control.</p>
+
+<figure class="chart wide" style="max-width:720px">
+  <div class="legend"><span style="--c:var(--accent)">3080lab</span><span style="--c:var(--muted)">llama.cpp b12428</span></div>
+  <svg id="decodeSvg" viewBox="0 0 640 260" role="img" aria-label="Decode throughput, 3080lab vs llama.cpp"></svg>
+  <figcaption>Tokens per second at 1, 2, 8 and 32 sequences decoded together. Medians of 6 paired rounds; the A/A
+    control agreed within 0.2%. Hover a bar for the numbers.</figcaption>
+</figure>
+
+<p>At batch size 1, a token takes 1.95 ms, which is 63% of the card's peak memory bandwidth spent reading 928 MB of
+  weights. The win there is mostly about launching fewer, fatter kernels. The bigger wins at batch 8 come from
+  reading each weight once and using it for every sequence on tensor cores.</p>
+<div class="note"><b>Same bytes, same answers.</b> Every tensor comes from llama.cpp's file. The last-token argmax
+  matches a token-by-token reference, and perplexity is within 0.1% of an fp16 path. The two engines write the same
+  coherent answers for the first eight words, then drift apart, because llama.cpp also quantizes activations.</div>
+<p class="mono" style="font-size:14px">&rarr; <a href="https://github.com/lblommesteyn/3080lab/blob/master/docs/reports/llm-inference.md">LLM inference report</a></p>
+
+<hr>
+
+<h2 id="choose"><span class="num">4</span>Can the model choose?</h2>
+<p>By now I had a hardware model that could predict a kernel's runtime with single-digit median error. The
+  natural next question: can it decide <em>which optimization to apply</em>? I froze the split, the predictors
+  and the metrics before fitting anything, then measured 771 decisions.</p>
+<div class="tablewrap"><table>
+  <tr><th>kind of decision</th><th class="r">best fixed rule</th><th class="r">the model</th><th class="r">oracle</th></tr>
+  <tr><td>launch structure (fusion, CUDA graphs)</td><td class="r">1.159&times;</td><td class="r"><b>1.229&times;</b></td><td class="r">1.231&times;</td></tr>
+  <tr><td>reordering SASS instructions</td><td class="r">1.000&times;</td><td class="r">1.0007&times;</td><td class="r">1.005&times;</td></tr>
+</table></div>
+<p>For launch structure, the model lands within 0.2% of perfect. For instruction reordering, there's almost
+  nothing to win, so even a perfect predictor barely helps. That was a useful thing to learn: <b>most of the
+  value is in deciding what the program looks like, not in shuffling its instructions.</b></p>
+<p class="mono" style="font-size:14px">&rarr; <a href="https://github.com/lblommesteyn/3080lab/blob/master/docs/reports/optimization-selection.md">optimization selection report</a></p>
+
+<hr>
+
+<h2 id="autotune"><span class="num">5</span>Model vs. autotuning</h2>
+<p>This is the question I care most about. If you can just <em>try</em> every option and keep the fastest
+  (that's autotuning), why bother modelling hardware at all?</p>
+<p>I tested it in five different search spaces, writing each rule down before seeing any number. In the small
+  ones, with 4 to 21 candidates, the model added nothing: a simple rule of thumb plus a couple of measurements
+  got just as close.</p>
+<p>The big one was different. A GEMM kernel has 212 valid tile shapes. On four layer shapes from a model the
+  cost model had never seen (Llama-3-8B), I timed every tile, checked every output against a reference, and asked:
+  how close does each strategy get with a given number of measurements?</p>
+
+<figure class="chart card">
+  <div class="legend"><span style="--c:var(--accent)">copy-cap model, measure its top k</span><span style="--c:var(--muted)">random search, k tiles</span><span style="--c:var(--blue)">default tile (0 measurements)</span></div>
+  <svg id="tileSvg" viewBox="0 0 640 260" role="img" aria-label="Regret vs number of measurements"></svg>
+  <label for="budget" class="mono" style="font-size:13px;color:var(--muted)">measurement budget</label>
+  <input type="range" id="budget" min="0" max="4" value="0" step="1">
+  <div class="budget-out" id="budgetOut"></div>
+  <figcaption>Regret = how much slower the chosen tile is than the best of all 212 (1.000 = found the best).
+    Geomean over the 4 shapes, medians of 3 timing rounds; run-to-run noise of the best tile was 0.1 to 1.7%.</figcaption>
+</figure>
+
+<p>With <b>zero</b> measurements, the model's first guess is within 1.3% of the best tile. Sixteen random
+  measurements still leave you 7% off. The production default tile is 22.6% off. So the honest answer is:
+  <span class="hand">hardware knowledge pays when the space is too big to search.</span></p>
+
+<div class="card pending">
+  <div class="kicker" style="color:var(--gold)">running right now</div>
+  <h3 style="margin-top:6px">The proper test: 32 unseen workloads vs. a real autotuner</h3>
+  <p style="margin-bottom:0">Four shapes isn't enough to believe in. A frozen benchmark is on the GPU as I write this:
+    32 workloads from Qwen2.5-7B, Gemma-2-9B, Phi-3-mini and Qwen2.5-14B, all 212 tiles each (6,784
+    pairs, every one checked against an fp32 reference), and the model racing Optuna's TPE autotuner at budgets from
+    0 to 64. The bar it has to clear, written down in advance: reach within 5% of the best tile with
+    <b>4&times; fewer measurements than TPE</b>. Whatever it says, it goes here.</p>
+</div>
+
+<hr>
+
+<h2 id="didnt"><span class="num">6</span>Things that didn't work</h2>
+<p>This list is longer than the list of wins, and I think it's the most useful part of the project.</p>
+<ul class="dont">
+  <li><b>A general SASS scheduler.</b> Parity with ptxas (1.003&times;), never a win. The oracle ceiling is 0.5%.</li>
+  <li><b>Joint register allocation + scheduling, and software pipelining.</b> No measurable gain.</li>
+  <li><b>Letting the model decide when to rewrite.</b> "Guided" mode was no better than rewriting blindly, and fell to 5 of 9 correct calls under register pressure.</li>
+  <li><b>Hardware models in small search spaces.</b> Tied a rule of thumb plus two measurements every time.</li>
+  <li><b>Ranking close GEMM tiles.</b> Earlier blind tests: pairwise accuracy 0.57 for the better model. The model knows which direction occupancy goes; it does not know which of two good tiles is better.</li>
+  <li><b>The time I trusted a correctness check that couldn't fail.</b> My test inputs made the reference output NaN, so every comparison "failed" and none of it meant anything. Caught it, rebuilt the check with properly quantized activations, then all 212 tiles passed.</li>
+</ul>
+
+<hr>
+
+<h2 id="how"><span class="num">7</span>How I tried not to fool myself</h2>
+<p>A GPU is a noisy instrument, and it's very easy to see a 2% win that isn't there. A few rules I ended up
+  living by:</p>
+<ol class="steps">
+  <li><b>Measure noise first.</b> Time two byte-identical binaries against each other (an A/A test). Anything smaller than that gap isn't a result.</li>
+  <li><b>Interleave and shuffle.</b> Never run all of A then all of B. Rotate the order every round so heat and clocks hit everyone equally.</li>
+  <li><b>Write the rule down first.</b> Before any held-out number exists, commit the split, the metric and what counts as a win. Amend only before the next number, and say so.</li>
+  <li><b>Check outputs, not just times.</b> A fast kernel that computes the wrong thing is the easiest win to fall for.</li>
+  <li><b>Validate SASS before spending GPU time.</b> The runner refuses to measure unless the timed loop has exactly the instructions it expects and nothing spills.</li>
+  <li><b>Keep the negative results.</b> They're in the notebook next to the wins, in the order they happened.</li>
+</ol>
+
+<footer>
+  <p>One GPU, one architecture: every rule here was measured on this RTX 3080, and none has been checked on
+    another card. SASS rewrites are checked statically and differentially, not proven equivalent.</p>
+  <p>Code, data and the full chronological <a href="https://github.com/lblommesteyn/3080lab/blob/master/docs/notebook.md">lab notebook</a>
+    are on <a href="https://github.com/lblommesteyn/3080lab">GitHub</a>. Thanks for reading all the way down here.
+    <span class="hand">&hearts;</span></p>
+</footer>
+</main>
+
+<script>
+(function () {
+  // theme
+  var root = document.documentElement, btn = document.getElementById("themeBtn");
+  try { var saved = localStorage.getItem("theme"); if (saved) root.setAttribute("data-theme", saved); } catch (e) {}
+  btn.addEventListener("click", function () {
+    var dark = root.getAttribute("data-theme") === "dark" ||
+      (!root.getAttribute("data-theme") && matchMedia("(prefers-color-scheme: dark)").matches);
+    var next = dark ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("theme", next); } catch (e) {}
+  });
+
+  // control word explorer
+  var EXP = {
+    stall: "<b>Stall (4 bits).</b> How many cycles to wait before issuing the next instruction. The hardware does <em>not</em> double-check this for fixed-latency ops: set it too low and you silently get wrong answers (20 of 20 trials).",
+    yield: "<b>Yield (1 bit).</b> A hint that lets the scheduler switch to another warp after this instruction.",
+    wbar: "<b>Write barrier (3 bits).</b> For variable-latency instructions like memory loads: names one of six scoreboards to set when the result is ready.",
+    rbar: "<b>Read barrier (3 bits).</b> A scoreboard released once the instruction has finished <em>reading</em> its source registers, so they can safely be overwritten.",
+    wait: "<b>Wait mask (6 bits).</b> One bit per scoreboard: don't issue until these are cleared. This is how a load and its first use are kept in order.",
+    reuse: "<b>Reuse (4 bits).</b> Keep this operand in a tiny cache next to the ALU. It matters because the register file has only 2 banks with one read each."
+  };
+  var bitbtns = document.querySelectorAll("#cw .bits button"), out = document.getElementById("bitexp");
+  function pick(k) {
+    bitbtns.forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.k === k ? "true" : "false"); });
+    out.innerHTML = EXP[k];
+  }
+  bitbtns.forEach(function (b) { b.addEventListener("click", function () { pick(b.dataset.k); }); });
+  pick("stall");
+
+  var NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, parent) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  var tip = document.getElementById("tip");
+  function hover(node, html) {
+    node.addEventListener("mousemove", function (ev) {
+      tip.innerHTML = html; tip.style.opacity = 1;
+      tip.style.left = Math.min(ev.clientX + 12, innerWidth - 270) + "px"; tip.style.top = (ev.clientY + 12) + "px";
+    });
+    node.addEventListener("mouseleave", function () { tip.style.opacity = 0; });
+  }
+
+  // sector stepper
+  var ss = document.getElementById("sectorSvg"), after = false;
+  function drawSector() {
+    ss.innerHTML = "";
+    var t = el("text", { x: 10, y: 22 }, ss); t.textContent = "time →";
+    t.setAttribute("style", "font:12px JetBrains Mono, monospace; fill:var(--muted)");
+    // sector box
+    var sx = 10, rows = [["LDG  half A", 60], ["LDG  half B", after ? 90 : 380]];
+    rows.forEach(function (r, i) {
+      var y = 50 + i * 52;
+      var lab = el("text", { x: sx, y: y + 20 }, ss); lab.textContent = r[0];
+      lab.setAttribute("style", "font:12px JetBrains Mono, monospace; fill:var(--ink-2)");
+      var rect = el("rect", { x: 130 + r[1], y: y, width: 110, height: 30, rx: 7 }, ss);
+      rect.setAttribute("style", "fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.5; transition: x .5s");
+      var tt = el("text", { x: 130 + r[1] + 12, y: y + 20 }, ss);
+      tt.textContent = (i === 0 || after) ? "fetch sector" : "fetch AGAIN";
+      tt.setAttribute("style", "font:12px JetBrains Mono, monospace; fill:var(--accent)");
+    });
+    var note = el("text", { x: 140, y: 160 }, ss);
+    note.textContent = after ? "one 32 B sector, one trip to memory" : "same 32 B sector, two trips to memory";
+    note.setAttribute("style", "font:20px Caveat, cursive; fill:var(--ink-2)");
+    document.getElementById("secBtn").innerHTML = after ? "&larr; show before" : "show after &rarr;";
+    document.getElementById("secLbl").textContent = after ? "after: halves paired, fetched once" : "before: ptxas order, the sector is fetched twice";
+  }
+  document.getElementById("secBtn").addEventListener("click", function () { after = !after; drawSector(); });
+  drawSector();
+
+  // decode chart
+  var D = [["B=1", 514, 385, "1.33×"], ["B=2", 947, 655, "1.44×"], ["B=8", 3477, 1487, "2.34×"], ["B=32", 7279, 3773, "1.93×"]];
+  var ds = document.getElementById("decodeSvg"), H = 200, top = 20, left = 50, gw = 140, max = 8000;
+  [0, 2000, 4000, 6000, 8000].forEach(function (v) {
+    var y = top + H - v / max * H;
+    el("line", { x1: left, x2: 630, y1: y, y2: y, class: "axis" }, ds);
+    var t = el("text", { x: left - 8, y: y + 4, "text-anchor": "end" }, ds); t.textContent = v.toLocaleString();
+  });
+  D.forEach(function (d, i) {
+    var x0 = left + 20 + i * gw;
+    [[d[1], "var(--accent)", "3080lab"], [d[2], "var(--muted)", "llama.cpp"]].forEach(function (b, j) {
+      var h = b[0] / max * H, x = x0 + j * 50;
+      var r = el("rect", { x: x, y: top + H - h, width: 46, height: h, rx: 4 }, ds);
+      r.setAttribute("style", "fill:" + b[1]);
+      hover(r, d[0] + " &middot; " + b[2] + "<br>" + b[0].toLocaleString() + " tok/s");
+    });
+    var t = el("text", { x: x0 + 48, y: top + H + 18, "text-anchor": "middle" }, ds); t.textContent = d[0];
+    var s = el("text", { x: x0 + 23, y: top + H - d[1] / max * H - 8, "text-anchor": "middle" }, ds);
+    s.textContent = d[3]; s.setAttribute("style", "font:600 13px Fraunces, serif; fill:var(--accent)");
+  });
+
+  // tile regret chart with budget slider
+  var K = [1, 2, 4, 8, 16], MOD = [1.013, 1.013, 1.013, 1.013, 1.000], RND = [1.347, 1.229, 1.150, 1.100, 1.070], DEF = 1.226;
+  var ts = document.getElementById("tileSvg"), L = 56, R = 620, T = 16, HB = 200, ymin = 1.0, ymax = 1.4;
+  function X(i) { return L + i / 4 * (R - L); }
+  function Y(v) { return T + (ymax - v) / (ymax - ymin) * HB; }
+  [1.0, 1.1, 1.2, 1.3, 1.4].forEach(function (v) {
+    el("line", { x1: L, x2: R, y1: Y(v), y2: Y(v), class: "axis" }, ts);
+    var t = el("text", { x: L - 8, y: Y(v) + 4, "text-anchor": "end" }, ts); t.textContent = v.toFixed(1);
+  });
+  K.forEach(function (k, i) { var t = el("text", { x: X(i), y: T + HB + 20, "text-anchor": "middle" }, ts); t.textContent = k; });
+  var xl = el("text", { x: (L + R) / 2, y: T + HB + 40, "text-anchor": "middle" }, ts); xl.textContent = "tiles measured";
+  var dl = el("line", { x1: L, x2: R, y1: Y(DEF), y2: Y(DEF), "stroke-dasharray": "5 5" }, ts);
+  dl.setAttribute("style", "stroke:var(--blue); stroke-width:2");
+  function line(arr, color) {
+    var p = el("polyline", { points: arr.map(function (v, i) { return X(i) + "," + Y(v); }).join(" "), fill: "none" }, ts);
+    p.setAttribute("style", "stroke:" + color + "; stroke-width:2.5; stroke-linejoin:round");
+    arr.forEach(function (v, i) {
+      var c = el("circle", { cx: X(i), cy: Y(v), r: 5 }, ts);
+      c.setAttribute("style", "fill:" + color + "; stroke:var(--card); stroke-width:2");
+      hover(c, "k = " + K[i] + "<br>regret " + v.toFixed(3));
+    });
+  }
+  line(RND, "var(--muted)"); line(MOD, "var(--accent)");
+  var cursor = el("line", { y1: T, y2: T + HB }, ts); cursor.setAttribute("style", "stroke:var(--ink-2); stroke-width:1; stroke-dasharray:2 4");
+  var bud = document.getElementById("budget"), bo = document.getElementById("budgetOut");
+  function setB() {
+    var i = +bud.value; cursor.setAttribute("x1", X(i)); cursor.setAttribute("x2", X(i));
+    var m = (MOD[i] - 1) * 100, r = (RND[i] - 1) * 100;
+    bo.textContent = "measure " + K[i] + ": model " + m.toFixed(1) + "% off the best, random " + r.toFixed(1) + "% off";
+  }
+  bud.addEventListener("input", setB); setB();
+})();
+</script>
+</body>
+</html>
