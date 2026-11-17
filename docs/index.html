@@ -61,6 +61,7 @@ th { font-weight: 600; color: var(--dim); font-size: 12.5px; text-transform: upp
 td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tw { overflow-x: auto; }
 
+.grave { max-width: 360px; margin: 28px auto; }
 .aside { color: var(--dim); font-size: 15px; margin: 22px 0; }
 .aside .t { font-weight: 600; color: var(--fg); }
 .learned { border-top: 1px dashed var(--line); margin-top: 30px; padding-top: 14px; font-size: 15px; color: var(--dim); }
@@ -213,9 +214,7 @@ footer { margin-top: 90px; font-size: 13.5px; color: var(--dim); border-top: 1px
     the win over llama.cpp is just launching fewer, bigger kernels. With more sequences the win gets bigger because
     each weight gets read once for all of them. Outputs match a token-by-token reference and perplexity is within
     0.1% of fp16, so it's not fast because it's wrong.</p>
-  <div class="aside"><span class="t">RIP megakernel.</span> I also tried one giant persistent kernel for the whole
-    decode step, with one warp streaming weights in while the others did math. It compiled, it ran, it picked the
-    wrong token, and it was slower than the CUDA graph anyway.</div>
+  <div class="grave"><svg viewBox="0 0 360 300" id="tomb" role="img" aria-label="Tombstone: RIP megakernel. One giant persistent kernel for the whole decode step. It compiled, it ran, it picked the wrong token, and it was slower than the CUDA graph anyway."></svg></div>
 </section>
 
 <section class="part" id="search">
@@ -481,6 +480,21 @@ footer { margin-top: 90px; font-size: 13.5px; color: var(--dim); border-top: 1px
     }
     series(Rn, C.dim, "random"); series(M, C.a, "cost model");
     T(s, X(0) + 6, Y(1.013) - 14, "zero measurements, 1.3% off", { "font-size": 14, fill: C.a });
+  })();
+
+
+  // tombstone
+  (function () {
+    var s = document.getElementById("tomb");
+    add(s, R(s).path("M70 270 L70 110 Q70 30 180 30 Q290 30 290 110 L290 270", opt({ stroke: C.dim, sw: 2, fill: C.panel === "" ? null : C.line, fs: "solid", roughness: 1.4 })));
+    curve(s, [[20, 272], [120, 268], [240, 274], [340, 270]], { stroke: C.dim, sw: 2 });
+    for (var i = 0; i < 9; i++) { var gx = 30 + i * 36; line(s, gx, 272, gx + 5, 258 - (i % 3) * 4, { stroke: C.g, sw: 1.4 }); line(s, gx + 8, 272, gx + 10, 262, { stroke: C.g, sw: 1.4 }); }
+    T(s, 180, 82, "RIP", { "text-anchor": "middle", "font-size": 30, "font-weight": 700 });
+    T(s, 180, 110, "megakernel", { "text-anchor": "middle", "font-size": 22, "font-weight": 700, fill: C.a });
+    T(s, 180, 130, "Oct 15, 2026", { "text-anchor": "middle", "font-size": 13, class: "d" });
+    ["one giant kernel for the", "whole decode step.", "it compiled. it ran.", "it picked the wrong token.", "and it was slower than", "the CUDA graph anyway."].forEach(function (l, i) {
+      T(s, 180, 160 + i * 18, l, { "text-anchor": "middle", "font-size": 14.5 });
+    });
   })();
 
   var links = [].slice.call(document.querySelectorAll("#toc a")), secs = links.map(function (a) { return document.querySelector(a.getAttribute("href")); });
