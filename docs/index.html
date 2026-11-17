@@ -98,8 +98,9 @@ footer { margin-top: 90px; font-size: 13.5px; color: var(--dim); border-top: 1px
 <section class="part" id="start">
   <div class="part-label">Prologue</div>
   <h2>Why one GPU</h2>
-  <p>First, how I ended up with a 3080: I'd sold my 3090 not long before starting this. In hindsight, for a
-    project that's entirely about squeezing one GPU, that was lowkey a dumb idea. So the 3080 it was.</p>
+  <p>Some context: I used to have a 3090, with 24 GB of VRAM. I sold it, which in hindsight was lowkey a dumb
+    idea, and was left with a 3080 and its 10 GB. So this project started as a way to get every last bit out of the
+    card I still had.</p>
   <p>When you write CUDA, two compilers stand between you and the hardware. The second one, <code>ptxas</code>, is
     closed source, and the machine code it produces (SASS) isn't documented. Neither is how long each instruction
     takes, or what the hardware does when two instructions depend on each other. Most GPU performance advice is
@@ -278,7 +279,7 @@ footer { margin-top: 90px; font-size: 13.5px; color: var(--dim); border-top: 1px
     <li><b>The decode megakernel.</b> Wrong token, slower than the graph.</li>
     <li><b>Ranking close GEMM tiles.</b> In blind tests the model got single trends right (occupancy 15 of 16), but picking between two good tiles was close to a coin flip (0.57).</li>
     <li><b>A correctness check that couldn't fail.</b> My test activations weren't validly quantized, so every output was NaN and the comparison meant nothing. I caught it, rebuilt the check around the production quantizer, and every tile passed.</li>
-    <li><b>Selling the 3090.</b> See the prologue.</li>
+    <li><b>Selling the 3090.</b> 24 GB of VRAM, gone. See the prologue.</li>
   </ul>
 </section>
 
