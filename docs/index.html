@@ -89,28 +89,24 @@ footer { margin-top: 90px; font-size: 13.5px; color: var(--dim); border-top: 1px
 
 <header>
   <h1>Six weeks inside <i>one</i> graphics card</h1>
-  <p class="sub">I measured an RTX 3080 below CUDA, down to the bits the compiler doesn't document, then used what I
-    found to rewrite its machine code and run a language model faster than llama.cpp. Here's how it went, including
-    the parts that didn't.</p>
+  <p class="sub">I spent six weeks poking at an RTX 3080 below CUDA, figured out a bunch of stuff NVIDIA doesn't
+    document, and used it to run an LLM faster than llama.cpp. Some of it worked, a lot of it didn't.</p>
   <div class="by">Luke Blommesteyn &middot; Oct 7 to Nov 16, 2026 &middot; <a href="https://github.com/lblommesteyn/3080lab">code</a> &middot; <a href="https://github.com/lblommesteyn/3080lab/blob/master/docs/notebook.md">lab notebook</a></div>
 </header>
 
 <section class="part" id="start">
   <div class="part-label">Prologue</div>
   <h2>Why one GPU</h2>
-  <p>Some context: I used to have a 3090, with 24 GB of VRAM. I sold it, which in hindsight was lowkey a dumb
-    idea, and was left with a 3080 and its 10 GB. So this project started as a way to get every last bit out of the
-    card I still had.</p>
-  <p>When you write CUDA, two compilers stand between you and the hardware. The second one, <code>ptxas</code>, is
-    closed source, and the machine code it produces (SASS) isn't documented. Neither is how long each instruction
-    takes, or what the hardware does when two instructions depend on each other. Most GPU performance advice is
-    built on top of that gap.</p>
-  <p>I wanted to see how much of it one person could fill in by measuring. The rules I gave myself: one card, no
-    CUDA toolkit install (compilers and disassembler come from pip wheels), and every claim backed by a measurement
-    I'd be comfortable showing someone.</p>
-  <p>I didn't do the reverse engineering alone. I worked with Claude (Opus 5.5) throughout: designing probe kernels,
-    reading disassembly, writing analysis and benchmark scripts, and arguing about whether a result was real. Being
-    able to try an idea in an afternoon instead of a week is most of why this fit in six weeks.</p>
+  <p>Some context: I used to have a 3090 with 24 GB of VRAM. I sold it (lowkey a dumb idea) and was left with a
+    3080 and 10 GB. So this started as me trying to get every last bit out of the card I still had.</p>
+  <p>When you write CUDA there are two compilers between you and the hardware. The second one, <code>ptxas</code>,
+    is closed source, and the machine code it spits out (SASS) isn't documented. NVIDIA also doesn't tell you how
+    long instructions take or what happens when one depends on another. So a lot of GPU perf advice is educated
+    guessing.</p>
+  <p>I wanted to see how much of that I could just measure. Rules: one card, no CUDA toolkit (the compilers and
+    disassembler all come from pip), and no claim without a measurement behind it.</p>
+  <p>I also did a lot of this with Claude (Opus 5.5). It wrote probe kernels and scripts, read disassembly with me,
+    and pushed back when a result looked too good. Honestly it's the reason this took six weeks and not six months.</p>
 
   <figure>
     <svg viewBox="0 0 620 150" id="stack" aria-label="CUDA to SASS compile path"></svg>
@@ -127,10 +123,10 @@ footer { margin-top: 90px; font-size: 13.5px; color: var(--dim); border-top: 1px
 <section class="part" id="machine">
   <div class="part-label">Part I</div>
   <h2>Measuring the machine</h2>
-  <p class="lede">The first surprise was how much the hardware trusts the compiler.</p>
-  <p>Every SASS instruction is 128 bits. Most of it says what to compute. Bits 105 to 125 are different: a small
-    note from the compiler telling the hardware how long to wait and which results to wait for. I worked out the
-    fields by patching them in compiled binaries and watching what changed.</p>
+  <p class="lede">Turns out the hardware just trusts the compiler.</p>
+  <p>Every SASS instruction is 128 bits. Most of that is what to compute. Bits 105 to 125 are the compiler telling
+    the hardware how long to wait and what to wait for. I figured out the fields by editing them in compiled binaries
+    and seeing what broke.</p>
 
   <figure>
     <svg viewBox="0 0 620 170" id="bits" aria-label="Layout of a 128-bit SASS instruction"></svg>
@@ -138,17 +134,16 @@ footer { margin-top: 90px; font-size: 13.5px; color: var(--dim); border-top: 1px
       does.</figcaption>
   </figure>
 
-  <p>I assumed that if the stall count was too small the hardware would notice and wait anyway, the way a CPU
-    pipeline does. So I took a chain of dependent adds, where each needs the previous result, and lowered the
-    stall below its 4-cycle latency.</p>
-  <p><b>Wrong answers, 20 trials out of 20.</b> Exactly half the increments disappeared, because each instruction
-    read its register before the previous write landed. There's no safety net for fixed-latency instructions:
-    those 4 bits are the only thing keeping the result correct. One more oddity: a stall of 0 isn't "no wait". It's
-    correct but costs about 33 cycles, which is why code compiled with <code>-O0</code> looks so slow.</p>
+  <p>I figured if the stall count was too low the hardware would catch it and wait anyway, like a CPU does. So I
+    took a chain of adds where each one needs the last result and set the stall below 4 cycles.</p>
+  <p><b>Wrong answer 20 times out of 20.</b> Exactly half the adds just vanished, because each one read the register
+    before the previous write landed. There's no safety net. Those 4 bits are the only thing keeping your math right.
+    Also weird: a stall of 0 doesn't mean "don't wait". It's correct but costs about 33 cycles, which is why
+    <code>-O0</code> code is so slow.</p>
 
   <h3>How long everything takes</h3>
-  <p>With a trustworthy runner (it checks the disassembly of the timed loop before spending any GPU time), the rest
-    was patient measurement. Memory latency spans more than an order of magnitude:</p>
+  <p>After that it was a lot of measuring. The runner checks the disassembly of every timed loop before it runs, so
+    I'm not accidentally timing something the compiler rewrote. Memory latency, for example:</p>
   <figure>
     <svg viewBox="0 0 620 200" id="mem" aria-label="Load latency by memory level"></svg>
     <figcaption>Load latency in cycles at about 1.97 GHz. DRAM bandwidth saturates at roughly <b>715 GB/s</b>. The
@@ -157,10 +152,9 @@ footer { margin-top: 90px; font-size: 13.5px; color: var(--dim); border-top: 1px
   </figure>
 
   <h3>A ceiling that turned out to be the compiler's fault</h3>
-  <p>Ampere is supposed to run 32-bit float and integer instructions side by side. In my measurements a mix of
-    float FMAs and integer shifts never got close, and for a while I believed the hardware just couldn't. It
-    turned out to be the register file. It has two banks, each able to serve one read per cycle, and an FMA reads
-    three registers. <code>ptxas</code> had put the FMA's operands in the same bank.</p>
+  <p>Ampere is supposed to run float and integer math at the same time. My float + integer mix never came close,
+    and for a while I thought the hardware just couldn't. It was the register file. There are two banks, each does
+    one read per cycle, and an FMA reads three registers. <code>ptxas</code> had put them in the same bank.</p>
   <figure>
     <svg viewBox="0 0 620 200" id="banks" aria-label="Register bank conflict"></svg>
     <figcaption>Left: two of the FMA's reads land in bank 0, so fetching operands takes two cycles. Right: moving
@@ -168,19 +162,16 @@ footer { margin-top: 90px; font-size: 13.5px; color: var(--dim); border-top: 1px
       register numbers change. On a 50/50 FMA and shift mix this made the kernel <b>1.48&times;</b> faster than
       <code>ptxas</code>.</figcaption>
   </figure>
-  <div class="learned"><b>What I took from Part I:</b> the documented model of the GPU is missing rules that
-    decide performance, and you can find them by breaking things on purpose.</div>
 </section>
 
 <section class="part" id="compiler">
   <div class="part-label">Part II</div>
   <h2>Beating the compiler, once</h2>
-  <p class="lede">Most of the time <code>ptxas</code> is right. I found one thing it doesn't model.</p>
-  <p>Memory reaches the SM in 32-byte sectors. In some quantized matrix-vector kernels, <code>ptxas</code> schedules
-    two loads that each need half of the same sector far apart, and by the time the second one runs the sector has
-    to be fetched again. So I wrote <code>3080lab optimize</code>. It reads the load addresses in the SASS
-    symbolically, finds these split pairs, moves the late half next to its partner, regenerates every control bit,
-    checks for hazards, and compares the output bit for bit with the original.</p>
+  <p class="lede"><code>ptxas</code> is usually right. I found one thing it isn't.</p>
+  <p>Memory comes in 32-byte sectors. In some quantized matrix-vector kernels, <code>ptxas</code> puts two loads that
+    each need half of the same sector way apart, so by the second load the sector's gone and gets fetched again. So I
+    wrote <code>3080lab optimize</code>: it finds those pairs in the SASS, moves the second load up next to the
+    first, redoes all the control bits, checks for hazards, and makes sure the output is bit-identical.</p>
 
   <figure>
     <svg viewBox="0 0 620 250" id="sector" aria-label="Split sector loads before and after"></svg>
@@ -189,7 +180,7 @@ footer { margin-top: 90px; font-size: 13.5px; color: var(--dim); border-top: 1px
       together and it comes once. On a 7B model's gate+up GEMV this took the kernel from 94.3 to 62.7 &micro;s.</figcaption>
   </figure>
 
-  <p>One kernel isn't a result, so I froze the tool and ran it blind on 120 kernels it hadn't been built on:</p>
+  <p>One kernel doesn't mean much, so I froze the tool and ran it on 120 kernels it had never seen:</p>
   <div class="tw"><table>
     <tr><th>suite</th><th class="n">kernels</th><th class="n">speedup (geomean)</th><th class="n">wrong outputs</th></tr>
     <tr><td>A, used while building</td><td class="n">56</td><td class="n">1.036&times;</td><td class="n">0</td></tr>
@@ -197,24 +188,20 @@ footer { margin-top: 90px; font-size: 13.5px; color: var(--dim); border-top: 1px
     <tr><td>C, held out, high register pressure</td><td class="n">20</td><td class="n">1.055&times;</td><td class="n">0</td></tr>
   </table></div>
 
-  <p>Then I got ambitious and wrote a full instruction scheduler using the same rules, hoping to beat
-    <code>ptxas</code> everywhere. It reached <b>parity</b>, 1.003&times;, and stayed there. When I measured an
-    oracle that picks the best of three orderings for every kernel, it only reached 1.005&times;. There wasn't
-    much left to win. Along the way the hazard checker found a rule I'd missed (memory instructions need at least
-    4 cycles between issues), and a 1-cycle gap had quietly broken one test suite.</p>
-  <div class="learned"><b>What I took from Part II:</b> beating a mature compiler means finding the specific
-    thing it doesn't model, not doing its general job better.</div>
+  <p>Then I tried writing a whole instruction scheduler to beat <code>ptxas</code> everywhere. It tied, 1.003&times;,
+    and never got better. Even picking the best of three orderings for every kernel only gets 1.005&times;, so there
+    just isn't much there. It did catch a rule I'd missed (memory instructions need 4 cycles between them), which
+    had been silently breaking one test suite.</p>
 </section>
 
 <section class="part" id="llm">
   <div class="part-label">Part III</div>
   <h2>A real model, end to end</h2>
-  <p class="lede">Did any of it add up to something you'd notice?</p>
-  <p>I took Qwen2.5-1.5B and loaded <em>llama.cpp's own</em> Q4_0 weight file, repacked bit-exactly so both engines
-    read the same bytes. Then I wrote the engine around it: about 200 fused kernels captured in one CUDA graph, int4
-    matrix-vector kernels for one sequence, tensor-core kernels for batches, and int8 tensor-core prefill straight
-    from the 4-bit weights. On day one it was already 1.28&times; llama.cpp. The current numbers, against the
-    newest llama.cpp, in paired rounds with an identical-binary control:</p>
+  <p class="lede">Does any of this actually make tok/s go up?</p>
+  <p>I took Qwen2.5-1.5B and loaded <em>llama.cpp's own</em> Q4_0 file, so both engines read the exact same bytes,
+    and wrote an engine around it: about 200 fused kernels in one CUDA graph, int4 kernels for single-stream decode,
+    tensor cores for batches, int8 tensor cores for prefill. It was already 1.28&times; llama.cpp on day one. Here's
+    where it is now against the newest llama.cpp:</p>
 
   <figure>
     <svg viewBox="0 0 620 250" id="decode" aria-label="Decode throughput"></svg>
@@ -222,36 +209,34 @@ footer { margin-top: 90px; font-size: 13.5px; color: var(--dim); border-top: 1px
       medians of 6 paired rounds with rotated order. The A/A control agreed within 0.2%.</figcaption>
   </figure>
 
-  <p>At one sequence, a token takes 1.95 ms and spends 63% of the card's peak bandwidth reading 928 MB of weights;
-    most of the gain over llama.cpp comes from fewer, fused launches. The bigger gains with several sequences come
-    from reading each weight once for all of them on tensor cores. Outputs match a token-by-token reference, and
-    perplexity is within 0.1% of an fp16 path.</p>
-  <div class="aside"><span class="t">A detour that didn't pay</span>I also built a decode "megakernel": one
-    persistent kernel for the whole step, a producer warp streaming weights through shared memory and consumer
-    warps doing the math. It compiled cleanly, ran without timeouts, picked the wrong token, and was slower than
-    the CUDA graph anyway.</div>
+  <p>Single stream is <b>514 tok/s</b>. A token takes 1.95 ms, most of which is reading 928 MB of weights, and most of
+    the win over llama.cpp is just launching fewer, bigger kernels. With more sequences the win gets bigger because
+    each weight gets read once for all of them. Outputs match a token-by-token reference and perplexity is within
+    0.1% of fp16, so it's not fast because it's wrong.</p>
+  <div class="aside"><span class="t">RIP megakernel</span>I also tried one giant persistent kernel for the whole
+    decode step, with one warp streaming weights in while the others did math. It compiled, it ran, it picked the
+    wrong token, and it was slower than the CUDA graph anyway.</div>
 </section>
 
 <section class="part" id="search">
   <div class="part-label">Part IV</div>
   <h2>Model, or just search?</h2>
-  <p class="lede">If you can try every option, why model the hardware at all?</p>
-  <p>By November I had a runtime model with single-digit median error, and the question I kept coming back to
-    was whether it's actually <em>useful</em> for decisions. I wrote down the test, the split and what counts as
-    a win before fitting anything, then measured 771 decisions:</p>
+  <p class="lede">If you can just try everything, why bother modelling the hardware?</p>
+  <p>By November I had a model that predicts kernel runtime pretty well, and I wanted to know if it's actually
+    useful for making decisions. I wrote down the test and what counts as a win before fitting anything, then
+    measured 771 decisions:</p>
   <div class="tw"><table>
     <tr><th>decision</th><th class="n">best fixed rule</th><th class="n">model</th><th class="n">oracle</th></tr>
     <tr><td>launch structure (fusion, CUDA graphs)</td><td class="n">1.159&times;</td><td class="n"><b>1.229&times;</b></td><td class="n">1.231&times;</td></tr>
     <tr><td>reordering SASS instructions</td><td class="n">1.000&times;</td><td class="n">1.0007&times;</td><td class="n">1.005&times;</td></tr>
   </table></div>
-  <p>Choosing how to launch work, the model is within 0.2% of perfect. Reordering instructions, even perfect
-    knowledge only buys 0.5%.</p>
+  <p>For how to launch work, the model is basically perfect (within 0.2%). For reordering instructions there's
+    only 0.5% to win in the first place, so it doesn't matter.</p>
 
   <h3>Against autotuning</h3>
-  <p>Autotuning just times candidates and keeps the fastest. In small spaces (4 to 21 candidates) the model was
-    no better than a rule of thumb plus a couple of measurements. The interesting case was the prefill GEMM, which
-    has 212 valid tile shapes. On four layers of Llama-3-8B, a model the cost model had never seen, I timed every
-    tile and checked every output:</p>
+  <p>Autotuning is just timing options and keeping the fastest. When there are only 4 to 21 options, the model
+    didn't beat a rule of thumb plus a couple of tries. The prefill GEMM is different: it has 212 tile shapes. On
+    four Llama-3-8B layers (which the model had never seen) I timed every single one:</p>
 
   <figure>
     <svg viewBox="0 0 620 270" id="regret" aria-label="Regret against measurements"></svg>
@@ -260,44 +245,41 @@ footer { margin-top: 90px; font-size: 13.5px; color: var(--dim); border-top: 1px
       random measurements still leave you 7% off.</figcaption>
   </figure>
 
-  <div class="pending"><b>Running as I write this.</b> Four layers isn't enough to believe in. The proper test is
-    on the GPU now: 32 workloads from Qwen2.5-7B, Gemma-2-9B, Phi-3-mini and Qwen2.5-14B at two prompt lengths, all
-    212 tiles each, checked against an fp32 reference, and the model racing Optuna's TPE autotuner from 0 to 64
-    measurements. The bar, written down before the first timing: reach within 5% of the best with <b>4&times;
-    fewer measurements than TPE</b>. The result goes here whichever way it lands.</div>
-  <div class="learned"><b>What I took from Part IV:</b> a hardware model earns its keep when the space is too big
-    to search, not when it's small enough to just try everything.</div>
+  <div class="pending"><b>Running right now.</b> Four layers isn't enough to trust, so there's a bigger test on the GPU:
+    32 workloads from Qwen2.5-7B, Gemma-2-9B, Phi-3-mini and Qwen2.5-14B, all 212 tiles each, model vs Optuna's TPE
+    autotuner. The bar I set before running it: get within 5% of the best tile with <b>4&times; fewer
+    measurements than TPE</b>. Whatever it says goes here.</div>
 </section>
 
 <section class="part" id="misses">
   <div class="part-label">Part V</div>
   <h2>What didn't work</h2>
-  <p>This list is longer than the list of wins. I think it's the most honest part of the project.</p>
+  <p>Longer list than the wins, ngl.</p>
   <ul class="miss">
     <li><b>A general SASS scheduler.</b> Parity with <code>ptxas</code>, never better. Joint register allocation plus scheduling, and software pipelining, didn't help either.</li>
     <li><b>Letting the model decide when to rewrite.</b> No better than always rewriting, and only 5 of 9 right calls under register pressure.</li>
     <li><b>The decode megakernel.</b> Wrong token, slower than the graph.</li>
     <li><b>Ranking close GEMM tiles.</b> In blind tests the model got single trends right (occupancy 15 of 16), but picking between two good tiles was close to a coin flip (0.57).</li>
-    <li><b>A correctness check that couldn't fail.</b> My test activations weren't validly quantized, so every output was NaN and the comparison meant nothing. I caught it, rebuilt the check around the production quantizer, and every tile passed.</li>
-    <li><b>Selling the 3090.</b> 24 GB of VRAM, gone. See the prologue.</li>
+    <li><b>A correctness check that couldn't fail.</b> My test inputs weren't quantized properly, so every output was NaN and the check was meaningless. Fixed it, reran it, everything passed.</li>
+    <li><b>Selling the 3090.</b> tbh this was really dumb even though I got a lot of money for it.</li>
   </ul>
 </section>
 
 <section class="part" id="method">
   <div class="part-label">Epilogue</div>
-  <h2>Trying not to fool myself</h2>
-  <p>A GPU is a noisy instrument, and it's easy to see a 2% win that isn't there. The habits that stuck:</p>
-  <p><b>Measure the noise first.</b> Time two identical binaries against each other. Anything smaller than that gap
-    isn't a result. <b>Interleave everything.</b> Never run all of A, then all of B; heat and clocks drift.
-    <b>Write the rule down before the number exists,</b> and if it has to change, say when and why.
-    <b>Check outputs, not just times,</b> because a fast wrong kernel is the easiest win to believe.</p>
-  <p>All of this is one RTX 3080. None of the hardware rules have been checked on another card, and the SASS
-    rewrites are tested, not proven equivalent (the <a href="https://github.com/lblommesteyn/3080lab/blob/master/docs/verification.md">verification
+  <h2>How I tried not to lie to myself</h2>
+  <p>GPU timings are noisy and it's really easy to see a 2% win that isn't real. Stuff I ended up always doing:</p>
+  <p>Time two identical binaries against each other first, and anything smaller than that gap doesn't count.
+    Alternate A and B instead of running all of A then all of B, because the card heats up. Write down what counts
+    as a win before running anything. And check the outputs, because a fast kernel that's wrong is the easiest
+    "win" to fall for.</p>
+  <p>All of this is one 3080. I haven't checked any of it on another card, and the SASS rewrites are tested, not
+    proven correct (the <a href="https://github.com/lblommesteyn/3080lab/blob/master/docs/verification.md">verification
     notes</a> list the gaps). The code, the raw data and the day-by-day notebook are all on
     <a href="https://github.com/lblommesteyn/3080lab">GitHub</a>.</p>
 </section>
 
-<footer>Luke Blommesteyn, November 2026. Built with a lot of help from Claude. Thanks for reading.</footer>
+<footer>Luke Blommesteyn, November 2026. Made with a lot of help from Claude.</footer>
 </main>
 </div>
 
