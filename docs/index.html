@@ -270,9 +270,8 @@ footer { margin-top: 90px; font-size: 13.5px; color: var(--dim); border-top: 1px
   <h2>How I tried not to lie to myself</h2>
   <p>GPU timings are noisy and it's really easy to see a 2% win that isn't real. Stuff I ended up always doing:</p>
   <p>Time two identical binaries against each other first, and anything smaller than that gap doesn't count.
-    Alternate A and B instead of running all of A then all of B, because the card heats up. Write down what counts
-    as a win before running anything. And check the outputs, because a fast kernel that's wrong is the easiest
-    "win" to fall for.</p>
+    Alternate A and B instead of running all of A then all of B, because the card heats up. Commit the rules for a test before running it, so I can't move the goalposts later.
+    And check the outputs too, since a fast kernel that gives the wrong answer is useless.</p>
   <p>All of this is one 3080. I haven't checked any of it on another card, and the SASS rewrites are tested, not
     proven correct (the <a href="https://github.com/lblommesteyn/3080lab/blob/master/docs/verification.md">verification
     notes</a> list the gaps). The code, the raw data and the day-by-day notebook are all on
