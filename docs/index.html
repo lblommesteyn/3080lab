@@ -61,8 +61,8 @@ th { font-weight: 600; color: var(--dim); font-size: 12.5px; text-transform: upp
 td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tw { overflow-x: auto; }
 
-.aside { border-left: 3px solid var(--y); background: var(--y2); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 24px 0; font-size: 15px; }
-.aside .t { font: 500 11px "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--y); display: block; margin-bottom: 2px; }
+.aside { color: var(--dim); font-size: 15px; margin: 22px 0; }
+.aside .t { font-weight: 600; color: var(--fg); }
 .learned { border-top: 1px dashed var(--line); margin-top: 30px; padding-top: 14px; font-size: 15px; color: var(--dim); }
 .learned b { color: var(--fg); }
 .pending { border: 1.5px dashed var(--y); border-radius: 10px; padding: 16px 18px; margin: 26px 0; font-size: 15px; }
@@ -213,7 +213,7 @@ footer { margin-top: 90px; font-size: 13.5px; color: var(--dim); border-top: 1px
     the win over llama.cpp is just launching fewer, bigger kernels. With more sequences the win gets bigger because
     each weight gets read once for all of them. Outputs match a token-by-token reference and perplexity is within
     0.1% of fp16, so it's not fast because it's wrong.</p>
-  <div class="aside"><span class="t">RIP megakernel</span>I also tried one giant persistent kernel for the whole
+  <div class="aside"><span class="t">RIP megakernel.</span> I also tried one giant persistent kernel for the whole
     decode step, with one warp streaming weights in while the others did math. It compiled, it ran, it picked the
     wrong token, and it was slower than the CUDA graph anyway.</div>
 </section>
