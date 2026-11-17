@@ -1,0 +1,84 @@
+32 workloads; candidates per workload 212-212; correctness failures 0
+A/A (twin / default, median of rounds): median |log ratio| 1.30%, max 10.50%; best-tile round spread median 1.0701
+
+geomean regret over workloads [95% bootstrap]
+  k=0  default        1.2703 [1.2263, 1.3198]
+  k=0  max_occupancy  1.2823 [1.2480, 1.3184]
+  k=0  model_top1     1.0472 [1.0280, 1.0707]
+  k=1   model 1.0472 [1.028,1.071]  tpe 1.3542 [1.337,1.373]  seeded_tpe 1.0472 [1.028,1.071]  random 1.3873 [1.370,1.406]
+  k=2   model 1.0472 [1.029,1.070]  tpe 1.2430 [1.226,1.261]  seeded_tpe 1.0471 [1.029,1.070]  random 1.2629 [1.248,1.279]
+  k=4   model 1.0453 [1.028,1.067]  tpe 1.1679 [1.155,1.182]  seeded_tpe 1.0453 [1.028,1.066]  random 1.1789 [1.166,1.194]
+  k=8   model 1.0392 [1.025,1.056]  tpe 1.1190 [1.106,1.133]  seeded_tpe 1.0416 [1.026,1.060]  random 1.1231 [1.112,1.136]
+  k=16  model 1.0165 [1.011,1.023]  tpe 1.0782 [1.068,1.090]  seeded_tpe 1.0367 [1.024,1.051]  random 1.0863 [1.077,1.097]
+  k=32  model 1.0125 [1.009,1.018]  tpe 1.0557 [1.047,1.066]  seeded_tpe 1.0304 [1.020,1.042]  random 1.0616 [1.053,1.071]
+  k=64  model 1.0119 [1.009,1.016]  tpe 1.0347 [1.028,1.042]  seeded_tpe 1.0246 [1.017,1.033]  random 1.0427 [1.036,1.050]
+
+measurements to within 5% of best (geomean over workloads; censored at 64 counted as 128)
+  model         2.44  (censor=65:   2.40; censored runs  2.3%)
+  tpe          22.57  (censor=65:  19.46; censored runs 21.9%)
+  seeded_tpe    3.37  (censor=65:   3.12; censored runs 11.4%)
+  random       27.06  (censor=65:  22.29; censored runs 28.6%)
+
+PRIMARY  E = m5(TPE) / m5(model-ranked) = 9.26  95% CI [5.96, 14.09]  -> SUPPORTED
+  secondary m5(random) / m5(model) = 11.10 [7.21, 16.82]
+  secondary m5(tpe) / m5(seeded_tpe) = 6.69 [3.78, 11.46]
+  secondary m5(random) / m5(tpe) = 1.20 [1.11, 1.29]
+
+E by group (TPE / model)
+  qwen2.5-7b   n= 8  E  14.29   m5 model  1.78  tpe 25.45
+  qkv          n= 8  E  10.10   m5 model  2.14  tpe 21.63
+  P256         n=16  E   6.61   m5 model  2.47  tpe 16.33
+  P1024        n=16  E  12.97   m5 model  2.40  tpe 31.18
+  o            n= 8  E   5.12   m5 model  4.29  tpe 21.94
+  gu           n= 8  E   6.93   m5 model  2.74  tpe 18.98
+  down         n= 8  E  20.53   m5 model  1.40  tpe 28.79
+  gemma-2-9b   n= 8  E   8.20   m5 model  2.15  tpe 17.67
+  phi-3-mini   n= 8  E   7.05   m5 model  3.31  tpe 23.37
+  qwen2.5-14b  n= 8  E   8.90   m5 model  2.77  tpe 24.70
+
+smallest budget with geomean regret <= 1.05
+  model       1
+  tpe         64
+  seeded_tpe  1
+  random      64
+
+wall-clock to within 5% (median over workloads of the per-workload median run, seconds)
+  model       measurements+builds    1.63 s
+  tpe         measurements+builds   26.07 s
+  seeded_tpe  measurements+builds    1.63 s
+  random      measurements+builds   27.56 s
+  model overhead: build+predict all candidates 229.8 s per workload alone, 114.1 s amortized over 32 workloads; TPE sampler 11.49 s per run
+
+per workload: n, best us, model k0 regret, model rank of best, tiles within 5%, spearman, m5 model / tpe / seeded / random, regret@4 model / tpe
+  qwen2.5-7b/qkv/P256        212     111.6  1.122   22   5 +0.63    7.8  45.2  47.7  25.1  1.054 1.164
+  qwen2.5-7b/qkv/P1024       212     367.2  1.029   13   3 +0.71    1.0  45.9   1.0  41.6  1.029 1.206
+  qwen2.5-7b/o/P256          212      84.9  1.037   12   8 +0.70    1.0  12.0   1.0  16.7  1.017 1.133
+  qwen2.5-7b/o/P1024         212     290.3  1.148   12   3 +0.67   13.0  33.4  45.0  41.7  1.154 1.205
+  qwen2.5-7b/gu/P256         212     781.3  1.000   86  15 +0.70    1.0   7.4   1.0  10.1  1.000 1.111
+  qwen2.5-7b/gu/P1024        212    2942.8  1.004   12   3 +0.69    1.0  34.8   1.0  42.1  1.004 1.174
+  qwen2.5-7b/down/P256       212     387.1  1.009   50  11 +0.80    1.0  10.2   1.0  14.1  1.028 1.151
+  qwen2.5-7b/down/P1024      212    1307.7  1.000    1   1 +0.83    1.0  79.6   1.0  77.8  1.000 1.246
+  gemma-2-9b/qkv/P256        212     166.4  1.046   12   3 +0.69    1.0  33.5   1.0  39.3  1.064 1.162
+  gemma-2-9b/qkv/P1024       212     693.2  1.005   86  17 +0.71    1.0   7.1   1.0   8.7  1.009 1.114
+  gemma-2-9b/o/P256          212      95.6  1.010   12  12 +0.71    1.0   9.6   1.0  10.9  1.014 1.117
+  gemma-2-9b/o/P1024         212     335.1  1.061   52   6 +0.69   24.8  15.4  33.0  24.1  1.068 1.146
+  gemma-2-9b/gu/P256         212     587.1  1.036   12  10 +0.70    1.0  11.8   1.0  15.1  1.036 1.138
+  gemma-2-9b/gu/P1024        212    2201.8  1.059   12   2 +0.68   18.8  42.5  34.8  62.1  1.067 1.189
+  gemma-2-9b/down/P256       212     295.9  1.008    4  12 +0.79    1.0   8.4   1.0  13.1  1.012 1.130
+  gemma-2-9b/down/P1024      212    1007.5  1.000    1   1 +0.83    1.0  64.0   1.0  77.1  1.000 1.237
+  phi-3-mini/qkv/P256        212     174.2  1.128    8   9 +0.62    5.0  11.3  14.0  15.9  1.151 1.151
+  phi-3-mini/qkv/P1024       212     653.7  1.034   19   7 +0.64    1.0  21.4   1.0  21.0  1.034 1.147
+  phi-3-mini/o/P256          212      63.2  1.000    1   9 +0.73    1.0  10.7   1.0  14.0  1.000 1.162
+  phi-3-mini/o/P1024         212     218.0  1.281   12   3 +0.66   17.1  39.3  56.4  49.9  1.208 1.178
+  phi-3-mini/gu/P256         212     287.8  1.074   12   7 +0.61   14.1  16.7  26.7  20.3  1.081 1.183
+  phi-3-mini/gu/P1024        212    1098.8  1.071   12   1 +0.66   12.0  57.3  34.4  81.8  1.073 1.190
+  phi-3-mini/down/P256       212     135.6  1.000    1   5 +0.74    1.0  23.9   1.0  26.5  1.000 1.242
+  phi-3-mini/down/P1024      212     538.7  1.000    1   3 +0.79    1.0  38.3   1.0  43.7  1.000 1.160
+  qwen2.5-14b/qkv/P256       212     220.4  1.087   37  11 +0.72   11.3  20.1  15.3  15.1  1.059 1.127
+  qwen2.5-14b/qkv/P1024      212     814.5  1.000    1   8 +0.76    1.0  20.1   1.0  21.5  1.029 1.138
+  qwen2.5-14b/o/P256         212     154.6  1.122   23   3 +0.67   20.6  48.1  65.9  44.2  1.089 1.190
+  qwen2.5-14b/o/P1024        212     580.1  1.014   12   2 +0.74    1.0  44.5   1.0  53.3  1.014 1.158
+  qwen2.5-14b/gu/P256        212     754.1  1.000    1   8 +0.70    1.0  12.1   1.0  18.6  1.000 1.152
+  qwen2.5-14b/gu/P1024       212    3035.6  1.005   12  10 +0.74    1.0  11.2   1.0  15.2  1.007 1.146
+  qwen2.5-14b/down/P256      212     375.0  1.183   25   2 +0.77   15.0  34.5  43.2  52.9  1.195 1.261
+  qwen2.5-14b/down/P1024     212    1441.3  1.000    1   3 +0.86    1.0  34.2   1.0  46.5  1.000 1.186

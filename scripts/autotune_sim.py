@@ -314,7 +314,7 @@ def plots():
     lab = {"model": "copy-cap model ranked", "seeded_tpe": "model-seeded TPE", "tpe": "Optuna TPE", "random": "random"}
     fig, ax = plt.subplots(figsize=(7, 4.2))
     for st in ("random", "tpe", "seeded_tpe", "model"):
-        ys = [gm([res[s][st]["regret"][k] for s in shapes]) for k in BUDGETS]
+        ys = [gm([res[s][st]["regret"][str(k)] for s in shapes]) for k in BUDGETS]
         ax.plot(BUDGETS, ys, marker="o", ms=4, lw=2, color=col[st], label=lab[st])
     for k0, mk in (("model_top1", "*"), ("max_occupancy", "s"), ("default", "D")):
         ax.scatter([0.7], [gm([res[s]["k0"][k0] for s in shapes])], marker=mk, s=50, color="#333",
