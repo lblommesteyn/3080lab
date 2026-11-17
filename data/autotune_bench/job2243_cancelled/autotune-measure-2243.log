@@ -1,0 +1,40 @@
+compiled 1/212
+compiled 51/212
+compiled 101/212
+compiled 151/212
+compiled 201/212
+compiled all in 88 s
+checked qwen2.5-7b/qkv/P256: 212 / 212 candidates pass
+checked qwen2.5-7b/qkv/P1024: 212 / 212 candidates pass
+checked qwen2.5-7b/o/P256: 212 / 212 candidates pass
+checked qwen2.5-7b/o/P1024: 212 / 212 candidates pass
+checked qwen2.5-7b/gu/P256: 212 / 212 candidates pass
+checked qwen2.5-7b/gu/P1024: 212 / 212 candidates pass
+checked qwen2.5-7b/down/P256: 212 / 212 candidates pass
+checked qwen2.5-7b/down/P1024: 212 / 212 candidates pass
+checked gemma-2-9b/qkv/P256: 212 / 212 candidates pass
+checked gemma-2-9b/qkv/P1024: 212 / 212 candidates pass
+checked gemma-2-9b/o/P256: 212 / 212 candidates pass
+checked gemma-2-9b/o/P1024: 212 / 212 candidates pass
+checked gemma-2-9b/gu/P256: 212 / 212 candidates pass
+checked gemma-2-9b/gu/P1024: 212 / 212 candidates pass
+checked gemma-2-9b/down/P256: 212 / 212 candidates pass
+checked gemma-2-9b/down/P1024: 212 / 212 candidates pass
+checked phi-3-mini/qkv/P256: 212 / 212 candidates pass
+checked phi-3-mini/qkv/P1024: 212 / 212 candidates pass
+checked phi-3-mini/o/P256: 212 / 212 candidates pass
+checked phi-3-mini/o/P1024: 212 / 212 candidates pass
+checked phi-3-mini/gu/P256: 212 / 212 candidates pass
+checked phi-3-mini/gu/P1024: 212 / 212 candidates pass
+checked phi-3-mini/down/P256: 212 / 212 candidates pass
+checked phi-3-mini/down/P1024: 212 / 212 candidates pass
+checked qwen2.5-14b/qkv/P256: 212 / 212 candidates pass
+checked qwen2.5-14b/qkv/P1024: 212 / 212 candidates pass
+checked qwen2.5-14b/o/P256: 212 / 212 candidates pass
+checked qwen2.5-14b/o/P1024: 212 / 212 candidates pass
+checked qwen2.5-14b/gu/P256: 212 / 212 candidates pass
+checked qwen2.5-14b/gu/P1024: 212 / 212 candidates pass
+checked qwen2.5-14b/down/P256: 212 / 212 candidates pass
+checked qwen2.5-14b/down/P1024: 212 / 212 candidates pass
+round 0: 0/6816 (3 s)
+slurmstepd-lukespc: error: *** JOB 2243 ON lukespc CANCELLED AT 2026-11-16T18:50:02 ***
